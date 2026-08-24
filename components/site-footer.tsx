@@ -82,6 +82,17 @@ export function SiteFooter() {
         </div>
 
         <div className="mt-10 pt-6 border-t border-line text-center">
+          <nav className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 mb-3">
+            <Link href="/privacy-policy" className="text-xs text-muted hover:text-purple-700 transition-colors">
+              Privacy Policy
+            </Link>
+            <Link href="/terms-of-use" className="text-xs text-muted hover:text-purple-700 transition-colors">
+              Terms of Use
+            </Link>
+            <Link href="/contact" className="text-xs text-muted hover:text-purple-700 transition-colors">
+              Contact
+            </Link>
+          </nav>
           <p className="text-xs text-muted">
             © {new Date().getFullYear()} Created by Women Human Rights Defenders Hub (The Hub). All rights reserved.
           </p>

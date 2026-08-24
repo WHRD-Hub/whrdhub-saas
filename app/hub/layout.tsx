@@ -20,6 +20,7 @@ export default async function HubLayout({ children }: { children: React.ReactNod
     { label: "Overview", href: "/hub", icon: "overview" },
     { label: "Posts", href: "/hub/posts", icon: "posts", badge: postsPending || undefined },
     { label: "Stories", href: "/hub/blogs", icon: "blogs", badge: blogsPending || undefined },
+    { label: "Resources", href: "/hub/resources", icon: "resources" },
     { label: "CBOs", href: "/hub/organizations", icon: "organisations", badge: orgsPending || undefined },
     { label: "Members", href: "/hub/members", icon: "members" },
   ];

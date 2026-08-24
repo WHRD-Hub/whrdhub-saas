@@ -16,9 +16,27 @@ function kindOf(file: File): MediaItem["type"] {
   return "document";
 }
 
-/** Drag-and-drop uploader that stores files in the `media` bucket under the
- *  user's own folder and returns public URLs. */
-export function MediaUploader({ value, onChange }: { value: MediaItem[]; onChange: (v: MediaItem[]) => void }) {
+/**
+ * Drag-and-drop uploader. By default files go to the `media` bucket under the
+ * user's own folder (member posts and stories). Pass `bucket="publications"`
+ * with a `folder` to store Hub documents instead — see supabase/012_publications_bucket.sql.
+ */
+export function MediaUploader({
+  value,
+  onChange,
+  bucket = "media",
+  folder,
+  accept = "image/*,video/*,.pdf,.doc,.docx,.ppt,.pptx",
+  maxMb = 50,
+}: {
+  value: MediaItem[];
+  onChange: (v: MediaItem[]) => void;
+  bucket?: string;
+  /** Path prefix inside the bucket. Defaults to the signed-in user's id. */
+  folder?: string;
+  accept?: string;
+  maxMb?: number;
+}) {
   const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -33,12 +51,12 @@ export function MediaUploader({ value, onChange }: { value: MediaItem[]; onChang
 
     const added: MediaItem[] = [];
     for (const file of Array.from(files)) {
-      if (file.size > 50 * 1024 * 1024) { setError(`${file.name} is larger than 50 MB.`); continue; }
+      if (file.size > maxMb * 1024 * 1024) { setError(`${file.name} is larger than ${maxMb} MB.`); continue; }
       const safe = file.name.replace(/[^a-zA-Z0-9.\-_]/g, "_");
-      const path = `${user.id}/${Date.now()}-${safe}`;
-      const { error: upErr } = await supabase.storage.from("media").upload(path, file, { upsert: false });
+      const path = `${folder ?? user.id}/${Date.now()}-${safe}`;
+      const { error: upErr } = await supabase.storage.from(bucket).upload(path, file, { upsert: false });
       if (upErr) { setError(upErr.message); continue; }
-      const { data: pub } = supabase.storage.from("media").getPublicUrl(path);
+      const { data: pub } = supabase.storage.from(bucket).getPublicUrl(path);
       added.push({ type: kindOf(file), url: pub.publicUrl, name: file.name });
     }
     onChange([...value, ...added]);
@@ -54,7 +72,7 @@ export function MediaUploader({ value, onChange }: { value: MediaItem[]; onChang
         onClick={() => inputRef.current?.click()}
         className={`rounded-xl border-2 border-dashed p-5 text-center cursor-pointer transition-colors ${dragging ? "border-purple bg-purple-050" : "border-line hover:border-purple/40 hover:bg-purple-050/40"}`}
       >
-        <input ref={inputRef} type="file" multiple accept="image/*,video/*,.pdf,.doc,.docx,.ppt,.pptx" className="hidden"
+        <input ref={inputRef} type="file" multiple accept={accept} className="hidden"
           onChange={(e) => { if (e.target.files?.length) upload(e.target.files); e.target.value = ""; }} />
         {uploading ? (
           <p className="text-sm text-muted flex items-center justify-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Uploading…</p>

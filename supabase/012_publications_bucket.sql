@@ -10,22 +10,16 @@
 -- (documents/... and covers/...) rather than per-user, so a document survives
 -- the admin who uploaded it leaving the team.
 
+-- No allowed_mime_types restriction on purpose: browsers report an empty or
+-- generic content type for some files (notably PDFs picked on Windows), and a
+-- MIME allow-list rejects those uploads with an error that is hard to read.
+-- The admin form restricts what can be chosen; storage stays permissive.
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-values (
-  'publications', 'publications', true, 104857600,  -- 100 MB per file
-  array[
-    'application/pdf',
-    'image/png','image/jpeg','image/jpg','image/webp','image/gif',
-    'application/msword',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    'application/vnd.ms-powerpoint',
-    'application/vnd.openxmlformats-officedocument.presentationml.presentation'
-  ]
-)
+values ('publications', 'publications', true, 104857600, null)  -- 100 MB per file
 on conflict (id) do update
   set public = true,
       file_size_limit = 104857600,
-      allowed_mime_types = excluded.allowed_mime_types;
+      allowed_mime_types = null;
 
 -- Anyone can read: the Resources and Newsletter pages are public.
 drop policy if exists "publications public read" on storage.objects;

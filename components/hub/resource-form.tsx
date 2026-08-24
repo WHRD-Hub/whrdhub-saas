@@ -7,6 +7,7 @@ import { ArrowLeft, Loader2, Save, Trash2, Download, Mail, FileText, ShieldCheck
 import { Input, Label, Textarea } from "@/components/ui/field";
 import { MediaUploader, type MediaItem } from "@/components/composer/media-uploader";
 import { RESOURCE_KINDS, type ResourceItem } from "@/lib/resource-types";
+import { StorageCheck } from "@/components/hub/storage-check";
 import { createResource, updateResource, deleteResource } from "@/app/actions/resources";
 import { cn } from "@/lib/utils";
 
@@ -255,6 +256,7 @@ export function ResourceForm({ item }: { item?: ResourceItem }) {
             the original site goes away.
           </span>
         </p>
+        <StorageCheck bucket="publications" />
         <div>
           <Label>Cover image</Label>
           <p className="text-xs text-muted mb-2">

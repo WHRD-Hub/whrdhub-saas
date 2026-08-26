@@ -171,7 +171,13 @@ export default function PrivacyPolicyPage() {
           <li>be informed about how your data is used;</li>
           <li>access the personal data we hold about you;</li>
           <li>correct data that is inaccurate or incomplete;</li>
-          <li>ask us to delete your data;</li>
+          <li>
+            ask us to delete your data &mdash; step-by-step instructions are on our{" "}
+            <Link href="/data#deletion" className="text-purple-700 font-semibold hover:underline">
+              data use and deletion page
+            </Link>
+            ;
+          </li>
           <li>object to or restrict certain processing;</li>
           <li>receive a copy of your data in a portable format;</li>
           <li>withdraw consent at any time, without affecting processing already carried out.</li>

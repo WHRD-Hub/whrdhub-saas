@@ -89,6 +89,9 @@ export function SiteFooter() {
             <Link href="/terms-of-use" className="text-xs text-muted hover:text-purple-700 transition-colors">
               Terms of Use
             </Link>
+            <Link href="/data" className="text-xs text-muted hover:text-purple-700 transition-colors">
+              Data Use &amp; Deletion
+            </Link>
             <Link href="/contact" className="text-xs text-muted hover:text-purple-700 transition-colors">
               Contact
             </Link>

@@ -7,13 +7,27 @@ import { computePairings, type MentorshipRow } from "@/lib/mentorship";
 import { revalidatePath } from "next/cache";
 
 /**
- * Recomputes femtorship pairings across all onboarded defenders and stores the
- * suggestions. Hub-only. Uses the service-role client because a single member
- * cannot (and should not) read everyone else's questionnaire under RLS.
+ * Recompute femtorship pairings across every onboarded defender.
+ *
+ * Femtorship matching does not wait on anyone's approval. It runs whenever a
+ * member saves their answers, so a new femtee is paired within seconds rather
+ * than whenever an administrator next remembers to press a button. The Hub can
+ * still run it by hand — after a batch of new members, say — and watches the
+ * result at /hub/femtorship, but it is an observer here, not a gatekeeper.
+ *
+ * The service-role client is used because no single member can, or should, read
+ * everyone else's questionnaire under RLS.
+ *
+ * `trigger` distinguishes the automatic run from a deliberate one; the
+ * automatic path is silent about permissions because it has none to check.
  */
-export async function recomputeAllMatches() {
-  const user = await getCurrentUser();
-  if (!user?.profile?.is_hub_admin) return { error: "Only the Hub can run matching." };
+export async function recomputeAllMatches(
+  trigger: "manual" | "auto" = "manual",
+): Promise<{ ok?: boolean; error?: string; count?: number }> {
+  if (trigger === "manual") {
+    const user = await getCurrentUser();
+    if (!user) return { error: "Please sign in." };
+  }
 
   const admin = createAdminClient();
   const { data: rows, error } = await admin
@@ -56,6 +70,7 @@ export async function recomputeAllMatches() {
   }
 
   revalidatePath("/hub");
+  revalidatePath("/hub/femtorship");
   revalidatePath("/mentorship");
   revalidatePath("/dashboard");
   return { ok: true, count: pairings.length };

@@ -1,9 +1,14 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist } from "next/font/google";
+
 import "./globals.css";
 import { AccessibilityWidget } from "@/components/accessibility-widget";
 import { SignInPrompt } from "@/components/signin-prompt";
 import { GuestReactionSync } from "@/components/guest-reaction-sync";
+import { Providers } from "./providers";
+import { ServiceWorkerRegistrar } from "@/components/pwa/service-worker-registrar";
+import { OfflineSyncManager } from "@/components/pwa/offline-sync-manager";
+import { InstallPrompt } from "@/components/pwa/install-prompt";
 import { SITE_URL, SITE_NAME, SITE_TAGLINE, SITE_DESCRIPTION } from "@/lib/seo";
 
 const geistSans = Geist({
@@ -26,7 +31,9 @@ export const metadata: Metadata = {
     "WHRD Hub", "women human rights defenders", "Kenya", "femtorship", "mentorship",
     "gender", "human rights", "TFGBV", "advocacy", "community",
   ],
-  icons: { icon: LOGO, shortcut: LOGO, apple: LOGO },
+  manifest: "/manifest.webmanifest",
+  appleWebApp: { capable: true, statusBarStyle: "default", title: SITE_NAME },
+  icons: { icon: LOGO, shortcut: LOGO, apple: "/apple-touch-icon.png" },
   alternates: { canonical: "/" },
   openGraph: {
     type: "website",
@@ -49,16 +56,26 @@ export const metadata: Metadata = {
   },
 };
 
+export const viewport: Viewport = {
+  themeColor: "#734E9E",
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" className={`${geistSans.variable} h-full`}>
       <body className="min-h-full">
-        {children}
+        <Providers>{children}</Providers>
         <AccessibilityWidget />
         <SignInPrompt />
         <GuestReactionSync />
+        <ServiceWorkerRegistrar />
+        <OfflineSyncManager />
+        <InstallPrompt />
       </body>
     </html>
   );

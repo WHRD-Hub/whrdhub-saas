@@ -1,34 +1,52 @@
-import { Sparkles } from "lucide-react";
+import { Suspense } from "react";
 import { SiteHeader } from "@/components/site-header";
-import { ImmersiveFeed } from "@/components/feed/immersive-feed";
+import { FeedClient } from "@/components/feed/feed-client";
 import { getFeed } from "@/lib/feed";
 import { getCurrentUser } from "@/lib/current-user";
+import { createClient } from "@/lib/supabase/server";
 import { HUB_VIDEOS } from "@/lib/videos";
 import { pageMeta } from "@/lib/seo";
 
 export const metadata = pageMeta({
   title: "Community Feed",
-  description: "Verified updates, stories, and video from women human rights defenders and the Hub.",
+  description:
+    "Verified updates, stories, and video from women human rights defenders and the Hub.",
   path: "/feed",
 });
 
 export default async function FeedPage() {
   const user = await getCurrentUser();
-  const feed = await getFeed(30, user?.id);
+  const supabase = await createClient();
+
+  const [feed, { data: counties }] = await Promise.all([
+    getFeed(30, user?.id),
+    supabase
+      .from("county_networks")
+      .select("name, slug")
+      .eq("is_active", true)
+      .order("name"),
+  ]);
+
+  // Writing to the feed is a member's act: an approved place in a county
+  // network's organisation, or Hub staff. Everyone else can read and support.
+  // The database enforces the same rule; this only decides what the UI offers.
+  const canPost = !!user && !user.isDeleted && user.canPost;
 
   return (
     <div className="min-h-screen bg-paper">
       <SiteHeader />
-      <div className="border-b border-line bg-surface">
-        <div className="max-w-xl mx-auto px-4 sm:px-0 py-5 text-center">
-          <p className="text-xs font-bold uppercase tracking-[0.14em] text-purple-700 flex items-center justify-center gap-1.5">
-            <Sparkles className="w-4 h-4" /> Community feed
-          </p>
-          <h1 className="mt-1 text-2xl font-black text-ink">From the movement</h1>
-          <p className="text-sm text-muted">Double-tap a post to support it.</p>
-        </div>
-      </div>
-      <ImmersiveFeed feed={feed} videos={HUB_VIDEOS} signedIn={!!user} />
+      <Suspense fallback={null}>
+        <FeedClient
+          feed={feed}
+          videos={HUB_VIDEOS}
+          signedIn={!!user}
+          isHubAdmin={!!user?.profile?.is_hub_admin}
+          canPost={canPost}
+          userName={user?.profile?.full_name ?? user?.profile?.username ?? null}
+          avatarUrl={user?.profile?.avatar_url}
+          counties={(counties ?? []) as { name: string; slug: string }[]}
+        />
+      </Suspense>
     </div>
   );
 }

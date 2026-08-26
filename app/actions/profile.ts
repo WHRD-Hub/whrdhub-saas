@@ -3,6 +3,9 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
+import { deleteOwnContent as softDeleteOwnContent } from "@/app/actions/lifecycle";
+import { deleteMyAccount } from "@/app/actions/account";
+import { recomputeAllMatches } from "@/app/actions/mentorship";
 
 async function requireUser() {
   const supabase = await createClient();
@@ -69,38 +72,37 @@ export async function saveFemtorship(input: {
     { onConflict: "user_id" },
   );
   if (error) return { error: error.message };
-  revalidatePath("/mentorship");
-  return { ok: true };
-}
 
-export async function deleteOwnContent(kind: "post" | "blog", id: string) {
-  const user = await requireUser();
-  if (!user) return { error: "Please sign in." };
-  const supabase = await createClient();
-  const table = kind === "post" ? "posts" : "blogs";
-  // RLS already restricts delete to the author; scope by author_id as well.
-  const { error } = await supabase.from(table).delete().eq("id", id).eq("author_id", user.id);
-  if (error) return { error: error.message };
-  revalidatePath("/profile");
-  revalidatePath("/");
-  revalidatePath("/feed");
+  // Femtorship matching needs nobody's approval, so answering the questionnaire
+  // is what triggers it. A new femtee is paired within seconds instead of
+  // waiting for an administrator to run a batch. A failure here is not the
+  // member's problem: their answers are saved either way.
+  try {
+    await recomputeAllMatches("auto");
+  } catch {
+    /* matching is best effort */
+  }
+
+  revalidatePath("/mentorship");
+  revalidatePath("/hub/femtorship");
   return { ok: true };
 }
 
 /**
- * Delete the signed-out... signed-IN user's own account and all their content.
- * Uses the service role to remove the auth user; app rows cascade via FKs.
+ * Kept as thin aliases so existing callers keep working.
+ *
+ * Deleting your own content is a SOFT delete now: it leaves the feed, stays in
+ * your own view marked "Deleted", and the Hub retains it. Account deletion no
+ * longer destroys the auth user or the content either - the person disappears
+ * from every member-facing surface and the Hub keeps the record.
+ *
+ * The real implementations live in app/actions/lifecycle.ts and
+ * app/actions/account.ts.
  */
+export async function deleteOwnContent(kind: "post" | "blog", id: string) {
+  return softDeleteOwnContent(kind, id);
+}
+
 export async function deleteAccount() {
-  const user = await requireUser();
-  if (!user) return { error: "Please sign in." };
-  const admin = createAdminClient();
-  // Remove content the user authored first (FKs set author_id null otherwise).
-  await admin.from("posts").delete().eq("author_id", user.id);
-  await admin.from("blogs").delete().eq("author_id", user.id);
-  await admin.from("mentorship_profiles").delete().eq("user_id", user.id);
-  await admin.from("org_memberships").delete().eq("user_id", user.id);
-  const { error } = await admin.auth.admin.deleteUser(user.id);
-  if (error) return { error: error.message };
-  return { ok: true };
+  return deleteMyAccount();
 }

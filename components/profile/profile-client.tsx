@@ -8,8 +8,8 @@ import { Input, Label, Textarea } from "@/components/ui/field";
 import { cn } from "@/lib/utils";
 import { CONTENT_STATUS_META } from "@/lib/data";
 import { Pill } from "@/components/ui/pill";
-import { createClient } from "@/lib/supabase/client";
-import { updateProfile, deleteOwnContent, deleteAccount } from "@/app/actions/profile";
+import { updateProfile } from "@/app/actions/profile";
+import { deleteOwnContent } from "@/app/actions/lifecycle";
 import { FemtorshipForm } from "@/components/femtorship/femtorship-form";
 import { AccessibilityControls } from "@/components/accessibility-controls";
 import { RoleSwitcher } from "@/components/dashboard/role-switcher";
@@ -144,10 +144,11 @@ function ActivitySection({ posts, blogs, reacted }: { posts: Content[]; blogs: C
   const [busy, setBusy] = useState<string | null>(null);
 
   const del = async (kind: "post" | "blog", id: string) => {
-    if (!confirm("Delete this permanently?")) return;
+    if (!confirm(`Delete this ${kind === "blog" ? "story" : "post"}?`)) return;
     setBusy(id);
     await deleteOwnContent(kind, id);
-    setBusy(null); router.refresh();
+    setBusy(null);
+    router.refresh();
   };
 
   const tabs = [
@@ -224,19 +225,6 @@ function ActivitySection({ posts, blogs, reacted }: { posts: Content[]; blogs: C
 }
 
 function PrivacySection() {
-  const router = useRouter();
-  const [confirming, setConfirming] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const remove = async () => {
-    setLoading(true); setError(null);
-    const res = await deleteAccount();
-    if (res?.error) { setError(res.error); setLoading(false); return; }
-    await createClient().auth.signOut();
-    router.push("/"); router.refresh();
-  };
-
   return (
     <>
       <Card title="Your data" desc="You are in control of your information.">
@@ -246,23 +234,16 @@ function PrivacySection() {
         </div>
       </Card>
 
-      <Card title="Delete account" desc="This permanently removes your Hub account, posts, stories, and femtorship profile. It cannot be undone.">
-        {!confirming ? (
-          <button onClick={() => setConfirming(true)} className="inline-flex items-center gap-2 rounded-xl border border-rose-300 text-rose-700 px-5 h-11 text-sm font-bold hover:bg-rose-50">
-            <Trash2 className="w-4 h-4" /> Delete my account
-          </button>
-        ) : (
-          <div className="rounded-xl border border-rose-200 bg-rose-50 p-4">
-            <p className="text-sm font-semibold text-rose-800">Are you absolutely sure? This is permanent.</p>
-            {error && <p className="text-sm text-rose-700 mt-2">{error}</p>}
-            <div className="mt-3 flex gap-2">
-              <button onClick={remove} disabled={loading} className="inline-flex items-center gap-2 rounded-xl bg-rose-600 text-white px-4 h-10 text-sm font-bold">
-                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Yes, delete everything"}
-              </button>
-              <button onClick={() => setConfirming(false)} className="rounded-xl border border-line px-4 h-10 text-sm font-semibold">Cancel</button>
-            </div>
-          </div>
-        )}
+      <Card
+        title="Delete account"
+        desc="Close your Hub account. Your profile and everything you have posted leaves the site."
+      >
+        <Link
+          href="/dashboard/account"
+          className="inline-flex h-11 items-center gap-2 rounded-xl border border-rose-300 px-5 text-sm font-bold text-rose-700 hover:bg-rose-50"
+        >
+          <Trash2 className="h-4 w-4" /> Go to account settings
+        </Link>
       </Card>
     </>
   );

@@ -1,0 +1,549 @@
+# Merging the reporting platform into the SaaS platform
+
+The WHRD Hub reporting platform (the `whrdhub` repo) now lives inside this app.
+Both already shared one Supabase project; this merge makes them share one
+codebase, one session, one navigation and one design system.
+
+Branch: `feat/merge-reporting-platform`.
+
+---
+
+## What moved where
+
+| Was (reporting platform) | Is now |
+| --- | --- |
+| `/report`, `/report/success` | same paths, public, no account needed |
+| `/dashboard` (reporter home) | `/dashboard/reports` |
+| `/dashboard/reports/[id]` | same path, inside the member shell |
+| `/admin` | `/hub/reporting` |
+| `/admin/reports`, `/admin/reports/[id]` | `/hub/reporting/reports[...]` |
+| `/admin/services` | `/hub/reporting/services` |
+| `/admin/analytics` | `/hub/reporting/analytics` |
+| `/admin/linkages` | `/hub/reporting/linkages` |
+| `/admin/listening` | `/hub/reporting/listening` |
+| `/map` | `/hub/reporting/map` |
+| `/api/ussd`, `/api/ussd/events` | unchanged |
+| `/api/meta/webhook`, `/api/chat`, `/chat` | unchanged |
+| `/auth/confirm` | unchanged; `/auth/login` → `/login` |
+| `components/admin/*` | `components/reporting/admin/*` |
+| `app/actions/submit-report.ts` | `app/actions/report-submit.ts` |
+| `app/actions/admin-actions.ts` | `app/actions/reporting-admin.ts` |
+
+Update the Africa's Talking USSD callback URL and the Meta webhook callback URL
+to this app's domain. The paths themselves have not changed.
+
+## Navigation
+
+* **Landing / public nav** — the old "Reporting ⇄" switch is a magenta
+  **Report Abuse** button pointing at `/report`, matching how the reporting
+  platform's own entry point behaves.
+* **Member sidebar** — *My Reports* is a real in-app page. *Report Abuse* in
+  the sidebar footer is an internal link.
+* **Hub sidebar** — items are grouped under **Community** and **Reporting**
+  headings. The reporting console is a section of the main nav, not a link out.
+
+## Roles and access
+
+Two role systems existed: `profiles.user_type` (`reporter` | `defender` |
+`admin`) from the reporting platform, and `profiles.is_hub_admin` from the Hub.
+`lib/reporting-access.ts` is now the single decision point:
+
+* **administer** — `is_hub_admin` OR `user_type = 'admin'`. Verify reports,
+  assign services, manage the service directory, run online listening.
+* **triage** — the above plus `user_type = 'defender'`. Open cases, change
+  status, see the map.
+
+`/hub` is split into two route groups (URLs unchanged):
+
+* `app/hub/(community)/` — requires `is_hub_admin`; a triage-only defender is
+  redirected to the reporting console.
+* `app/hub/reporting/` — requires triage. The per-page `user_type !== 'admin'`
+  checks the old code carried have been removed in favour of this layout.
+
+Migration `013` mirrors all of this in RLS. **Before it, a Hub admin whose
+`user_type` was still `reporter` could open the reporting console and see an
+empty list** — the UI let them in, the database returned nothing.
+
+## Anonymous reporters
+
+The report form creates credentialed-but-anonymous accounts
+(`is_anonymous = true`, `user_type = 'reporter'`, `hub_onboarded = false`).
+The Hub's member layout forces anyone without `hub_onboarded` into community
+onboarding, which would have dropped a survivor who had just filed a report
+into a "choose your county network and CBO" wizard.
+
+`getCurrentUser()` now returns `isReporterOnly`. Those accounts skip Hub
+onboarding, land on `/dashboard/reports`, and get a reports-only sidebar. They
+can still become full members later by completing onboarding.
+
+## Database
+
+> Superseded. Everything below was folded into the single
+> **`supabase/install.sql`** described in part two. The historical file is kept
+> in `supabase/legacy/` and does not need to be run.
+
+Migration `013` was the one that:
+
+1. Ensures both profile shapes exist on the one `profiles` table.
+2. Adds `can_administer_reports()` / `can_triage_reports()` and rewrites the
+   reporting RLS policies against them.
+3. Reconciles `notifications`. **Both apps ran `create table if not exists
+   public.notifications` with different columns** — the Hub's (`read`, `title`,
+   `body`, `link`) and the reporting platform's (`is_read`, `report_id`,
+   `service_name`). Whichever migration ran first won. `013` makes the table
+   satisfy both, keeps `read` and `is_read` in step with a trigger, relaxes the
+   `title NOT NULL` constraint that would have rejected the reporting triggers'
+   inserts, and gives report notifications a title and link so they appear in
+   the Hub notifications view.
+4. Extends `hub_overview()` with reporting counters.
+5. Promotes existing reporting admins to `is_hub_admin` and marks staff as
+   onboarded.
+
+The reporting platform's own historical migrations are kept in
+`supabase/legacy/reporting/`.
+
+## Environment
+
+Add to `.env.local` (all optional — each feature degrades quietly if unset):
+
+```
+AT_USERNAME=            # Africa's Talking, for USSD confirmation SMS
+AT_API_KEY=
+OPENROUTER_API_KEY=     # resource assistant chat
+OPENROUTER_MODEL=       # defaults to openai/gpt-4o-mini
+META_APP_SECRET=        # online listening
+META_PAGE_ID=
+META_PAGE_ACCESS_TOKEN=
+META_VERIFY_TOKEN=
+```
+
+`NEXT_PUBLIC_REPORTING_URL` is no longer used for navigation and can be removed
+once the old deployment is retired.
+
+## Deliberate deviations from a straight copy
+
+* **No new npm packages.** `sonner` was replaced by
+  `components/ui/toast.tsx`, and Radix's Dialog / Select / Sheet by plain
+  components. Leaflet is loaded from the CDN at runtime by `lib/leaflet.ts`
+  (its stylesheet already was). **If you would rather bundle it, run
+  `npm i leaflet @types/leaflet` and change `loadLeaflet()` back to
+  `import("leaflet")` — the returned shape is identical.**
+* **Styling.** Ported markup was mechanically rewritten from shadcn's semantic
+  tokens onto the Hub's brand tokens (`primary` → `purple`, `border` → `line`,
+  `muted-foreground` → `muted`, and so on), and the page chrome was rebuilt
+  around `DashboardShell`. `components/ui/badge.tsx` maps shadcn's Badge
+  variants onto the Hub palette; `components/ui/button.tsx` gained `asChild`
+  and shadcn's variant/size names so ported files needed no edits.
+* **`next-themes`** was dropped — the Hub is light-only.
+
+## Fixes made along the way
+
+* **Quick exit now works.** The report page has always said "press Esc twice to
+  leave immediately"; nothing listened for it. `components/reporting/quick-exit.tsx`
+  implements it, and uses `location.replace` so the Back button does not return
+  to the form.
+* **The proxy would have blocked anonymous reporting.** `/report`, `/offline`,
+  the machine-called API routes and the PWA files are now explicitly public in
+  `lib/supabase/proxy.ts`.
+* **`removeService` had no permission check.** It does now.
+* **The chat transcript could be wiped.** Its persist effect fired with an empty
+  list before the load effect had run, briefly writing `[]` over saved history.
+  Both effects are gone; the transcript is read with `useSyncExternalStore`.
+* **Language selection no longer flashes English.** `lib/i18n/language-store.ts`
+  exposes the preference as an external store instead of a mount effect.
+
+## Known follow-ups
+
+* `npm i leaflet @types/leaflet` and un-CDN the map (see above).
+* The reporting platform's own `/onboarding` (role choice + terms) was not
+  ported; the Hub's onboarding is the single flow. If you still need the
+  reporting terms acceptance, `lib/i18n/terms.ts` was carried over and holds
+  the copy in English and Kiswahili.
+* `profiles.onboarding_completed` (reporting) and `profiles.hub_onboarded`
+  (Hub) both survive. Only `hub_onboarded` drives redirects now; the older
+  column is left in place rather than dropped.
+* ESLint reports 20 pre-existing errors from React Compiler rules in
+  `rich-editor`, `rich-text`, `accessibility-controls`, `dashboard-shell`,
+  `use-reaction` and `post-composer-modal`. The merge adds none — that count is
+  identical on `main`.
+
+---
+
+# Part two: community lifecycle
+
+The merge above put the two products in one app. This part makes the joins
+between them actually work: an account that starts on the reporting side can
+become a full member, content can be taken down without being destroyed, and
+the Hub keeps a record of everything.
+
+## The journeys, end to end
+
+**Report anonymously.** `/report` is public — the middleware allows it
+explicitly. Submitting creates a credentialed but anonymous auth user (a
+generated username, a placeholder `@whrdhub.local` address that can never
+receive mail) and signs the reporter straight in. They land on
+`/dashboard/reports` with a reports-only sidebar, never the member onboarding
+wizard.
+
+**Report with an account.** Same form, no account creation; the report attaches
+to the signed-in user.
+
+**Claim an anonymous account.** `/dashboard/account` → *Secure this account*.
+Adds a real address and optionally a password to the **same** auth user, so
+every report already filed comes with it. Nothing is migrated because nothing
+moves. Sets `profiles.claimed_at` and clears `is_anonymous`.
+
+**Join a network.** From `/organizations` (*Ask to join*, with a note to the
+admins) or through onboarding. Either way it creates a **pending** request, not
+a membership. Founding a new organisation still makes you its admin at once.
+
+**Network admins verify members.** `/dashboard/network`. Org admins see the
+requests for the organisations they administer; Hub admins see all of them.
+Requests coming from the reporting side are flagged, because those are the
+people an organisation is least likely to recognise on sight. Admins can also
+promote and demote.
+
+**Write to the feed and publish stories.** Any signed-in account can submit.
+Non-admin posts and stories go out as `pending` and reach the feed once a Hub
+admin approves them at `/hub/posts` and `/hub/blogs`. The author sees their own
+pending item in the feed with an "Awaiting review" banner.
+
+**Referral matching.** Verifying a report auto-assigns support services. The
+rule is county-aware: for each kind of support asked for, the reporter gets the
+services in their own county *and* the ones operating nationally, but not other
+counties' — unless that category has neither, in which case the nearest
+available service is assigned rather than answering with nothing. Each referral
+carries a note saying which of the three it was.
+
+## Deleting things
+
+**For the person, delete means delete.** Their post, story, comment or report
+leaves the feed and leaves their account. No banner, no "the Hub can still see
+this", no restore control — being told your delete only half worked is worse
+than not having the button.
+
+Underneath it is a soft delete, so the Hub keeps the record for safeguarding at
+`/hub/deleted`, `/hub/reporting/deleted` and `/hub/accounts`. That is a
+back-office fact and is deliberately never surfaced to the author.
+
+**Delete permanently** is the Hub's, from those views, behind a typed `DELETE`.
+It is the only thing in the system that destroys a row. Restoring is the Hub's
+too, for the obvious reason that the author can no longer see the item.
+
+Deleting your account soft-deletes your profile, posts, stories, comments **and
+reports**, closes your memberships, and signs you out. The auth user and the
+content stay, so the Hub can still answer a question about them later.
+
+### Why the delete runs through a database function
+
+Not a preference. PostgreSQL applies SELECT policies to the *updated* row, so
+an author-run `UPDATE ... SET deleted_at = now()` on a row whose SELECT policy
+hides deleted rows from the author is rejected: the write would move the row out
+of the writer's own visibility. `delete_own_content()` is `SECURITY DEFINER`
+and does the ownership check itself, which is what makes "gone from your
+account" possible at all.
+
+## Who can do what on the feed
+
+| | Read | Support | Comment | Post |
+| --- | --- | --- | --- | --- |
+| Signed out | yes | up to 3, held in the browser | no | no |
+| Signed in, no network | yes | yes | yes | no |
+| Network member | yes | yes | yes | yes, for review |
+| Hub admin | yes | yes | yes | yes, published |
+
+Supporting is deliberately open. A signed-out visitor can support three posts;
+those are kept in `localStorage` and written to their account the moment they
+sign in, so nothing they did is lost. The fourth attempt raises the sign-in
+prompt, whose wording depends on why it appeared. Commenting carries a name, so
+it needs an account. Posting is a member's act, enforced by
+`can_post_to_feed()` in the insert policy rather than merely hidden in the UI.
+
+## Referral matching
+
+Matching runs the moment a report is filed, not when someone gets round to
+verifying it. Somebody describing an immediate threat should not wait on
+fact-checking before the response team — and she herself — can see which
+shelter and which legal desk are the right ones.
+
+For each kind of support asked for she gets every service in her own county
+**and** every service that operates nationally: the local desk is reachable,
+the national body has reach, and withholding either helps nobody. Other
+counties' services are excluded, unless that category has neither a local nor a
+national service, in which case the nearest available one is assigned rather
+than answering with nothing. Each referral records which of the three it was.
+
+## Progressive web app
+
+The Hub is installable, and that matters more here than for most sites: the
+installed app is what lets someone write a report where there is no signal.
+
+* **Install prompt.** A banner on any page, riding Chromium's
+  `beforeinstallprompt`; on iOS Safari, which has no such event, it shows the
+  manual Add to Home Screen steps. Dismissing holds it back for 14 days.
+* **Offline outbox.** `lib/offline/outbox.ts`, an IndexedDB store holding two
+  kinds of thing: reports filed with no connection, and feed posts composed
+  offline. A queued post appears at the top of your own feed marked "Sending",
+  the way an unsent message does in a chat app, and goes out by itself when the
+  connection returns — Background Sync where the browser supports it, with the
+  `online` event, tab visibility and app load as reliable fallbacks.
+* **Media needs a connection**, so an offline post is text and the composer
+  says so rather than silently dropping a photo.
+* **The service worker caches nothing sensitive.** Static assets and an offline
+  fallback page only; navigations are network-first. No authenticated HTML and
+  no report content is ever persisted.
+
+## Database
+
+**One script.** `supabase/install.sql`. Paste it into the SQL editor of a
+Supabase project and the database is ready: extensions, 14 types, 20 tables
+with every index and constraint, 30 functions, 12 triggers, 65 RLS policies,
+4 storage buckets with their policies, grants, and the seed content that makes
+a fresh project look like a working product rather than an empty shell.
+
+It is idempotent, so the same file is also how you bring an existing project up
+to date. Nothing else to run, no order to remember.
+
+The old incremental migrations sit in `supabase/legacy/` for provenance only.
+The single script is verified to produce a schema identical to running that
+whole sequence — same 263 columns, 58 indexes, 73 constraints.
+
+After running it, make yourself an administrator:
+
+```sql
+update public.profiles set is_hub_admin = true
+where id = (select id from auth.users where email = 'you@example.com');
+```
+
+### Testing it
+
+```bash
+npm run db:test     # needs a local PostgreSQL 16, nothing else
+```
+
+Creates a throwaway database, applies `install.sql` **three times** to prove
+idempotency, then runs 66 assertions that sign in as six different users and
+check what each can actually see and do: report visibility per role, who may
+post, delete and purge, comments, membership approval, account deletion, and
+referral matching including its county preference.
+`supabase/tests/README.md` explains how to add one.
+
+
+## Bugs found and fixed in this pass
+
+* **A fresh project could not be created at all.** On an empty database
+  `006_dashboard_features.sql` aborted with `column "read" does not exist` —
+  the two `notifications` definitions colliding. Made order-independent.
+* **`013` could not be re-run.** It dropped the old policy names before
+  recreating but not its own, so a second run failed on "policy already
+  exists".
+* **A seed used `ON CONFLICT` against a partial unique index**, which Postgres
+  rejects unless the predicate is restated.
+* **Hub admins could not view report evidence.** The `report-screenshots`
+  storage policy still tested `profiles.user_type` directly.
+* **Onboarding added you to any CBO you picked**, with no approval step.
+* **`removeService` had no permission check.**
+* **The chat transcript could be wiped** by its persist effect firing before
+  its load effect.
+* **Matching ignored county**, so a Kitui reporter could be referred to a
+  Nakuru shelter while the Kitui desk sat unused.
+
+## Known follow-ups
+
+* `npm i leaflet @types/leaflet` and switch `loadLeaflet()` back to a bundled
+  `import("leaflet")`; the shape it returns is identical.
+* Comment replies are modelled (`post_comments.parent_id`) but the UI renders a
+  single flat level. Threading is a UI change only.
+* Offline posts are text. Queuing an attachment means holding the blob in
+  IndexedDB and uploading it at flush time — doable, but it changes the storage
+  budget on the device, so it is a deliberate next step rather than an
+  oversight.
+* `profiles.onboarding_completed` (reporting) and `profiles.hub_onboarded`
+  (Hub) both survive; only the latter drives redirects.
+
+---
+
+# Part three: networks, moderation and femtorship
+
+## A post belongs to a network
+
+A defender posts on behalf of her network, so the network is the author. Its
+name and its own mark head the card; she is credited underneath with her small
+avatar. That is how the movement presents itself, and it means a post does not
+stop making sense when one person moves on.
+
+`organizations.logo_url` holds the mark, and a network's admins set it from
+`/dashboard/network`. Without one the card falls back to the network's initials
+on a brand tint, which is legible rather than broken.
+
+Attribution is never lost: `FeedByline.person` carries the individual, which is
+what the Hub's moderation views read. A post from someone with no CBO yet is
+published as the Hub, because the Hub is the body that reviewed and approved it.
+
+The rule holds on the feed, the landing page cards, and the story page.
+
+## Moderation
+
+Two levels, deliberately separate, because they belong to different people.
+
+**Suspend** is a network admin's decision about one of their own members. It is
+local to that organisation, it is reversible by the same admin, and it stops the
+person posting — enforced by `can_post_to_feed()`, not merely hidden. A reason
+is required: the member sees exactly what it says, and so does the Hub, which is
+notified automatically because it is the only body that can escalate.
+
+**Ban** is the Hub's alone, from `/hub/moderation`. Account-wide: no posting,
+commenting, supporting, or filing a report while signed in. Every authenticated
+layout refuses the session and sends the person to `/account-suspended`.
+
+Three calls worth knowing about:
+
+* **A ban does not delete anything.** A moderation record that erased the
+  evidence would be worse than useless, and the content is what any later review
+  turns on.
+* **Anonymous reporting is untouched.** A ban blocks the signed-in report path;
+  the anonymous route goes through the service role and belongs to nobody yet.
+  `/account-suspended` links to `/report` for exactly this reason. Being barred
+  from the community is not a reason to be barred from help.
+* **A network admin cannot suspend a Hub admin**, and nobody can suspend
+  themselves.
+
+Lifting is symmetric and independent. Unbanning does not lift a network
+suspension, because the network's decision was never the Hub's to reverse.
+
+## Femtorship
+
+Writing a pairing has always been restricted — the RLS on
+`mentorship_matches` says only a Hub admin may — but there was no screen for
+it, so the only way anyone got paired was if a member happened to open their
+own page. `/hub/femtorship` is that screen: the mentor and mentee pools, the
+pairings and what people did with them. (Since the next section, matching also
+runs by itself; the Hub watches it rather than gating it.)
+
+It leads with the thing the Hub most needs to see: **people who asked for a
+femtor and have no suggestion at all**, which usually means nobody has offered
+support in the areas they need.
+
+Names appear there and nowhere else. A member sees a suggestion without an
+identity until both sides accept.
+
+## Database
+
+Still one script. `supabase/install.sql` gained:
+
+* `organizations.logo_url`
+* `org_memberships.status` extended with `suspended`, plus `suspended_at`,
+  `suspended_by`, `suspension_reason`
+* `profiles.banned_at`, `banned_by`, `ban_reason`
+* `suspend_member()`, `unsuspend_member()`, `ban_account()`, `unban_account()`
+* `is_banned()`, and `can_post_to_feed()` now refusing a banned account and a
+  suspended membership
+* RLS refusing a banned account from commenting, reacting and filing a
+  signed-in report
+
+`npm run db:test` covers all of it: 86 assertions now, including twenty on
+moderation alone — that a plain member cannot suspend, that a network admin
+cannot ban, that a banned account cannot act, that banning deletes nothing, and
+that lifting a ban does not lift a suspension.
+
+---
+
+# Data use, and matching in the open
+
+## A public data-use page
+
+`/data` is a public page — no session, no network, listed in the footer and in
+the middleware's allowlist — covering what the Hub collects, why, how long it
+keeps it, who it is shared with, and how to get it back or get rid of it.
+`/data#deletion` is the anchor: deleting your account from the app in four
+steps, or by writing to `data@whrdhub.org` with the subject *Delete my data*.
+It states plainly what deletion removes, and what it cannot remove — other
+people's posts that quote you, anonymous aggregates already published, records
+the law requires be kept, and backups, which are overwritten within thirty
+days.
+
+It also says, in the Hub's own words, that the Hub is a **data controller**
+under the Kenya Data Protection Act 2019 and answerable to the **ODPC**: the
+lawful bases it relies on (s.30), the data-subject rights it must honour, the
+72-hour breach-notification duty, and how to complain to the Commissioner if
+the Hub gets it wrong. The ODPC's contact details on the page are the real
+ones.
+
+One thing on that page is deliberately unfinished. The registered address and
+the ODPC registration number are placeholders with a note saying so: **do not
+publish a registration number you have not been granted.**
+
+The page exists partly because Facebook's app review asks for a public data-use
+and deletion URL. It reads as a page for the women who use the Hub, because
+that is who it is for.
+
+## Femtorship matching runs itself
+
+A woman who fills in her femtorship answers is paired within seconds.
+`recomputeAllMatches("auto")` runs from `saveProfile` and from onboarding, in a
+try/catch so a matcher failure can never cost her the answers she just typed.
+
+The Hub still has `/hub/femtorship`, but its job there changed: it watches. The
+button recomputes suggestions early — useful after a batch of new members,
+pointless otherwise — and the page now says so. The one thing on that screen
+that still needs a person is the amber panel: women who asked for a femtor and
+got nothing, which is a supply problem no button can solve.
+
+## Referrals have states now
+
+"Matched" was doing too much work. A referral sitting untouched for three days
+and one where both sides are actively talking looked identical in the console.
+`report_services` gained `match_status` (`proposed` → `provider_accepted` →
+`accepted`, or `declined` / `completed` / `cancelled`), `match_score`, separate
+`provider_responded_at` and `survivor_responded_at`, `declined_reason` and
+`cascade_level`.
+
+`respond_to_match(referral, decision, reason)` is how either side answers, and
+**the survivor's answer outranks the service's**. She can accept a proposal the
+service has not looked at yet and the referral is accepted — a service cannot
+mark itself as helping her, and she does not have to wait for it to notice her
+before she can say yes.
+
+She acts on this from her own report page: *Yes, connect me* / *Not this one*,
+with no confirmation dialogue, because a woman who has already decided should
+not have to decide twice.
+
+## The Hub can see it
+
+**`/hub/reporting/matching`** is the new screen:
+
+* counters straight from `matching_overview()` — awaiting response, service
+  accepted, both accepted, cases matched and unmatched;
+* an alert for **stale proposals**: anything open more than 24 hours with no
+  response from either side, because a silent referral is indistinguishable
+  from no referral;
+* every matched case with its referrals and their states, sorted so cases
+  waiting on somebody come first;
+* **a simulation.** The matcher is a database function, so the only way to see
+  what it does was to file a report and read a table afterwards. The simulation
+  steps a worked example through the pipeline — candidate pool, hard filters,
+  service relevance, proximity, urgency, load balancing, selection — showing
+  what each stage adds or takes away and why, then the state machine the
+  referral enters. Two scenarios: an urgent Nairobi case with local services,
+  and a Turkana case where almost nothing is local and the fallback carries it.
+  It touches no real data. It is built out of CSS and plain React: the graph
+  and animation libraries the reference implementation used are not
+  installable here, and the Hub ships no dependency it cannot audit.
+
+The reports list gained a **Matching** column and filter, so "show me
+everything matched that nobody has answered" is one dropdown.
+
+## Database
+
+Still one script. `supabase/install.sql` gained the `match_state` enum, the six
+new `report_services` columns, `respond_to_match()`, `notify_match_progress()`,
+`matching_overview()`, and a rewritten `rs_own_read` so a reporter can act on
+her own referrals rather than only read them. The seed walks ten referrals
+through the lifecycle so a fresh project shows a realistic spread rather than
+an empty console.
+
+`npm run db:test` is at 101 assertions. The new file, `50_match_states.sql`,
+asserts that a referral starts as proposed, that a stranger can neither see nor
+answer it, that the survivor's accept lands on `accepted` and is timestamped,
+that a decline keeps its reason, and that a deleted report drops out of the
+Hub's matching numbers.

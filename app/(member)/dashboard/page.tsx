@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { redirect } from "next/navigation";
 import Link from "next/link";
 import { PenLine, Building2, Heart, FileText, BookOpen, ShieldCheck, ArrowUpRight, AlertTriangle } from "lucide-react";
 import { getCurrentUser } from "@/lib/current-user";
@@ -6,11 +7,14 @@ import { createClient } from "@/lib/supabase/server";
 import { Pill } from "@/components/ui/pill";
 import { timeAgo } from "@/lib/utils";
 import { CONTENT_STATUS_META, VERIF_STATUS_META } from "@/lib/data";
-import { links } from "@/lib/site-nav";
 import { PostComposerModal } from "@/components/composer/post-composer-modal";
 
 export default async function DashboardPage() {
   const user = await getCurrentUser();
+  // Anonymous reporter accounts have no community profile — their dashboard is
+  // the reports list.
+  if (user?.isReporterOnly) redirect("/dashboard/reports");
+
   const supabase = await createClient();
   const uid = user!.id;
 
@@ -48,13 +52,13 @@ export default async function DashboardPage() {
           <PostComposerModal variant="card" isHub={!!user?.profile?.is_hub_admin} userName={name} avatarUrl={user?.profile?.avatar_url} />
         </Suspense>
 
-        <a href={links.reportingDashboard} className="block">
+        <Link href="/dashboard/reports" className="block">
           <div className="rounded-2xl bg-cyan-050 p-5 h-full hover:shadow-md transition-shadow">
             <div className="w-11 h-11 rounded-xl grid place-items-center bg-white text-cyan-700"><ShieldCheck className="w-5 h-5" /></div>
             <p className="mt-3 font-bold text-ink truncate">{reportsList.length} report{reportsList.length === 1 ? "" : "s"}</p>
-            <p className="text-xs text-ink/60">{actionedReports > 0 ? `${actionedReports} with updates` : "On the reporting platform"}</p>
+            <p className="text-xs text-ink/60">{actionedReports > 0 ? `${actionedReports} with updates` : "Private to you"}</p>
           </div>
-        </a>
+        </Link>
 
         <Link href="/mentorship" className="block">
           <div className="rounded-2xl bg-magenta-050 p-5 h-full hover:shadow-md transition-shadow">
@@ -78,11 +82,11 @@ export default async function DashboardPage() {
 
       {/* Reports banner */}
       {actionedReports > 0 && (
-        <a href={links.reportingDashboard} className="flex items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 mb-6 hover:shadow-sm">
+        <Link href="/dashboard/reports" className="flex items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 mb-6 hover:shadow-sm">
           <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
           <p className="text-sm text-amber-900 flex-1"><span className="font-bold">{actionedReports}</span> of your reports {actionedReports === 1 ? "has" : "have"} updates or assigned support.</p>
           <ArrowUpRight className="w-4 h-4 text-amber-700" />
-        </a>
+        </Link>
       )}
 
       {/* Submissions */}

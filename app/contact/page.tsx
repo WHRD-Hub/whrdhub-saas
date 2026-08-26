@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Mail, MapPin, ShieldAlert, Youtube } from "lucide-react";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
@@ -38,11 +39,11 @@ export default function ContactPage() {
           <h2 className="mt-4 font-bold text-ink">Where we work</h2>
           <p className="text-sm text-muted mt-1">Eight county networks across Kenya, anchored in Nairobi.</p>
         </div>
-        <a href={links.reportAbuse} target="_blank" className="rounded-2xl border border-line bg-magenta-050 p-6 hover:shadow-md transition-shadow">
+        <Link href={links.reportAbuse} className="rounded-2xl border border-line bg-magenta-050 p-6 hover:shadow-md transition-shadow">
           <div className="w-11 h-11 rounded-xl bg-magenta text-white flex items-center justify-center"><ShieldAlert className="w-5 h-5" /></div>
           <h2 className="mt-4 font-bold text-ink">Report abuse</h2>
-          <p className="text-sm text-muted mt-1">Securely report an incident on the reporting platform.</p>
-        </a>
+          <p className="text-sm text-muted mt-1">Securely report an incident. Anonymous, encrypted, confidential.</p>
+        </Link>
         <a href={HUB_CHANNEL_URL} target="_blank" className="rounded-2xl border border-line bg-surface p-6 hover:shadow-md transition-shadow">
           <div className="w-11 h-11 rounded-xl bg-[#FF0000]/10 text-[#FF0000] flex items-center justify-center"><Youtube className="w-5 h-5" /></div>
           <h2 className="mt-4 font-bold text-ink">Watch our work</h2>

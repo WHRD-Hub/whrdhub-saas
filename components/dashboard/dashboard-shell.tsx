@@ -7,6 +7,8 @@ import {
   LayoutGrid, FileText, MessageCircle, BookOpen, Calendar, Briefcase, Heart, User,
   ShieldCheck, Building2, Users, GitBranch, ChevronLeft, ChevronRight, Search, Bell,
   Megaphone, ClipboardCheck, Sparkles, LogOut, ChevronDown,
+  BarChart2, RadioTower, Map as MapIcon, LifeBuoy, Trash2, UserX, UserCog, Gavel,
+  Workflow,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
@@ -21,6 +23,10 @@ const ICONS = {
   resources: BookOpen, calendar: Calendar, services: Briefcase, femtorship: Heart,
   profile: User, verifications: ShieldCheck, organisations: Building2, members: Users,
   matching: GitBranch, reports: FileText, queue: ClipboardCheck, blogs: BookOpen,
+  // Reporting console
+  triage: ShieldCheck, analytics: BarChart2, listening: RadioTower, map: MapIcon,
+  support: LifeBuoy, linkages: GitBranch, matchflow: Workflow,
+  deleted: Trash2, accounts: UserX, account: UserCog, moderation: Gavel,
 } as const;
 
 export interface NavItem {
@@ -28,6 +34,12 @@ export interface NavItem {
   href: string;
   icon: keyof typeof ICONS;
   badge?: number;
+  /**
+   * Optional group heading. Consecutive items sharing a section are rendered
+   * under one label — this is how the reporting console appears as its own
+   * block in the Hub sidebar rather than a flat list of extra links.
+   */
+  section?: string;
 }
 
 export function DashboardShell({
@@ -58,7 +70,15 @@ export function DashboardShell({
   const [userMenu, setUserMenu] = useState(false);
 
   // Title in the top bar follows the active nav item.
-  const activeTitle = nav.find((n) => pathname === n.href || (n.href !== "/dashboard" && n.href !== "/hub" && pathname.startsWith(n.href)))?.label ?? title;
+  const isActive = (href: string) =>
+    pathname === href ||
+    (href !== "/dashboard" && href !== "/hub" && pathname.startsWith(href + "/"));
+
+  // The most specific match wins, so /hub/reporting/reports highlights Reports
+  // rather than the Reporting overview.
+  const activeTitle =
+    [...nav].sort((a, b) => b.href.length - a.href.length).find((n) => isActive(n.href))?.label ??
+    title;
 
   const signOut = async () => {
     await createClient().auth.signOut();
@@ -119,10 +139,20 @@ export function DashboardShell({
 
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-1">
-        {nav.map((item) => {
+        {nav.map((item, i) => {
           const Icon = ICONS[item.icon];
-          const active = pathname === item.href || (item.href !== "/dashboard" && item.href !== "/hub" && pathname.startsWith(item.href));
+          const active = isActive(item.href);
+          const startsSection = !!item.section && item.section !== nav[i - 1]?.section;
           return (
+            <div key={`${item.href}-wrap`}>
+            {startsSection && (
+              <p className={cn(
+                "px-3 pb-1 pt-4 text-[10px] font-bold uppercase tracking-[0.14em] text-muted",
+                collapsed && "sr-only",
+              )}>
+                {item.section}
+              </p>
+            )}
             <Link
               key={item.href}
               href={item.href}
@@ -139,6 +169,7 @@ export function DashboardShell({
                 <span className="ml-auto text-xs font-bold bg-magenta text-white rounded-full px-2 py-0.5">{item.badge}</span>
               ) : null}
             </Link>
+            </div>
           );
         })}
       </nav>
@@ -146,10 +177,10 @@ export function DashboardShell({
       {/* Footer: Report Abuse styled like a nav item. Extra bottom padding
           keeps it clear of the fixed accessibility button in the corner. */}
       <div className="px-3 pt-3 pb-24 border-t border-line">
-        <a href={links.reportAbuse} target="_blank" className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-ink/70 hover:bg-purple-050 hover:text-ink transition-colors">
+        <Link href={links.reportAbuse} className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-ink/70 hover:bg-purple-050 hover:text-ink transition-colors">
           <Megaphone className="w-5 h-5 shrink-0 text-magenta-700" />
           {!collapsed && "Report Abuse"}
-        </a>
+        </Link>
       </div>
     </div>
   );

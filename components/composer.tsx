@@ -9,6 +9,8 @@ import { cn } from "@/lib/utils";
 import { createPost, createBlog } from "@/app/actions/content";
 import { MediaUploader, type MediaItem } from "@/components/composer/media-uploader";
 import { RichText } from "@/components/editor/rich-text";
+import { enqueue, requestBackgroundSync } from "@/lib/offline/outbox";
+import { useOnline } from "@/lib/use-online";
 
 export function Composer({ isHub = false, onDone }: { isHub?: boolean; onDone?: () => void }) {
   const router = useRouter();
@@ -28,11 +30,39 @@ export function Composer({ isHub = false, onDone }: { isHub?: boolean; onDone?: 
   const [blogBody, setBlogBody] = useState("");
   const [cover, setCover] = useState<MediaItem[]>([]);
 
-  const [doneKind, setDoneKind] = useState<"published" | "review" | "draft">("review");
+  const [doneKind, setDoneKind] = useState<"published" | "review" | "draft" | "queued">("review");
+  const online = useOnline();
+
+  const clear = () => {
+    setBody(""); setMedia([]); setYoutube(""); setPin(false);
+    setTitle(""); setExcerpt(""); setBlogBody(""); setCover([]);
+  };
 
   const submit = async (asDraft = false) => {
     setLoading(true);
     setError(null);
+
+    // Offline: keep the post on the device and send it when the connection is
+    // back, the way a chat app does. Stories are long-form and usually have a
+    // cover image, so they are not queued — the draft is the right home for a
+    // story you cannot submit yet.
+    if (!online && tab === "post") {
+      try {
+        await enqueue("post", { body, pinned: isHub ? pin : undefined });
+        await requestBackgroundSync();
+        setLoading(false);
+        setDoneKind("queued");
+        setDone(true);
+        clear();
+        onDone?.();
+        return;
+      } catch {
+        setLoading(false);
+        setError("This device could not save your post offline. Please try again when you have a connection.");
+        return;
+      }
+    }
+
     const res =
       tab === "post"
         ? await createPost(body, media, isHub ? { pinned: pin, youtubeUrl: youtube || undefined } : {})
@@ -41,7 +71,7 @@ export function Composer({ isHub = false, onDone }: { isHub?: boolean; onDone?: 
     if (res?.error) { setError(res.error); return; }
     setDoneKind(isHub ? "published" : asDraft ? "draft" : "review");
     setDone(true);
-    setBody(""); setMedia([]); setYoutube(""); setPin(false); setTitle(""); setExcerpt(""); setBlogBody(""); setCover([]);
+    clear();
     router.refresh();
     onDone?.();
   };
@@ -60,11 +90,20 @@ export function Composer({ isHub = false, onDone }: { isHub?: boolean; onDone?: 
       </div>
 
       {done ? (
-        <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-4 text-sm text-emerald-800">
+        <div
+          className={cn(
+            "rounded-xl border p-4 text-sm",
+            doneKind === "queued"
+              ? "border-amber-200 bg-amber-50 text-amber-900"
+              : "border-emerald-200 bg-emerald-50 text-emerald-800",
+          )}
+        >
           {doneKind === "published"
             ? "Published. It is live on the feed now."
             : doneKind === "draft"
             ? "Saved as a draft. Find it under Profile → My Activity to keep editing or submit it."
+            : doneKind === "queued"
+            ? "Saved on this device. It will send itself as soon as you are back online — you can close the app."
             : "Sent to the Hub for review. You will see it on the feed once it is approved."}
         </div>
       ) : tab === "post" ? (
@@ -72,7 +111,14 @@ export function Composer({ isHub = false, onDone }: { isHub?: boolean; onDone?: 
           <textarea rows={4} value={body} onChange={(e) => setBody(e.target.value)}
             placeholder="Share an update from your work or community..."
             className="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-[15px] text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-purple/30 resize-y" />
-          <MediaUploader value={media} onChange={setMedia} />
+          {online ? (
+            <MediaUploader value={media} onChange={setMedia} />
+          ) : (
+            <p className="rounded-xl border border-dashed border-line bg-paper p-3 text-xs text-muted">
+              You are offline. Photos and files need a connection, so this post will go out
+              as text. It is saved here and sends itself when you reconnect.
+            </p>
+          )}
 
           {isHub && (
             <div className="rounded-xl border border-purple-050 bg-purple-050/40 p-3 space-y-3">
@@ -107,7 +153,13 @@ export function Composer({ isHub = false, onDone }: { isHub?: boolean; onDone?: 
       {!done && (
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
           <p className="text-xs text-muted">
-            {isHub ? "Posting as the Hub. Goes live immediately." : tab === "blog" ? "Save a draft, or submit for the Hub to review." : "Reviewed by the Hub before it goes public."}
+            {!online && tab === "post"
+              ? "Offline. Your post is saved here and sends itself when you reconnect."
+              : isHub
+                ? "Posting as the Hub. Goes live immediately."
+                : tab === "blog"
+                  ? "Save a draft, or submit for the Hub to review."
+                  : "Reviewed by the Hub before it goes public."}
           </p>
           <div className="flex items-center gap-2">
             {!isHub && tab === "blog" && (
@@ -116,7 +168,20 @@ export function Composer({ isHub = false, onDone }: { isHub?: boolean; onDone?: 
               </Button>
             )}
             <Button onClick={() => submit(false)} disabled={loading}>
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Send className="w-4 h-4" /> {isHub ? "Publish" : tab === "blog" ? "Submit for review" : "Submit"}</>}
+              {loading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <>
+                  <Send className="w-4 h-4" />{" "}
+                  {!online && tab === "post"
+                    ? "Save and send later"
+                    : isHub
+                      ? "Publish"
+                      : tab === "blog"
+                        ? "Submit for review"
+                        : "Submit"}
+                </>
+              )}
             </Button>
           </div>
         </div>

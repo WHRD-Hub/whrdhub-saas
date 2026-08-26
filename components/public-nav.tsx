@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import { ChevronDown, Menu, X, ArrowLeftRight, Sparkles } from "lucide-react";
+import { ChevronDown, Menu, X, Megaphone, Sparkles } from "lucide-react";
 import { NAV, links, type NavItem } from "@/lib/site-nav";
 import { cn } from "@/lib/utils";
 
@@ -76,13 +76,13 @@ export function PublicNav({ signedIn, isHubAdmin }: { signedIn: boolean; isHubAd
         </nav>
 
         <div className="hidden lg:flex items-center gap-2">
-          <a
-            href={links.reportingDashboard}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-line px-3 h-10 text-sm font-semibold text-ink/80 hover:bg-purple-050"
-            title="Switch to the reporting platform"
+          <Link
+            href={links.reportAbuse}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-magenta px-3 h-10 text-sm font-bold text-white hover:brightness-95 transition-[filter]"
+            title="Securely report an incident"
           >
-            <ArrowLeftRight className="w-4 h-4" /> Reporting
-          </a>
+            <Megaphone className="w-4 h-4" /> Report Abuse
+          </Link>
           {signedIn ? (
             <Link href={isHubAdmin ? "/hub" : "/dashboard"} className="inline-flex items-center rounded-xl bg-purple text-white px-4 h-10 text-sm font-bold hover:bg-purple-600">
               Dashboard
@@ -142,14 +142,17 @@ export function PublicNav({ signedIn, isHubAdmin }: { signedIn: boolean; isHubAd
               )}
             </nav>
             <div className="mt-4 pt-4 border-t border-line space-y-2">
+              <Link href={links.reportAbuse} onClick={() => setMobile(false)} className="flex items-center justify-center gap-1.5 rounded-xl bg-magenta text-white px-4 h-11 text-sm font-bold">
+                <Megaphone className="w-4 h-4" /> Report Abuse
+              </Link>
               {signedIn ? (
                 <>
                   <Link href={isHubAdmin ? "/hub" : "/dashboard"} onClick={() => setMobile(false)} className="block text-center rounded-xl bg-purple text-white px-4 h-11 leading-[2.75rem] text-sm font-bold">
                     Dashboard
                   </Link>
-                  <a href={links.reportingDashboard} className="block text-center rounded-xl border border-line px-4 h-11 leading-[2.75rem] text-sm font-semibold">
-                    Switch to reporting
-                  </a>
+                  <Link href={links.reportingDashboard} onClick={() => setMobile(false)} className="block text-center rounded-xl border border-line px-4 h-11 leading-[2.75rem] text-sm font-semibold">
+                    My reports
+                  </Link>
                 </>
               ) : (
                 <Link href="/login" onClick={() => setMobile(false)} className="block text-center rounded-xl bg-purple text-white px-4 h-11 leading-[2.75rem] text-sm font-bold">

@@ -5,6 +5,7 @@ import { ArrowLeft } from "lucide-react";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { Avatar } from "@/components/ui/field";
+import { NetworkAvatar } from "@/components/feed/network-avatar";
 import { BlogGallery } from "@/components/blog/blog-gallery";
 import { createClient } from "@/lib/supabase/server";
 import { pageMeta, SITE_DESCRIPTION } from "@/lib/seo";
@@ -34,15 +35,17 @@ export default async function BlogReader({
 
   const { data: blog } = await supabase
     .from("blogs")
-    .select("id, title, body, cover_image_url, gallery, is_hub, author_id, published_at, created_at, county_networks(name), organizations(name)")
+    .select("id, title, body, cover_image_url, gallery, is_hub, author_id, published_at, created_at, county_networks(name), organizations(name, logo_url)")
     .eq("slug", slug)
     .eq("status", "approved")
     .maybeSingle();
 
   if (!blog) notFound();
 
-  let authorName = blog.is_hub ? "WHRD Hub" : "WHRD member";
-  let authorTitle: string | null = blog.is_hub ? "National office" : null;
+  // The story is published by a network; the person who wrote it is credited
+  // under it. Same rule as the feed — see the FeedByline note in lib/feed.ts.
+  let authorName: string | null = null;
+  let authorTitle: string | null = null;
   let avatar: string | null = null;
   if (!blog.is_hub && blog.author_id) {
     const { data: p } = await supabase
@@ -51,11 +54,15 @@ export default async function BlogReader({
       .eq("id", blog.author_id)
       .maybeSingle();
     if (p) {
-      authorName = (p.full_name as string) || (p.username as string) || authorName;
+      authorName = (p.full_name as string) || (p.username as string) || "WHRD member";
       authorTitle = (p.title as string) ?? null;
       avatar = (p.avatar_url as string) ?? null;
     }
   }
+
+  const org = Array.isArray(blog.organizations)
+    ? blog.organizations[0]
+    : (blog.organizations as { name: string; logo_url?: string | null } | null);
 
   const county = Array.isArray(blog.county_networks)
     ? blog.county_networks[0]?.name
@@ -65,6 +72,11 @@ export default async function BlogReader({
     month: "long",
     year: "numeric",
   });
+
+  const networkName = blog.is_hub
+    ? "WHRD Hub"
+    : (org?.name ?? (county ? `WHRD Hub · ${county}` : "WHRD Hub"));
+  const networkLogo = blog.is_hub ? "/main-logo.png" : (org?.logo_url ?? (org ? null : "/main-logo.png"));
 
   return (
     <div className="min-h-screen">
@@ -77,12 +89,24 @@ export default async function BlogReader({
         <h1 className="mt-4 text-3xl sm:text-4xl font-black text-ink leading-tight">{blog.title}</h1>
 
         <div className="mt-5 flex items-center gap-3">
-          <Avatar name={authorName} src={avatar} size={44} />
+          <NetworkAvatar
+            name={networkName}
+            logoUrl={networkLogo}
+            isHub={blog.is_hub || !org}
+            size={44}
+          />
           <div className="text-sm">
-            <p className="font-semibold text-ink">{authorName}</p>
-            <p className="text-xs text-muted">
-              {[authorTitle, county].filter(Boolean).join(" · ")} {county || authorTitle ? "·" : ""} {date}
+            <p className="font-semibold text-ink">{networkName}</p>
+            <p className="mt-0.5 text-xs text-muted">
+              {[county, date].filter(Boolean).join(" · ")}
             </p>
+            {authorName && (
+              <p className="mt-1 flex items-center gap-1.5 text-xs text-muted">
+                <Avatar name={authorName} src={avatar} size={16} />
+                Written by <span className="font-semibold text-ink/80">{authorName}</span>
+                {authorTitle ? `, ${authorTitle}` : ""}
+              </p>
+            )}
           </div>
         </div>
 

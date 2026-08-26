@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { LayoutGrid, Sparkles, X } from "lucide-react";
-import { ImmersiveFeed } from "@/components/feed/immersive-feed";
+import { useRouter } from "next/navigation";
+import { FeedView } from "@/components/feed/feed-view";
 import { cn } from "@/lib/utils";
 import type { FeedItem } from "@/lib/feed";
 
@@ -39,9 +40,9 @@ function Segmented({ mode, setMode }: { mode: "site" | "feed"; setMode: (m: "sit
 }
 
 /**
- * TikTok-style stem tabs on the landing page. "Website" shows the official
- * marketing site (children); "Feed" takes over the whole screen with the
- * immersive community feed (double-tap to support, share).
+ * Stem tabs on the landing page. "Website" shows the marketing site
+ * (children); "Feed" takes over the screen with the community feed. Mobile
+ * only — on a large screen the feed has its own page.
  */
 export function LandingModeSwitcher({
   feed,
@@ -55,6 +56,7 @@ export function LandingModeSwitcher({
   children: React.ReactNode;
 }) {
   const [mode, setMode] = useState<"site" | "feed">("site");
+  const router = useRouter();
 
   useEffect(() => {
     document.body.style.overflow = mode === "feed" ? "hidden" : "";
@@ -88,7 +90,12 @@ export function LandingModeSwitcher({
               </button>
             </div>
           </div>
-          <ImmersiveFeed feed={feed} videos={videos} signedIn={signedIn} />
+          <FeedView
+            feed={feed}
+            videos={videos}
+            signedIn={signedIn}
+            onCompose={() => router.push(signedIn ? "/feed?compose=1" : "/login?next=/feed")}
+          />
         </div>
       )}
     </>

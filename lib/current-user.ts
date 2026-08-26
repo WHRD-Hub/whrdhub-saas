@@ -15,6 +15,8 @@ export interface HubProfile {
   is_anonymous: boolean | null;
   user_type: "reporter" | "defender" | "admin" | null;
   preferred_language: string | null;
+  account_deleted_at: string | null;
+  claimed_at: string | null;
 }
 
 export interface CurrentUser {
@@ -26,6 +28,10 @@ export interface CurrentUser {
    * through Hub member onboarding — their home is /dashboard/reports.
    */
   isReporterOnly: boolean;
+  /** The account was deleted. Every authenticated surface must refuse it. */
+  isDeleted: boolean;
+  /** Still on a generated username and an unreachable placeholder address. */
+  needsClaiming: boolean;
   profile: HubProfile | null;
   membership: {
     organization_id: string;
@@ -45,15 +51,16 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
   const { data: profile } = await supabase
     .from("profiles")
     .select(
-      "id, email, full_name, username, title, bio, avatar_url, is_hub_admin, hub_onboarded, county_network_id, is_anonymous, user_type, preferred_language",
+      "id, email, full_name, username, title, bio, avatar_url, is_hub_admin, hub_onboarded, county_network_id, is_anonymous, user_type, preferred_language, account_deleted_at, claimed_at",
     )
     .eq("id", user.id)
     .single();
 
   const { data: membership } = await supabase
     .from("org_memberships")
-    .select("organization_id, role, organizations(name, verification_status)")
+    .select("organization_id, role, status, organizations(name, verification_status)")
     .eq("user_id", user.id)
+    .eq("status", "approved")
     .limit(1)
     .maybeSingle();
 
@@ -64,6 +71,8 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
     email: user.email ?? null,
     isReporterOnly:
       !!p && !p.hub_onboarded && !p.is_hub_admin && (p.is_anonymous === true || p.user_type === "reporter"),
+    isDeleted: !!p?.account_deleted_at,
+    needsClaiming: !!p?.is_anonymous && !p.claimed_at,
     profile: p,
     membership: membership
       ? {

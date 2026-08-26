@@ -23,6 +23,8 @@ export default async function HubPosts({ searchParams }: { searchParams: Promise
   let query = supabase
     .from("posts")
     .select("id, author_id, body, image_urls, media, is_hub, pinned, status, created_at, county_networks(name)")
+    // Deleted posts live in /hub/deleted, not in the moderation list.
+    .is("deleted_at", null)
     .order("pinned", { ascending: false })
     .order("created_at", { ascending: false })
     .limit(100);
@@ -31,7 +33,11 @@ export default async function HubPosts({ searchParams }: { searchParams: Promise
 
   const counts: Record<string, number> = {};
   for (const s of ["pending", "approved", "rejected"]) {
-    const { count } = await supabase.from("posts").select("id", { count: "exact", head: true }).eq("status", s);
+    const { count } = await supabase
+      .from("posts")
+      .select("id", { count: "exact", head: true })
+      .eq("status", s)
+      .is("deleted_at", null);
     counts[s] = count ?? 0;
   }
 

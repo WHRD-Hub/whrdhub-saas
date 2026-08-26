@@ -8,7 +8,8 @@ async function AnalyticsContent() {
 
   const { data: reports } = await supabase
     .from("reports")
-    .select("id, incident_types, status, urgency, verification_status, reporter_type, county, attack_nature, derogatory_words, created_at");
+    .select("id, incident_types, status, urgency, verification_status, reporter_type, county, attack_nature, derogatory_words, created_at")
+    .is("deleted_at", null);
 
   const total = reports?.length ?? 0;
 

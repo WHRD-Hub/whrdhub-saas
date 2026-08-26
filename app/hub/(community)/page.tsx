@@ -35,8 +35,8 @@ export default async function HubOverview() {
     supabase.rpc("hub_overview"),
     supabase.rpc("hub_submissions_timeseries", { days: 30 }),
     supabase.rpc("hub_member_growth", { days: 30 }),
-    supabase.from("posts").select("id, author_id, body, media, image_urls, created_at, county_networks(name)").eq("status", "pending").order("created_at", { ascending: false }).limit(8),
-    supabase.from("blogs").select("id, author_id, title, cover_image_url, created_at, county_networks(name)").eq("status", "pending").order("created_at", { ascending: false }).limit(8),
+    supabase.from("posts").select("id, author_id, body, media, image_urls, created_at, county_networks(name)").eq("status", "pending").is("deleted_at", null).order("created_at", { ascending: false }).limit(8),
+    supabase.from("blogs").select("id, author_id, title, cover_image_url, created_at, county_networks(name)").eq("status", "pending").is("deleted_at", null).order("created_at", { ascending: false }).limit(8),
     supabase.from("organizations").select("id, name, created_at, county_networks(name)").eq("verification_status", "pending").order("created_at", { ascending: false }).limit(8),
   ]);
 

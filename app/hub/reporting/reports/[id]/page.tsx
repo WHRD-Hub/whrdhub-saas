@@ -6,6 +6,8 @@ import { ArrowLeft, ExternalLink, Shield, CheckCircle, XCircle, HelpCircle, MapP
 import { Badge } from "@/components/ui/badge";
 import { FactCheckForm } from "@/components/reporting/admin/fact-check-form";
 import { AssignServiceForm } from "@/components/reporting/admin/assign-service-form";
+import { ReportDelete } from "@/components/reporting/admin/report-delete";
+import { getReportingAccess } from "@/lib/reporting-access";
 
 const VERIFICATION_META: Record<string, { label: string; icon: React.ReactNode; variant: "info" | "success" | "destructive" | "warning" }> = {
   pending:         { label: "Pending Fact-Check", icon: <HelpCircle className="w-4 h-4" />, variant: "info" },
@@ -26,6 +28,8 @@ function Field({ label, value, mono }: { label: string; value?: string | null; m
 
 async function ReportDetail({ id }: { id: string }) {
   const supabase = await createClient();
+  const access = await getReportingAccess();
+  const canAdminister = !!access?.canAdminister;
 
   const { data: report } = await supabase
     .from("reports")
@@ -96,7 +100,7 @@ async function ReportDetail({ id }: { id: string }) {
   const suggestedServices = unassignedServices.filter(s => matchedCategories.has(s.category));
 
   return (
-    <div className="p-8 max-w-5xl mx-auto space-y-6">
+    <div className="mx-auto max-w-5xl space-y-6">
       {/* Back */}
       <Link href="/hub/reporting/reports" className="flex items-center gap-2 text-sm text-muted hover:text-ink transition-colors">
         <ArrowLeft className="w-4 h-4" /> Back to Reports
@@ -114,8 +118,20 @@ async function ReportDetail({ id }: { id: string }) {
           </Badge>
           <Badge variant="secondary">{report.status?.replace(/_/g, " ")}</Badge>
           {report.urgency === "immediate" && <Badge variant="destructive">IMMEDIATE URGENCY</Badge>}
+          {canAdminister && <ReportDelete reportId={report.id as string} />}
         </div>
       </div>
+
+      {report.deleted_at ? (
+        <div className="flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900">
+          <Trash2 className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>
+            <span className="font-bold">This report is deleted.</span> The reporter can no
+            longer see it. Restore it from Deleted reports.
+            {report.deleted_reason ? ` Reason: ${report.deleted_reason as string}` : ""}
+          </span>
+        </div>
+      ) : null}
 
       <div className="grid lg:grid-cols-3 gap-6">
         {/* Main report content */}

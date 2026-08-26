@@ -8,6 +8,8 @@ import { ChatFab } from "@/components/reporting/chat-fab";
 export default async function HubLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();
   if (!user) redirect("/login?next=/hub");
+  // A deleted account keeps a valid session until it is signed out; refuse it.
+  if (user.isDeleted) redirect("/account-deleted");
 
   const access = await getReportingAccess();
   const isHubAdmin = !!user.profile?.is_hub_admin;
@@ -25,6 +27,7 @@ export default async function HubLayout({ children }: { children: React.ReactNod
     { count: notifCount },
     { count: reportsPending },
     { count: reportsUrgent },
+    { count: membersPending },
   ] = await Promise.all([
     supabase.from("posts").select("id", { count: "exact", head: true }).eq("status", "pending"),
     supabase.from("blogs").select("id", { count: "exact", head: true }).eq("status", "pending"),
@@ -40,12 +43,18 @@ export default async function HubLayout({ children }: { children: React.ReactNod
     supabase
       .from("reports")
       .select("id", { count: "exact", head: true })
-      .eq("verification_status", "pending"),
+      .eq("verification_status", "pending")
+      .is("deleted_at", null),
     supabase
       .from("reports")
       .select("id", { count: "exact", head: true })
       .eq("urgency", "immediate")
-      .in("status", ["submitted", "under_review"]),
+      .in("status", ["submitted", "under_review"])
+      .is("deleted_at", null),
+    supabase
+      .from("org_memberships")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "pending"),
   ]);
 
   const communityNav: NavItem[] = [
@@ -55,6 +64,15 @@ export default async function HubLayout({ children }: { children: React.ReactNod
     { label: "Resources", href: "/hub/resources", icon: "resources", section: "Community" },
     { label: "CBOs", href: "/hub/organizations", icon: "organisations", badge: orgsPending || undefined, section: "Community" },
     { label: "Members", href: "/hub/members", icon: "members", section: "Community" },
+    {
+      label: "Membership requests",
+      href: "/dashboard/network",
+      icon: "matching",
+      badge: membersPending || undefined,
+      section: "Community",
+    },
+    { label: "Deleted content", href: "/hub/deleted", icon: "deleted", section: "Community" },
+    { label: "Deleted accounts", href: "/hub/accounts", icon: "accounts", section: "Community" },
   ];
 
   // The reporting console. Triage-only accounts see the case-handling pages;
@@ -75,6 +93,7 @@ export default async function HubLayout({ children }: { children: React.ReactNod
           { label: "Analytics", href: "/hub/reporting/analytics", icon: "analytics", section: "Reporting" },
           { label: "Referral linkages", href: "/hub/reporting/linkages", icon: "linkages", section: "Reporting" },
           { label: "Online listening", href: "/hub/reporting/listening", icon: "listening", section: "Reporting" },
+          { label: "Deleted reports", href: "/hub/reporting/deleted", icon: "deleted", section: "Reporting" },
         ] as NavItem[])
       : []),
   ];

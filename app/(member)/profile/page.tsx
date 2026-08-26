@@ -12,8 +12,8 @@ export default async function ProfilePage() {
   const [{ data: fem }, { data: posts }, { data: blogs }, { data: reactions }, { data: counties }] =
     await Promise.all([
       supabase.from("mentorship_profiles").select("*").eq("user_id", uid).maybeSingle(),
-      supabase.from("posts").select("id, body, status, created_at").eq("author_id", uid).order("created_at", { ascending: false }),
-      supabase.from("blogs").select("id, title, slug, status, created_at").eq("author_id", uid).order("created_at", { ascending: false }),
+      supabase.from("posts").select("id, body, status, created_at, deleted_at").eq("author_id", uid).order("created_at", { ascending: false }),
+      supabase.from("blogs").select("id, title, slug, status, created_at, deleted_at").eq("author_id", uid).order("created_at", { ascending: false }),
       supabase.from("post_reactions").select("post_id, posts(id, body, is_hub, status)").eq("user_id", uid).limit(50),
       supabase.from("county_networks").select("id, name, is_active").order("is_active", { ascending: false }).order("name"),
     ]);

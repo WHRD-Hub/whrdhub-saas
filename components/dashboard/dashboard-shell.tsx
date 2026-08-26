@@ -7,7 +7,7 @@ import {
   LayoutGrid, FileText, MessageCircle, BookOpen, Calendar, Briefcase, Heart, User,
   ShieldCheck, Building2, Users, GitBranch, ChevronLeft, ChevronRight, Search, Bell,
   Megaphone, ClipboardCheck, Sparkles, LogOut, ChevronDown,
-  BarChart2, RadioTower, Map as MapIcon, LifeBuoy,
+  BarChart2, RadioTower, Map as MapIcon, LifeBuoy, Trash2, UserX, UserCog,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
@@ -25,6 +25,7 @@ const ICONS = {
   // Reporting console
   triage: ShieldCheck, analytics: BarChart2, listening: RadioTower, map: MapIcon,
   support: LifeBuoy, linkages: GitBranch,
+  deleted: Trash2, accounts: UserX, account: UserCog,
 } as const;
 
 export interface NavItem {

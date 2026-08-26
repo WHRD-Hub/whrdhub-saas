@@ -97,15 +97,46 @@ export async function completeOnboarding(input: OnboardingInput) {
   }
 
   if (organizationId) {
+    // Founding an organisation makes you its admin immediately. Joining an
+    // existing one is a request that its admins decide on, so nobody can add
+    // themselves to a network they have no connection to.
     const { error: memErr } = await admin.from("org_memberships").upsert(
       {
         organization_id: organizationId,
         user_id: user.id,
         role: isCreator ? "org_admin" : "member",
+        status: isCreator ? "approved" : "pending",
+        requested_at: new Date().toISOString(),
       },
       { onConflict: "organization_id,user_id", ignoreDuplicates: true },
     );
     if (memErr) return { error: memErr.message };
+
+    if (!isCreator) {
+      const { data: orgAdmins } = await admin
+        .from("org_memberships")
+        .select("user_id")
+        .eq("organization_id", organizationId)
+        .eq("role", "org_admin")
+        .eq("status", "approved");
+      let recipients = (orgAdmins ?? []).map((a) => a.user_id as string);
+      if (recipients.length === 0) {
+        const { data: hubAdmins } = await admin.from("profiles").select("id").eq("is_hub_admin", true);
+        recipients = (hubAdmins ?? []).map((a) => a.id as string);
+      }
+      if (recipients.length) {
+        await admin.from("notifications").insert(
+          recipients.map((id) => ({
+            user_id: id,
+            type: "membership",
+            title: "New membership request",
+            body: `${input.full_name} asked to join your network.`,
+            link: "/dashboard/network",
+            content_type: "organization",
+          })),
+        );
+      }
+    }
   }
 
   // 3. Femtorship questionnaire

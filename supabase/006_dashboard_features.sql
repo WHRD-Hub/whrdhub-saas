@@ -10,12 +10,16 @@ alter table public.posts
 alter table public.blogs
   add column if not exists body_format text default 'html';
 
--- ── Notifications ───────────────────────────────────────────────────────────
+-- ââ Notifications ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+-- The reporting platform also creates this table, with `is_read` instead of
+-- `read` and a report_id. Whichever migration runs first wins, so every column
+-- is added defensively and 013 reconciles the two shapes. Without this the
+-- whole file used to abort on a fresh project.
 create table if not exists public.notifications (
   id          uuid default gen_random_uuid() primary key,
   user_id     uuid not null references auth.users(id) on delete cascade,
   type        text not null,            -- content_submitted | content_published | content_declined | membership
-  title       text not null,
+  title       text,
   body        text,
   link        text,
   content_type text,                    -- 'post' | 'blog' | 'organization'
@@ -23,6 +27,15 @@ create table if not exists public.notifications (
   read        boolean default false,
   created_at  timestamptz default now()
 );
+
+alter table public.notifications
+  add column if not exists title        text,
+  add column if not exists body         text,
+  add column if not exists link         text,
+  add column if not exists content_type text,
+  add column if not exists content_id   uuid,
+  add column if not exists read         boolean default false;
+
 create index if not exists notifications_user_idx on public.notifications(user_id, read);
 
 alter table public.notifications enable row level security;

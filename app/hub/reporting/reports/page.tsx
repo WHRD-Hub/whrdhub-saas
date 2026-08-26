@@ -31,6 +31,8 @@ async function ReportsTable({ page, county, urgency, verif, reporter, channel, s
   let query = supabase
     .from("reports")
     .select("id, incident_types, status, urgency, verification_status, reporter_type, county, created_at, perpetrator_type, consent_to_followup, channel", { count: "exact" })
+    // Deleted cases live in /hub/reporting/deleted.
+    .is("deleted_at", null)
     .order("created_at", { ascending: false })
     .range(from, from + PAGE_SIZE - 1);
 
@@ -171,7 +173,11 @@ async function AdminReportsContent({ searchParams }: { searchParams: Promise<Rec
   const { data: { session } } = await supabase.auth.getSession();
   const currentUserId = session?.user?.id;
 
-  const { data: counties } = await supabase.from("reports").select("county").not("county", "is", null);
+  const { data: counties } = await supabase
+    .from("reports")
+    .select("county")
+    .not("county", "is", null)
+    .is("deleted_at", null);
   const uniqueCounties = [...new Set((counties ?? []).map(r => r.county).filter(Boolean))].sort();
 
   return (

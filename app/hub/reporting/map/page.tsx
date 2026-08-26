@@ -14,7 +14,8 @@ async function MapData() {
       "id, latitude, longitude, incident_types, county, urgency, reporter_type, verification_status, created_at",
     )
     .not("latitude", "is", null)
-    .not("longitude", "is", null);
+    .not("longitude", "is", null)
+    .is("deleted_at", null);
 
   return <MapView reports={reports ?? []} />;
 }

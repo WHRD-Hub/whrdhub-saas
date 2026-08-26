@@ -8,6 +8,8 @@ import { ChatFab } from "@/components/reporting/chat-fab";
 export default async function MemberLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();
   if (!user) redirect("/login?next=/dashboard");
+  // A deleted account keeps a valid session until it is signed out; refuse it.
+  if (user.isDeleted) redirect("/account-deleted");
 
   // Accounts created by the report form are credentialed but anonymous: they
   // have no Hub community profile and must not be pushed through member
@@ -26,17 +28,41 @@ export default async function MemberLayout({ children }: { children: React.React
   ]);
   const actioned = (reports ?? []).filter((r) => r.status && r.status !== "submitted").length;
 
+  // Someone who administers a CBO gets the approvals queue in their sidebar.
+  const { data: adminOf, count: pendingRequests } = await supabase
+    .from("org_memberships")
+    .select("organization_id", { count: "exact" })
+    .eq("user_id", user.id)
+    .eq("role", "org_admin")
+    .eq("status", "approved");
+  const isOrgAdmin = (adminOf ?? []).length > 0;
+
+  let requestCount = 0;
+  if (isOrgAdmin) {
+    const { count } = await supabase
+      .from("org_memberships")
+      .select("id", { count: "exact", head: true })
+      .in("organization_id", (adminOf ?? []).map((o) => o.organization_id as string))
+      .eq("status", "pending");
+    requestCount = count ?? 0;
+  }
+  void pendingRequests;
+
   const nav: NavItem[] = reporterOnly
     ? [
         { label: "My Reports", href: "/dashboard/reports", icon: "reports", badge: actioned || undefined },
-        { label: "Profile", href: "/profile", icon: "profile" },
+        { label: "Account", href: "/dashboard/account", icon: "account" },
       ]
     : [
         { label: "Overview", href: "/dashboard", icon: "overview" },
         { label: "Community Feed", href: "/dashboard/feed", icon: "feed" },
         { label: "Femtorship", href: "/mentorship", icon: "femtorship" },
         { label: "My Reports", href: "/dashboard/reports", icon: "reports", badge: actioned || undefined },
+        ...(isOrgAdmin
+          ? ([{ label: "Your network", href: "/dashboard/network", icon: "members", badge: requestCount || undefined }] as NavItem[])
+          : []),
         { label: "Profile", href: "/profile", icon: "profile" },
+        { label: "Account", href: "/dashboard/account", icon: "account" },
       ];
 
   // Hub admins and reporting defenders get the console switch in the user menu.

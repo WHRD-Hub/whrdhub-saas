@@ -120,13 +120,20 @@ alter table public.report_services  enable row level security;
 alter table public.report_audit_log enable row level security;
 alter table public.services         enable row level security;
 
+-- Both the old names and the ones this file creates, so re-running is safe.
 do $$ begin
   drop policy if exists "defenders_see_all"                on public.reports;
   drop policy if exists "defenders_update_reports"         on public.reports;
+  drop policy if exists "responders_see_all_reports"       on public.reports;
+  drop policy if exists "responders_update_reports"        on public.reports;
   drop policy if exists "defenders_audit_log"              on public.report_audit_log;
+  drop policy if exists "responders_audit_log"             on public.report_audit_log;
   drop policy if exists "defenders_manage_services"        on public.services;
+  drop policy if exists "admins_manage_services"           on public.services;
   drop policy if exists "defenders_manage_report_services" on public.report_services;
+  drop policy if exists "responders_manage_report_services" on public.report_services;
   drop policy if exists "admins_read_all_profiles"         on public.profiles;
+  drop policy if exists "responders_read_all_profiles"     on public.profiles;
   drop policy if exists "admins_update_all_profiles"       on public.profiles;
 exception when others then null;
 end $$;

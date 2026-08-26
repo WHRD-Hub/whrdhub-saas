@@ -26,6 +26,7 @@ export default async function MemberReportsPage() {
       .from("reports")
       .select("id, incident_types, county, status, verification_status, urgency, created_at")
       .eq("user_id", user!.id)
+      .is("deleted_at", null)
       .order("created_at", { ascending: false }),
     supabase.from("profiles").select("preferred_language").eq("id", user!.id).maybeSingle(),
   ]);

@@ -18,8 +18,8 @@ export default async function ReviewQueue() {
   const supabase = await createClient();
 
   const [{ data: posts }, { data: blogs }] = await Promise.all([
-    supabase.from("posts").select("id, author_id, body, image_urls, pinned, created_at, county_networks(name)").eq("status", "pending").order("created_at"),
-    supabase.from("blogs").select("id, author_id, title, excerpt, cover_image_url, pinned, created_at, county_networks(name)").eq("status", "pending").order("created_at"),
+    supabase.from("posts").select("id, author_id, body, image_urls, pinned, created_at, county_networks(name)").eq("status", "pending").is("deleted_at", null).order("created_at"),
+    supabase.from("blogs").select("id, author_id, title, excerpt, cover_image_url, pinned, created_at, county_networks(name)").eq("status", "pending").is("deleted_at", null).order("created_at"),
   ]);
 
   const ids = [

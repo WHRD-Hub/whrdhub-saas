@@ -10,6 +10,8 @@ export default async function MemberLayout({ children }: { children: React.React
   if (!user) redirect("/login?next=/dashboard");
   // A deleted account keeps a valid session until it is signed out; refuse it.
   if (user.isDeleted) redirect("/account-deleted");
+  // A banned account keeps a valid session; every authenticated surface refuses it.
+  if (user.isBanned) redirect("/account-suspended");
 
   // Accounts created by the report form are credentialed but anonymous: they
   // have no Hub community profile and must not be pushed through member

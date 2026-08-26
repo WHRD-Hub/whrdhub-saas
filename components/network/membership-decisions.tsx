@@ -8,24 +8,28 @@ import { Avatar } from "@/components/ui/field";
 import { Pill } from "@/components/ui/pill";
 import { toast } from "@/components/ui/toast";
 import { timeAgo } from "@/lib/utils";
+import { SuspendMember } from "@/components/network/suspend-member";
 
 export interface MemberRow {
   id: string;
-  status: "pending" | "approved" | "rejected";
+  status: "pending" | "approved" | "rejected" | "suspended";
   role: "member" | "org_admin";
   requested_at: string | null;
   request_note: string | null;
+  suspensionReason: string | null;
   orgName: string;
   person: {
     name: string;
     title: string | null;
     avatar_url: string | null;
     fromReporting: boolean;
+    banned: boolean;
   };
 }
 
 /**
- * Approving the people who ask to join a network.
+ * Running a network's membership: approving the people who ask to join,
+ * appointing other admins, and pausing a member who needs pausing.
  *
  * Requests arriving from the reporting side are flagged, because they are the
  * ones an organisation is least likely to recognise: the person may have come
@@ -34,10 +38,12 @@ export interface MemberRow {
 export function MembershipDecisions({
   pending,
   members,
+  suspended,
   canManageRoles,
 }: {
   pending: MemberRow[];
   members: MemberRow[];
+  suspended: MemberRow[];
   canManageRoles: boolean;
 }) {
   const router = useRouter();
@@ -132,6 +138,43 @@ export function MembershipDecisions({
         )}
       </section>
 
+      {suspended.length > 0 && (
+        <section>
+          <h2 className="mb-3 text-lg font-black text-ink">
+            Suspended
+            <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-800">
+              {suspended.length}
+            </span>
+          </h2>
+          <p className="mb-3 max-w-prose text-sm text-muted">
+            These members cannot post or comment. The Hub has been told about each
+            suspension and can take it further if it needs to.
+          </p>
+          <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-amber-200 bg-surface">
+            {suspended.map((row) => (
+              <li key={row.id} className="flex flex-wrap items-start gap-3 p-4">
+                <Avatar name={row.person.name} src={row.person.avatar_url} size={40} />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-ink">{row.person.name}</p>
+                  <p className="text-xs text-muted">{row.orgName}</p>
+                  {row.suspensionReason && (
+                    <p className="mt-2 rounded-lg bg-amber-50 p-2.5 text-sm text-amber-900">
+                      {row.suspensionReason}
+                    </p>
+                  )}
+                  {row.person.banned && (
+                    <span className="mt-2 inline-block">
+                      <Pill tone="red">Banned by the Hub</Pill>
+                    </span>
+                  )}
+                </div>
+                <SuspendMember membershipId={row.id} name={row.person.name} suspended />
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       <section>
         <h2 className="mb-3 text-lg font-black text-ink">Members ({members.length})</h2>
         {members.length === 0 ? (
@@ -164,6 +207,11 @@ export function MembershipDecisions({
                     {row.role === "org_admin" ? "Make member" : "Make admin"}
                   </button>
                 )}
+                <SuspendMember
+                  membershipId={row.id}
+                  name={row.person.name}
+                  suspended={false}
+                />
               </li>
             ))}
           </ul>

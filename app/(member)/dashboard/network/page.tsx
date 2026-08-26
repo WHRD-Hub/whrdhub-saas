@@ -7,6 +7,7 @@ import {
   MembershipDecisions,
   type MemberRow,
 } from "@/components/network/membership-decisions";
+import { NetworkBranding } from "@/components/network/network-branding";
 
 export const metadata = { title: "Your network — WHRD Hub" };
 
@@ -18,6 +19,7 @@ interface Row {
   role: string;
   requested_at: string | null;
   request_note: string | null;
+  suspension_reason: string | null;
   organizations: { name: string } | { name: string }[] | null;
 }
 
@@ -49,12 +51,22 @@ export default async function NetworkPage() {
 
   let query = supabase
     .from("org_memberships")
-    .select("id, user_id, organization_id, status, role, requested_at, request_note, organizations(name)")
+    .select("id, user_id, organization_id, status, role, requested_at, request_note, suspension_reason, organizations(name)")
     .order("requested_at", { ascending: false });
   if (!isHubAdmin) query = query.in("organization_id", adminOrgIds);
 
   const { data: rows } = await query;
   const list = (rows ?? []) as unknown as Row[];
+
+  // The organisations this person actually administers, so they can set the
+  // mark that heads every post their members write.
+  const { data: myOrgs } = adminOrgIds.length
+    ? await supabase
+        .from("organizations")
+        .select("id, name, logo_url")
+        .in("id", adminOrgIds)
+        .order("name")
+    : { data: [] as { id: string; name: string; logo_url: string | null }[] };
 
   // Profiles are read with the service role: an org admin is not otherwise
   // entitled to read the profile of someone who has only *requested* to join.
@@ -62,12 +74,15 @@ export default async function NetworkPage() {
   const ids = Array.from(new Set(list.map((r) => r.user_id)));
   const people = new Map<
     string,
-    { name: string; title: string | null; avatar_url: string | null; fromReporting: boolean }
+    {
+      name: string; title: string | null; avatar_url: string | null;
+      fromReporting: boolean; banned: boolean;
+    }
   >();
   if (ids.length) {
     const { data: profiles } = await admin
       .from("profiles")
-      .select("id, full_name, username, title, avatar_url, is_anonymous, user_type, claimed_at, account_deleted_at")
+      .select("id, full_name, username, title, avatar_url, is_anonymous, user_type, claimed_at, account_deleted_at, banned_at")
       .in("id", ids);
     for (const p of profiles ?? []) {
       if (p.account_deleted_at) continue;
@@ -76,6 +91,7 @@ export default async function NetworkPage() {
         title: (p.title as string) ?? null,
         avatar_url: (p.avatar_url as string) ?? null,
         fromReporting: !!p.claimed_at || p.is_anonymous === true || p.user_type === "reporter",
+        banned: !!p.banned_at,
       });
     }
   }
@@ -90,6 +106,7 @@ export default async function NetworkPage() {
       role: (r.role as MemberRow["role"]) ?? "member",
       requested_at: r.requested_at,
       request_note: r.request_note,
+      suspensionReason: r.suspension_reason,
       orgName: org?.name ?? "",
       person,
     };
@@ -110,9 +127,19 @@ export default async function NetworkPage() {
         </p>
       </div>
 
+      {(myOrgs ?? []).map((o) => (
+        <NetworkBranding
+          key={o.id as string}
+          organizationId={o.id as string}
+          name={o.name as string}
+          logoUrl={(o.logo_url as string) ?? null}
+        />
+      ))}
+
       <MembershipDecisions
         pending={mapped.filter((r) => r.status === "pending")}
         members={mapped.filter((r) => r.status === "approved")}
+        suspended={mapped.filter((r) => r.status === "suspended")}
         canManageRoles={isHubAdmin || adminOrgIds.length > 0}
       />
     </div>

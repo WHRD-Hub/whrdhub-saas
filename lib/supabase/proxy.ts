@@ -46,7 +46,7 @@ export async function updateSession(request: NextRequest) {
     // Reporting: filing a report must work without an account. The form creates
     // an anonymous credentialed account on submit, so gating this behind login
     // would defeat the purpose of the platform.
-    "/report", "/offline", "/account-deleted",
+    "/report", "/offline", "/account-deleted", "/account-suspended",
     // Machine callers authenticate themselves inside the route handler:
     // Africa's Talking (USSD), Meta (signed webhook) and the chat assistant.
     "/api/ussd", "/api/meta", "/api/chat",

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { BadgeCheck, MapPin, BookOpen, Pin } from "lucide-react";
-import { Avatar } from "@/components/ui/field";
+import { NetworkAvatar } from "@/components/feed/network-avatar";
 import { Pill } from "@/components/ui/pill";
 import { ReactionBar } from "@/components/feed/reaction-bar";
 import { MediaBlock } from "@/components/feed/media-block";
@@ -12,16 +12,16 @@ export function FeedCard({ item, signedIn = false }: { item: FeedItem; signedIn?
   return (
     <article className="bg-surface px-4 py-4 hover:bg-paper/60 transition-colors">
       <header className="flex items-start gap-3">
-        <Avatar name={item.author.name} src={item.author.avatar_url} size={44} />
+        <NetworkAvatar name={item.byline.name} logoUrl={item.byline.logo_url} isHub={item.byline.isHub} size={44} />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="font-semibold text-sm text-ink truncate">{item.author.name}</span>
+            <span className="truncate text-sm font-semibold text-ink">{item.byline.name}</span>
             {item.is_hub && (
               <BadgeCheck className="w-4 h-4 text-purple shrink-0" aria-label="WHRD Hub" />
             )}
           </div>
           <p className="text-xs text-muted truncate">
-            {[item.author.title, item.org].filter(Boolean).join(" · ") || "Women human rights defender"}
+            {item.byline.person ? `Posted by ${item.byline.person.name}` : (item.byline.county ?? "Women human rights defenders")}
           </p>
           <p className="text-xs text-muted mt-0.5 flex items-center gap-2">
             <span>{timeAgo(item.published_at)}</span>

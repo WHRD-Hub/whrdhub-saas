@@ -4,6 +4,7 @@ import { SiteFooter } from "@/components/site-footer";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/current-user";
 import { JoinButton } from "@/components/network/join-button";
+import { NetworkAvatar } from "@/components/feed/network-avatar";
 
 export const metadata = {
   title: "Networks — WHRD Hub",
@@ -14,7 +15,7 @@ export default async function OrganizationsPage() {
   const supabase = await createClient();
   const { data: orgs } = await supabase
     .from("organizations")
-    .select("id, name, description, verification_status, county_networks(name)")
+    .select("id, name, description, logo_url, verification_status, county_networks(name)")
     .eq("verification_status", "verified")
     .order("name");
 
@@ -68,9 +69,11 @@ export default async function OrganizationsPage() {
             {list.map((o) => (
               <div key={o.id} className="flex flex-col rounded-2xl border border-line bg-surface p-5">
                 <div className="flex items-center justify-between">
-                  <div className="w-10 h-10 rounded-xl bg-purple-050 text-purple flex items-center justify-center">
-                    <Building2 className="w-5 h-5" />
-                  </div>
+                  <NetworkAvatar
+                    name={o.name as string}
+                    logoUrl={(o.logo_url as string) ?? null}
+                    size={40}
+                  />
                   <ShieldCheck className="w-4 h-4 text-emerald-500" aria-label="Verified" />
                 </div>
                 <h2 className="mt-3 font-bold text-ink">{o.name}</h2>

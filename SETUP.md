@@ -104,4 +104,9 @@ HTML and no report content.
 community console. An organisation can have any number of admins, appointed by
 its existing admins or by any Hub admin.
 
+**Moderation.** A network's admins can suspend one of their own members, which
+stops them posting and notifies the Hub. Only the Hub can ban an account, from
+`/hub/moderation`. Neither deletes anything, and neither closes the reporting
+route: someone barred from the community can still file a report.
+
 **Architecture and decisions** are written up in `MERGE.md`.

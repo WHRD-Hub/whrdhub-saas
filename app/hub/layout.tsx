@@ -10,6 +10,7 @@ export default async function HubLayout({ children }: { children: React.ReactNod
   if (!user) redirect("/login?next=/hub");
   // A deleted account keeps a valid session until it is signed out; refuse it.
   if (user.isDeleted) redirect("/account-deleted");
+  if (user.isBanned) redirect("/account-suspended");
 
   const access = await getReportingAccess();
   const isHubAdmin = !!user.profile?.is_hub_admin;
@@ -28,6 +29,7 @@ export default async function HubLayout({ children }: { children: React.ReactNod
     { count: reportsPending },
     { count: reportsUrgent },
     { count: membersPending },
+    { count: suspendedMembers },
   ] = await Promise.all([
     supabase.from("posts").select("id", { count: "exact", head: true }).eq("status", "pending"),
     supabase.from("blogs").select("id", { count: "exact", head: true }).eq("status", "pending"),
@@ -55,6 +57,10 @@ export default async function HubLayout({ children }: { children: React.ReactNod
       .from("org_memberships")
       .select("id", { count: "exact", head: true })
       .eq("status", "pending"),
+    supabase
+      .from("org_memberships")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "suspended"),
   ]);
 
   const communityNav: NavItem[] = [
@@ -64,11 +70,19 @@ export default async function HubLayout({ children }: { children: React.ReactNod
     { label: "Resources", href: "/hub/resources", icon: "resources", section: "Community" },
     { label: "CBOs", href: "/hub/organizations", icon: "organisations", badge: orgsPending || undefined, section: "Community" },
     { label: "Members", href: "/hub/members", icon: "members", section: "Community" },
+    { label: "Femtorship", href: "/hub/femtorship", icon: "femtorship", section: "Community" },
     {
       label: "Membership requests",
       href: "/dashboard/network",
       icon: "matching",
       badge: membersPending || undefined,
+      section: "Community",
+    },
+    {
+      label: "Moderation",
+      href: "/hub/moderation",
+      icon: "moderation",
+      badge: suspendedMembers || undefined,
       section: "Community",
     },
     { label: "Deleted content", href: "/hub/deleted", icon: "deleted", section: "Community" },

@@ -7,6 +7,30 @@ export interface FeedAuthor {
   avatar_url: string | null;
 }
 
+/**
+ * Who a post is *from*.
+ *
+ * A defender posts on behalf of her network, so the network is the author: its
+ * name and its mark head the card, and the individual is credited underneath.
+ * That is how the movement presents itself, and it means a post does not stop
+ * making sense when one person moves on.
+ *
+ * `person` is still carried, because attribution matters and because the Hub's
+ * moderation views need to know who actually wrote it.
+ */
+export interface FeedByline {
+  /** The network the post belongs to: an organisation, or the Hub itself. */
+  name: string;
+  /** The organisation's own mark, falling back to the Hub logo. */
+  logo_url: string | null;
+  /** The county network the organisation sits in, if any. */
+  county: string | null;
+  /** True when the Hub posted as itself rather than a CBO. */
+  isHub: boolean;
+  /** The individual who wrote it, credited under the network. */
+  person: FeedAuthor | null;
+}
+
 export interface MediaItem {
   type: "image" | "video" | "document";
   url: string;
@@ -30,6 +54,8 @@ export interface FeedItem {
   image: string | null;
   media: MediaItem[];
   author: FeedAuthor;
+  /** The network the post is published as. Always present. */
+  byline: FeedByline;
   org: string | null;
   county: string | null;
   is_hub: boolean;
@@ -64,9 +90,11 @@ type Row = {
   created_at: string;
   guest_name?: string | null;
   guest_title?: string | null;
-  organizations?: { name: string } | { name: string }[] | null;
+  organizations?: OrgRef | OrgRef[] | null;
   county_networks?: { name: string } | { name: string }[] | null;
 };
+
+type OrgRef = { name: string; logo_url?: string | null };
 
 function one<T>(v: T | T[] | null | undefined): T | null {
   if (!v) return null;
@@ -79,6 +107,9 @@ const HUB_AUTHOR: FeedAuthor = {
   title: "National office",
   avatar_url: null,
 };
+
+/** The Hub's own mark, used when a post belongs to no CBO. */
+const HUB_LOGO = "/main-logo.png";
 
 const FALLBACK_AUTHOR: FeedAuthor = {
   id: null,
@@ -102,14 +133,14 @@ export async function getFeed(limit = 40, userId?: string): Promise<FeedItem[]> 
     supabase
       .from("posts")
       .select(
-        "id, author_id, body, image_urls, media, is_hub, pinned, status, deleted_at, deleted_reason, published_at, created_at, guest_name, guest_title, organizations(name), county_networks(name)",
+        "id, author_id, body, image_urls, media, is_hub, pinned, status, deleted_at, deleted_reason, published_at, created_at, guest_name, guest_title, organizations(name, logo_url), county_networks(name)",
       )
       .order("created_at", { ascending: false })
       .limit(limit * 2),
     supabase
       .from("blogs")
       .select(
-        "id, author_id, title, slug, excerpt, cover_image_url, is_hub, pinned, status, deleted_at, deleted_reason, published_at, created_at, organizations(name), county_networks(name)",
+        "id, author_id, title, slug, excerpt, cover_image_url, is_hub, pinned, status, deleted_at, deleted_reason, published_at, created_at, organizations(name, logo_url), county_networks(name)",
       )
       .order("created_at", { ascending: false })
       .limit(limit * 2),
@@ -229,6 +260,31 @@ export async function getFeed(limit = 40, userId?: string): Promise<FeedItem[]> 
               avatar_url: null,
             }
           : FALLBACK_AUTHOR);
+
+    const org = one(r.organizations);
+    const county = one(r.county_networks)?.name ?? null;
+
+    // The network is the author. A post from someone with no CBO yet still has
+    // to be published as something, and the Hub is the honest answer: it is the
+    // body that reviewed and approved it.
+    const byline: FeedByline = r.is_hub
+      ? { name: "WHRD Hub", logo_url: HUB_LOGO, county: null, isHub: true, person: null }
+      : org
+        ? {
+            name: org.name,
+            logo_url: org.logo_url ?? null,
+            county,
+            isHub: false,
+            person: author,
+          }
+        : {
+            name: county ? `WHRD Hub · ${county}` : "WHRD Hub",
+            logo_url: HUB_LOGO,
+            county,
+            isHub: true,
+            person: author,
+          };
+
     return {
       kind: r.kind,
       id: r.id,
@@ -238,8 +294,9 @@ export async function getFeed(limit = 40, userId?: string): Promise<FeedItem[]> 
       image: r.kind === "post" ? (r.image_urls?.[0] ?? null) : (r.cover_image_url ?? null),
       media: r.kind === "post" ? ((r.media as MediaItem[]) ?? []) : [],
       author,
-      org: one(r.organizations)?.name ?? null,
-      county: one(r.county_networks)?.name ?? null,
+      byline,
+      org: org?.name ?? null,
+      county,
       is_hub: r.is_hub,
       pinned: r.pinned,
       published_at: r.published_at ?? r.created_at,

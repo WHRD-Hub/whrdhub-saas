@@ -54,6 +54,10 @@ do $$ begin create type public.verification_state       as enum ('pending','veri
 do $$ begin create type public.content_state            as enum ('draft','pending','approved','rejected'); exception when duplicate_object then null; end $$;
 do $$ begin create type public.membership_role          as enum ('member','org_admin'); exception when duplicate_object then null; end $$;
 do $$ begin create type public.membership_state         as enum ('pending','approved','rejected'); exception when duplicate_object then null; end $$;
+-- 'suspended' was added after the first release, so it is appended rather than
+-- redefined: an enum value cannot be added inside a transaction that uses it,
+-- hence its own statement.
+do $$ begin alter type public.membership_state add value if not exists 'suspended'; exception when others then null; end $$;
 
 
 -- ╔════════════════════════════════════════════════════════════════════════╗
@@ -1011,6 +1015,33 @@ create unique index if not exists listening_results_source_uidx on public.listen
 create index if not exists listening_results_status_idx on public.listening_results (status);
 
 
+-- ── Columns added after the tables above were first generated ───────────────
+-- Kept in one place so the generated section stays a faithful dump.
+
+-- A post belongs to a network. The organisation's own mark is what the feed
+-- shows, so it needs somewhere to live.
+alter table public.organizations
+  add column if not exists logo_url text;
+
+-- Suspension is a property of a membership: it is local to one network.
+alter table public.org_memberships
+  add column if not exists suspended_at      timestamptz,
+  add column if not exists suspended_by      uuid references auth.users(id) on delete set null,
+  add column if not exists suspension_reason text;
+
+create index if not exists org_memberships_suspended_idx
+  on public.org_memberships (organization_id, suspended_at)
+  where suspended_at is not null;
+
+-- A ban is a property of the account.
+alter table public.profiles
+  add column if not exists banned_at  timestamptz,
+  add column if not exists banned_by  uuid references auth.users(id) on delete set null,
+  add column if not exists ban_reason text;
+
+create index if not exists profiles_banned_idx
+  on public.profiles (banned_at) where banned_at is not null;
+
 -- ╔════════════════════════════════════════════════════════════════════════╗
 -- ║  4. Functions                                                           ║
 -- ╚════════════════════════════════════════════════════════════════════════╝
@@ -1057,6 +1088,8 @@ returns boolean language sql security definer set search_path = public stable as
                     and m.role = 'org_admin' and m.status = 'approved');
 $$;
 
+-- Suspended memberships are excluded everywhere: a suspended member is not a
+-- member for any purpose except being able to see that they are suspended.
 create or replace function public.my_org_ids()
 returns setof uuid language sql security definer set search_path = public stable as $$
   select organization_id from public.org_memberships
@@ -1075,6 +1108,9 @@ $$;
  * Posting is for the movement, not for passers-by: an approved membership of a
  * county network's organisation, or Hub staff. Anyone can read the feed and
  * support a post; writing to it is a member's act.
+ *
+ * A banned account is refused outright, and a suspended membership does not
+ * count — which is the whole point of a network admin being able to suspend.
  */
 create or replace function public.can_post_to_feed(uid uuid default auth.uid())
 returns boolean language sql security definer set search_path = public stable as $$
@@ -1084,9 +1120,19 @@ returns boolean language sql security definer set search_path = public stable as
         or exists (select 1 from public.org_memberships m
                     where m.user_id = p.id and m.status = 'approved')
       from public.profiles p
-     where p.id = uid and p.account_deleted_at is null
+     where p.id = uid
+       and p.account_deleted_at is null
+       and p.banned_at is null
   ), false);
 $$;
+
+/** A banned account can still read, but may not act. */
+create or replace function public.is_banned(uid uuid default auth.uid())
+returns boolean language sql security definer set search_path = public stable as $$
+  select coalesce((select banned_at is not null from public.profiles where id = uid), false);
+$$;
+
+grant execute on function public.is_banned(uuid) to anon, authenticated;
 
 grant execute on function public.is_hub_admin(uuid)           to anon, authenticated;
 grant execute on function public.can_administer_reports(uuid) to anon, authenticated;
@@ -1475,6 +1521,8 @@ returns json language sql security definer set search_path = public as $$
   select json_build_object(
     'members',          (select count(distinct user_id) from public.org_memberships where status = 'approved'),
     'members_pending',  (select count(*) from public.org_memberships where status = 'pending'),
+    'members_suspended',(select count(*) from public.org_memberships where status = 'suspended'),
+    'accounts_banned',  (select count(*) from public.profiles where banned_at is not null),
     'onboarded',        (select count(*) from public.profiles where hub_onboarded and account_deleted_at is null),
     'accounts_deleted', (select count(*) from public.profiles where account_deleted_at is not null),
     'organizations',    (select count(*) from public.organizations),
@@ -1536,6 +1584,175 @@ create or replace function public.get_user_report_count(uid uuid default auth.ui
 returns bigint language sql security definer set search_path = public stable as $$
   select count(*) from public.reports where user_id = uid and deleted_at is null;
 $$;
+
+-- ╔════════════════════════════════════════════════════════════════════════╗
+-- ║  4b. Suspension and banning                                             ║
+-- ╚════════════════════════════════════════════════════════════════════════╝
+--
+-- Two levels, deliberately separate, because they belong to different people.
+--
+--   Suspend  An organisation's admin decides that one of their own members
+--            should stop posting for now. It is local to that network, it is
+--            reversible by the same admin, and it tells the Hub so somebody
+--            senior knows it happened.
+--
+--   Ban      The Hub decides the person should not use the platform at all.
+--            Only a Hub admin can do it, it is account-wide, and the person is
+--            signed out and refused at every authenticated surface.
+--
+-- A network admin can suspend but never ban; escalation is the Hub's call.
+
+/**
+ * Suspend a member of an organisation you administer.
+ *
+ * SECURITY DEFINER because it also writes notifications to the Hub, which the
+ * caller has no rights over.
+ */
+create or replace function public.suspend_member(membership uuid, reason text default null)
+returns boolean language plpgsql security definer set search_path = public as $$
+declare
+  caller uuid := auth.uid();
+  m      public.org_memberships%rowtype;
+  org_name text;
+  who      text;
+  admin_id uuid;
+begin
+  if caller is null then raise exception 'Not signed in'; end if;
+
+  select * into m from public.org_memberships where id = membership;
+  if not found then raise exception 'That membership no longer exists'; end if;
+
+  if not (public.is_hub_admin(caller) or public.is_org_admin(m.organization_id, caller)) then
+    raise exception 'Only an admin of this network can suspend a member';
+  end if;
+  if m.user_id = caller then
+    raise exception 'You cannot suspend yourself';
+  end if;
+  -- A network admin cannot suspend a Hub admin out of the way.
+  if public.is_hub_admin(m.user_id) and not public.is_hub_admin(caller) then
+    raise exception 'You cannot suspend a Hub administrator';
+  end if;
+
+  update public.org_memberships
+     set status = 'suspended',
+         suspended_at = now(),
+         suspended_by = caller,
+         suspension_reason = reason,
+         decided_at = now(),
+         decided_by = caller
+   where id = membership;
+
+  select name into org_name from public.organizations where id = m.organization_id;
+  select coalesce(full_name, username, 'A member') into who from public.profiles where id = m.user_id;
+
+  -- Tell the person plainly.
+  insert into public.notifications (user_id, type, title, body, link, content_type)
+  values (
+    m.user_id, 'membership',
+    'Your membership of ' || coalesce(org_name, 'your network') || ' is suspended',
+    coalesce(reason, 'Your network''s administrators have paused your membership. Contact them or the Hub if you think this is a mistake.'),
+    '/dashboard/account', 'organization'
+  );
+
+  -- And tell the Hub, which is the only party that can escalate to a ban.
+  for admin_id in select id from public.profiles where coalesce(is_hub_admin, false) loop
+    insert into public.notifications (user_id, type, title, body, link, content_type)
+    values (
+      admin_id, 'moderation',
+      who || ' was suspended by ' || coalesce(org_name, 'their network'),
+      coalesce(reason, 'No reason was given.') || ' Review the account if this needs to go further.',
+      '/hub/accounts', 'organization'
+    );
+  end loop;
+
+  return true;
+end $$;
+
+/** Lift a suspension. The same people who can impose one can lift it. */
+create or replace function public.unsuspend_member(membership uuid)
+returns boolean language plpgsql security definer set search_path = public as $$
+declare
+  caller uuid := auth.uid();
+  m public.org_memberships%rowtype;
+  org_name text;
+begin
+  if caller is null then raise exception 'Not signed in'; end if;
+  select * into m from public.org_memberships where id = membership;
+  if not found then raise exception 'That membership no longer exists'; end if;
+  if not (public.is_hub_admin(caller) or public.is_org_admin(m.organization_id, caller)) then
+    raise exception 'Only an admin of this network can lift a suspension';
+  end if;
+
+  update public.org_memberships
+     set status = 'approved',
+         suspended_at = null, suspended_by = null, suspension_reason = null,
+         decided_at = now(), decided_by = caller
+   where id = membership;
+
+  select name into org_name from public.organizations where id = m.organization_id;
+  insert into public.notifications (user_id, type, title, body, link, content_type)
+  values (m.user_id, 'membership',
+          'Your membership of ' || coalesce(org_name, 'your network') || ' is active again',
+          'You can post and publish again.', '/dashboard', 'organization');
+  return true;
+end $$;
+
+/**
+ * Ban an account. The Hub's decision alone.
+ *
+ * The content stays where it is — banning is not deletion, and a moderation
+ * record that erased the evidence would be worse than useless. Every
+ * membership is suspended so the person cannot post through any network, and
+ * the app refuses the session at every authenticated surface.
+ */
+create or replace function public.ban_account(target uuid, reason text default null)
+returns boolean language plpgsql security definer set search_path = public as $$
+declare caller uuid := auth.uid();
+begin
+  if not public.is_hub_admin(caller) then
+    raise exception 'Only the Hub can ban an account';
+  end if;
+  if caller = target then raise exception 'You cannot ban yourself'; end if;
+
+  update public.profiles
+     set banned_at = coalesce(banned_at, now()),
+         banned_by = caller,
+         ban_reason = reason
+   where id = target;
+
+  update public.org_memberships
+     set status = 'suspended',
+         suspended_at = coalesce(suspended_at, now()),
+         suspended_by = caller,
+         suspension_reason = coalesce(suspension_reason, 'Account banned by the Hub')
+   where user_id = target and status = 'approved';
+
+  insert into public.notifications (user_id, type, title, body, link, content_type)
+  values (target, 'moderation', 'Your account has been suspended by the Hub',
+          coalesce(reason, 'Contact the Hub if you believe this is a mistake.'),
+          '/account-suspended', 'account');
+  return true;
+end $$;
+
+create or replace function public.unban_account(target uuid)
+returns boolean language plpgsql security definer set search_path = public as $$
+begin
+  if not public.is_hub_admin(auth.uid()) then
+    raise exception 'Only the Hub can lift a ban';
+  end if;
+  update public.profiles
+     set banned_at = null, banned_by = null, ban_reason = null
+   where id = target;
+  insert into public.notifications (user_id, type, title, body, link, content_type)
+  values (target, 'moderation', 'Your account has been reinstated',
+          'You can sign in and take part again.', '/dashboard', 'account');
+  return true;
+end $$;
+
+grant execute on function public.suspend_member(uuid, text)   to authenticated;
+grant execute on function public.unsuspend_member(uuid)       to authenticated;
+grant execute on function public.ban_account(uuid, text)      to authenticated;
+grant execute on function public.unban_account(uuid)          to authenticated;
 
 -- ╔════════════════════════════════════════════════════════════════════════╗
 -- ║  5. Triggers                                                            ║
@@ -1737,10 +1954,11 @@ create policy blog_delete on public.blogs for delete using (public.is_hub_admin(
 -- visitor's support is held in their browser and saved here when they sign in.
 create policy react_read on public.post_reactions for select using (true);
 create policy react_write on public.post_reactions for all to authenticated
-  using (user_id = auth.uid()) with check (user_id = auth.uid());
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid() and not public.is_banned());
 
 -- ── Comments ─────────────────────────────────────────────────────────────
--- Commenting needs an account, unlike supporting.
+-- Commenting needs an account, unlike supporting. A banned account is refused.
 create policy comment_read on public.post_comments for select using (
   public.is_hub_admin()
   or (deleted_at is null and exists (
@@ -1750,6 +1968,7 @@ create policy comment_read on public.post_comments for select using (
 create policy comment_insert on public.post_comments for insert to authenticated
   with check (
     author_id = auth.uid()
+    and not public.is_banned()
     and exists (select 1 from public.posts p
                  where p.id = post_id and p.deleted_at is null and p.status = 'approved')
   );
@@ -1777,8 +1996,12 @@ create policy resource_write on public.resources for all
 -- ── Reports ──────────────────────────────────────────────────────────────
 create policy report_own_read on public.reports for select
   using (auth.uid() = user_id and deleted_at is null);
+-- A banned account cannot file through the signed-in path. Anonymous reporting
+-- is untouched: it goes through the service role and belongs to nobody yet, and
+-- refusing a survivor a report because of a moderation decision would be the
+-- wrong trade.
 create policy report_own_insert on public.reports for insert to authenticated
-  with check (auth.uid() = user_id);
+  with check (auth.uid() = user_id and not public.is_banned());
 
 create policy report_responders_read on public.reports for select using (
   public.can_administer_reports()

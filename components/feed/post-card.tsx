@@ -10,6 +10,7 @@ import { useReaction } from "@/lib/use-reaction";
 import { promptSignIn } from "@/lib/guest-reactions";
 import { timeAgo, cn } from "@/lib/utils";
 import { Avatar } from "@/components/ui/field";
+import { NetworkAvatar } from "@/components/feed/network-avatar";
 import { MediaBlock } from "@/components/feed/media-block";
 import { CommentThread } from "@/components/feed/comment-thread";
 import { deleteOwnContent, adminSoftDelete } from "@/app/actions/lifecycle";
@@ -126,32 +127,49 @@ export function PostCard({
     >
       <StateBanner item={item} />
 
-      {/* Header */}
+      {/* Header — the network is the author; the person who wrote it is
+          credited underneath, with their own avatar at a smaller size. */}
       <header className="flex items-start gap-2.5 p-3 pb-2">
-        <Avatar name={item.author.name} src={item.author.avatar_url} size={40} />
+        <NetworkAvatar
+          name={item.byline.name}
+          logoUrl={item.byline.logo_url}
+          isHub={item.byline.isHub}
+          size={44}
+        />
         <div className="min-w-0 flex-1">
           <p className="text-[15px] leading-tight">
-            <span className="font-semibold text-ink">{item.author.name}</span>
-            {item.is_hub && (
-              <BadgeCheck className="ml-1 inline h-4 w-4 -translate-y-px text-purple" aria-label="Verified" />
-            )}
-            {item.county && (
+            <span className="font-semibold text-ink">{item.byline.name}</span>
+            <BadgeCheck
+              className="ml-1 inline h-4 w-4 -translate-y-px text-purple"
+              aria-label="Verified network"
+            />
+            {item.byline.county && (
               <span className="text-ink/70">
                 {" "}
-                is in <span className="font-semibold text-ink">{item.county}</span>.
+                is in <span className="font-semibold text-ink">{item.byline.county}</span>.
               </span>
             )}
           </p>
+
+          {item.byline.person && (
+            <p className="mt-1 flex items-center gap-1.5 text-xs text-muted">
+              <Avatar
+                name={item.byline.person.name}
+                src={item.byline.person.avatar_url}
+                size={16}
+              />
+              <span className="truncate">
+                Posted by{" "}
+                <span className="font-semibold text-ink/80">{item.byline.person.name}</span>
+                {item.byline.person.title ? `, ${item.byline.person.title}` : ""}
+              </span>
+            </p>
+          )}
+
           <p className="mt-0.5 flex items-center gap-1.5 text-xs text-muted">
             <span>{timeAgo(item.published_at)}</span>
             <span aria-hidden>·</span>
             <Globe2 className="h-3 w-3" aria-label="Public" />
-            {item.org && (
-              <>
-                <span aria-hidden>·</span>
-                <span className="truncate">{item.org}</span>
-              </>
-            )}
           </p>
         </div>
 

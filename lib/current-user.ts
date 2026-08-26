@@ -17,6 +17,8 @@ export interface HubProfile {
   preferred_language: string | null;
   account_deleted_at: string | null;
   claimed_at: string | null;
+  banned_at: string | null;
+  ban_reason: string | null;
 }
 
 export interface CurrentUser {
@@ -30,6 +32,8 @@ export interface CurrentUser {
   isReporterOnly: boolean;
   /** The account was deleted. Every authenticated surface must refuse it. */
   isDeleted: boolean;
+  /** Banned by the Hub. Can read, cannot act. */
+  isBanned: boolean;
   /** Still on a generated username and an unreachable placeholder address. */
   needsClaiming: boolean;
   /**
@@ -56,7 +60,7 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
   const { data: profile } = await supabase
     .from("profiles")
     .select(
-      "id, email, full_name, username, title, bio, avatar_url, is_hub_admin, hub_onboarded, county_network_id, is_anonymous, user_type, preferred_language, account_deleted_at, claimed_at",
+      "id, email, full_name, username, title, bio, avatar_url, is_hub_admin, hub_onboarded, county_network_id, is_anonymous, user_type, preferred_language, account_deleted_at, claimed_at, banned_at, ban_reason",
     )
     .eq("id", user.id)
     .single();
@@ -77,9 +81,11 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
     isReporterOnly:
       !!p && !p.hub_onboarded && !p.is_hub_admin && (p.is_anonymous === true || p.user_type === "reporter"),
     isDeleted: !!p?.account_deleted_at,
+    isBanned: !!p?.banned_at,
     needsClaiming: !!p?.is_anonymous && !p.claimed_at,
     canPost:
       !p?.account_deleted_at &&
+      !p?.banned_at &&
       (!!p?.is_hub_admin ||
         p?.user_type === "admin" ||
         p?.user_type === "defender" ||

@@ -166,3 +166,46 @@ export async function setMemberRole(membershipId: string, role: "member" | "org_
   revalidatePath("/hub/members");
   return { ok: true };
 }
+
+/**
+ * The network's own mark.
+ *
+ * Posts are published as the organisation, so this is the image that heads
+ * every card its members write. Its own admins set it; so can the Hub.
+ */
+export async function updateOrganizationBranding(
+  organizationId: string,
+  patch: { logo_url?: string | null; description?: string },
+) {
+  const user = await getCurrentUser();
+  if (!user) return { error: "Please sign in." };
+
+  const supabase = await createClient();
+  const update: Record<string, unknown> = {};
+  if (patch.logo_url !== undefined) update.logo_url = patch.logo_url || null;
+  if (patch.description !== undefined) update.description = patch.description.trim() || null;
+  if (Object.keys(update).length === 0) return { ok: true };
+
+  const { error } = await supabase
+    .from("organizations")
+    .update(update)
+    .eq("id", organizationId);
+  if (error) return { error: error.message };
+
+  // RLS is the gate; confirm the write actually landed so a member without
+  // permission gets a message rather than a silent no-op.
+  const { data: after } = await supabase
+    .from("organizations")
+    .select("logo_url")
+    .eq("id", organizationId)
+    .maybeSingle();
+  if (patch.logo_url !== undefined && (after?.logo_url ?? null) !== (patch.logo_url || null)) {
+    return { error: "Only this network's admins can change its mark." };
+  }
+
+  revalidatePath("/dashboard/network");
+  revalidatePath("/organizations");
+  revalidatePath("/feed");
+  revalidatePath("/");
+  return { ok: true };
+}

@@ -360,3 +360,87 @@ referral matching including its county preference.
   oversight.
 * `profiles.onboarding_completed` (reporting) and `profiles.hub_onboarded`
   (Hub) both survive; only the latter drives redirects.
+
+---
+
+# Part three: networks, moderation and femtorship
+
+## A post belongs to a network
+
+A defender posts on behalf of her network, so the network is the author. Its
+name and its own mark head the card; she is credited underneath with her small
+avatar. That is how the movement presents itself, and it means a post does not
+stop making sense when one person moves on.
+
+`organizations.logo_url` holds the mark, and a network's admins set it from
+`/dashboard/network`. Without one the card falls back to the network's initials
+on a brand tint, which is legible rather than broken.
+
+Attribution is never lost: `FeedByline.person` carries the individual, which is
+what the Hub's moderation views read. A post from someone with no CBO yet is
+published as the Hub, because the Hub is the body that reviewed and approved it.
+
+The rule holds on the feed, the landing page cards, and the story page.
+
+## Moderation
+
+Two levels, deliberately separate, because they belong to different people.
+
+**Suspend** is a network admin's decision about one of their own members. It is
+local to that organisation, it is reversible by the same admin, and it stops the
+person posting — enforced by `can_post_to_feed()`, not merely hidden. A reason
+is required: the member sees exactly what it says, and so does the Hub, which is
+notified automatically because it is the only body that can escalate.
+
+**Ban** is the Hub's alone, from `/hub/moderation`. Account-wide: no posting,
+commenting, supporting, or filing a report while signed in. Every authenticated
+layout refuses the session and sends the person to `/account-suspended`.
+
+Three calls worth knowing about:
+
+* **A ban does not delete anything.** A moderation record that erased the
+  evidence would be worse than useless, and the content is what any later review
+  turns on.
+* **Anonymous reporting is untouched.** A ban blocks the signed-in report path;
+  the anonymous route goes through the service role and belongs to nobody yet.
+  `/account-suspended` links to `/report` for exactly this reason. Being barred
+  from the community is not a reason to be barred from help.
+* **A network admin cannot suspend a Hub admin**, and nobody can suspend
+  themselves.
+
+Lifting is symmetric and independent. Unbanning does not lift a network
+suspension, because the network's decision was never the Hub's to reverse.
+
+## Femtorship
+
+Matching has always been a Hub responsibility — the RLS on
+`mentorship_matches` says only a Hub admin may write one — but there was no
+screen for it, so the only way anyone got paired was if a member happened to
+open their own page. `/hub/femtorship` is that screen: the mentor and mentee
+pools, the pairings and what people did with them, and the matcher itself.
+
+It leads with the thing the Hub most needs to see: **people who asked for a
+femtor and have no suggestion at all**, which usually means nobody has offered
+support in the areas they need.
+
+Names appear there and nowhere else. A member sees a suggestion without an
+identity until both sides accept.
+
+## Database
+
+Still one script. `supabase/install.sql` gained:
+
+* `organizations.logo_url`
+* `org_memberships.status` extended with `suspended`, plus `suspended_at`,
+  `suspended_by`, `suspension_reason`
+* `profiles.banned_at`, `banned_by`, `ban_reason`
+* `suspend_member()`, `unsuspend_member()`, `ban_account()`, `unban_account()`
+* `is_banned()`, and `can_post_to_feed()` now refusing a banned account and a
+  suspended membership
+* RLS refusing a banned account from commenting, reacting and filing a
+  signed-in report
+
+`npm run db:test` covers all of it: 86 assertions now, including twenty on
+moderation alone — that a plain member cannot suspend, that a network admin
+cannot ban, that a banned account cannot act, that banning deletes nothing, and
+that lifting a ban does not lift a suspension.

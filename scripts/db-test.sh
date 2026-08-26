@@ -31,7 +31,9 @@ echo "Assertions:"
 # The assertion files change state as they go (they delete and purge rows), so
 # each one runs exactly once. psql's status is read from PIPESTATUS rather than
 # by re-running, which would fail against the state the first run left behind.
-for f in "$DIR"/tests/[123]*.sql; do
+for f in "$DIR"/tests/[0-9][0-9]_*.sql; do
+  # 00 is the Supabase shim, applied above; everything else is assertions.
+  case "$(basename "$f")" in 00_*) continue ;; esac
   printf '  %s\n' "$(basename "$f")"
   set +e
   psql -q -v ON_ERROR_STOP=1 -d "$DB" -f "$f" 2>&1 \

@@ -5,6 +5,8 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { Pill } from "@/components/ui/pill";
+import { matchMeta } from "@/lib/match-state";
+import { ReferralResponse } from "@/components/reporting/referral-response";
 import { translations } from "@/lib/i18n/translations";
 import { getServerLanguage } from "@/lib/i18n/server";
 
@@ -48,6 +50,7 @@ interface AssignedService {
   id: string;
   assigned_at: string | null;
   note: string | null;
+  match_status: string | null;
   services: {
     name: string;
     description: string | null;
@@ -87,7 +90,7 @@ export default async function ReportDetailPage({
     .select(
       `*,
        report_services (
-         id, service_id, assigned_at, note,
+         id, service_id, assigned_at, note, match_status,
          services (id, name, description, contact_phone, contact_email, contact_url)
        )`,
     )
@@ -97,12 +100,12 @@ export default async function ReportDetailPage({
 
   if (error || !report) return notFound();
 
-  const isVerified = report.verification_status === "verified";
-
-  // Support-service contact details only surface once the case is verified.
-  const services: AssignedService[] = isVerified
-    ? ((report.report_services ?? []) as unknown as AssignedService[])
-    : [];
+  // Matching runs the moment a report is filed, so support reaches the person
+  // who needs it without waiting on a fact-check. Somebody describing an
+  // immediate threat should not be told to come back when a case worker has
+  // had time to look.
+  const services: AssignedService[] =
+    (report.report_services ?? []) as unknown as AssignedService[];
 
   const STATUS: Record<string, { tone: Tone; label: string }> = {
     submitted: { tone: "amber", label: td.statusSubmitted },
@@ -275,9 +278,7 @@ export default async function ReportDetailPage({
       )}
 
       <Section title={t.assignedServices}>
-        {!isVerified ? (
-          <p className="text-sm text-muted">{t.notVerifiedYet}</p>
-        ) : services.length === 0 ? (
+        {services.length === 0 ? (
           <p className="text-sm text-muted">{t.notSpecified}</p>
         ) : (
           <div className="space-y-3">
@@ -322,6 +323,16 @@ export default async function ReportDetailPage({
                     <p className="mt-2 text-xs text-muted">
                       {t.assignedOn} {new Date(a.assigned_at).toLocaleDateString()}
                     </p>
+                  )}
+
+                  {/* Where this offer stands, and what she can do about it. */}
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <Pill tone={matchMeta(a.match_status).tone}>
+                      {matchMeta(a.match_status).survivorLabel}
+                    </Pill>
+                  </div>
+                  {(a.match_status === "proposed" || a.match_status === "provider_accepted") && (
+                    <ReferralResponse referralId={a.id} serviceName={svc?.name ?? "The service"} />
                   )}
                 </div>
               );

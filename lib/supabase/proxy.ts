@@ -42,7 +42,7 @@ export async function updateSession(request: NextRequest) {
     "/", "/login", "/signup", "/auth", "/feed",
     "/blog", "/about", "/our-work", "/organizations", "/counties", "/contact",
     "/partners", "/activity-images", "/press", "/resources", "/newsletter", "/opportunities",
-    "/privacy-policy", "/terms-of-use",
+    "/privacy-policy", "/terms-of-use", "/data",
     // Reporting: filing a report must work without an account. The form creates
     // an anonymous credentialed account on submit, so gating this behind login
     // would defeat the purpose of the platform.

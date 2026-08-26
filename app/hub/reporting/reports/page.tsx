@@ -5,6 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Pill } from "@/components/ui/pill";
+import { summariseReport } from "@/lib/match-state";
 
 const PAGE_SIZE = 15;
 
@@ -21,16 +23,22 @@ const CHANNEL_BADGE: Record<string, "secondary" | "info" | "success" | "warning"
   web: "secondary", ussd: "warning", api: "info", mobile: "success",
 };
 
-async function ReportsTable({ page, county, urgency, verif, reporter, channel, selfOnly, currentUserId }: {
+async function ReportsTable({ page, county, urgency, verif, reporter, channel, match, selfOnly, currentUserId }: {
   page: number; county?: string; urgency?: string; verif?: string; reporter?: string; channel?: string;
-  selfOnly?: boolean; currentUserId?: string;
+  match?: string; selfOnly?: boolean; currentUserId?: string;
 }) {
   const supabase = await createClient();
   const from = (page - 1) * PAGE_SIZE;
 
+  // A match filter has to join through report_services, so the embed becomes an
+  // inner join. The referral states shown in the column are then re-fetched
+  // separately below — otherwise the join would only hand back the referrals
+  // that matched the filter and the column would understate the case.
+  const columns = "id, incident_types, status, urgency, verification_status, reporter_type, county, created_at, perpetrator_type, consent_to_followup, channel";
+
   let query = supabase
     .from("reports")
-    .select("id, incident_types, status, urgency, verification_status, reporter_type, county, created_at, perpetrator_type, consent_to_followup, channel", { count: "exact" })
+    .select(match ? `${columns}, report_services!inner(match_status)` : columns, { count: "exact" })
     // Deleted cases live in /hub/reporting/deleted.
     .is("deleted_at", null)
     .order("created_at", { ascending: false })
@@ -42,9 +50,29 @@ async function ReportsTable({ page, county, urgency, verif, reporter, channel, s
   if (reporter) query = query.eq("reporter_type", reporter as "anonymous" | "authenticated");
   if (channel) query = query.eq("channel", channel as "web" | "ussd" | "api" | "mobile");
   if (selfOnly && currentUserId) query = query.eq("user_id", currentUserId);
+  if (match) query = query.eq("report_services.match_status", match);
 
-  const { data: reports, count } = await query;
+  const { data: rawReports, count } = await query;
+  const reports = (rawReports ?? []) as unknown as {
+    id: string; incident_types: string[]; status: string | null; urgency: string | null;
+    verification_status: string | null; reporter_type: string | null; county: string | null;
+    created_at: string | null; perpetrator_type: string | null; channel: string | null;
+  }[];
   const totalPages = Math.ceil((count ?? 0) / PAGE_SIZE);
+
+  // Referral states for the rows on this page, in one round trip.
+  const states = new Map<string, string[]>();
+  if (reports.length) {
+    const { data: refs } = await supabase
+      .from("report_services")
+      .select("report_id, match_status")
+      .in("report_id", reports.map(r => r.id));
+    for (const r of (refs ?? []) as { report_id: string; match_status: string | null }[]) {
+      const list = states.get(r.report_id) ?? [];
+      list.push(r.match_status ?? "proposed");
+      states.set(r.report_id, list);
+    }
+  }
 
   const buildUrl = (p: number) => {
     const params = new URLSearchParams();
@@ -54,6 +82,7 @@ async function ReportsTable({ page, county, urgency, verif, reporter, channel, s
     if (verif) params.set("verif", verif);
     if (reporter) params.set("reporter", reporter);
     if (channel) params.set("channel", channel);
+    if (match) params.set("match", match);
     if (selfOnly) params.set("self", "1");
     return `/hub/reporting/reports?${params}`;
   };
@@ -71,15 +100,16 @@ async function ReportsTable({ page, county, urgency, verif, reporter, channel, s
               <TableHead>Urgency</TableHead>
               <TableHead>Fact-Check</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead>Matching</TableHead>
               <TableHead>Channel</TableHead>
               <TableHead>Reporter</TableHead>
               <TableHead></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {!reports?.length ? (
+            {reports.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={10} className="text-center text-muted py-12">No reports found</TableCell>
+                <TableCell colSpan={11} className="text-center text-muted py-12">No reports found</TableCell>
               </TableRow>
             ) : reports.map(r => (
               <TableRow key={r.id}>
@@ -110,6 +140,12 @@ async function ReportsTable({ page, county, urgency, verif, reporter, channel, s
                   <Badge variant={(r.status && STATUS_BADGE[r.status]) || "secondary"}>
                     {r.status?.replace(/_/g, " ")}
                   </Badge>
+                </TableCell>
+                <TableCell>
+                  {(() => {
+                    const m = summariseReport(states.get(r.id) ?? []);
+                    return <Pill tone={m.tone}>{m.label}</Pill>;
+                  })()}
                 </TableCell>
                 <TableCell>
                   <Badge variant={CHANNEL_BADGE[r.channel ?? "web"] || "secondary"} className="uppercase">
@@ -167,6 +203,7 @@ async function AdminReportsContent({ searchParams }: { searchParams: Promise<Rec
   const verif = sp.verif;
   const reporter = sp.reporter;
   const channel = sp.channel;
+  const match = sp.match;
   const selfOnly = sp.self === "1";
 
   const supabase = await createClient();
@@ -234,6 +271,17 @@ async function AdminReportsContent({ searchParams }: { searchParams: Promise<Rec
           </select>
         </div>
         <div>
+          <label className="block text-xs font-semibold mb-1 text-muted">Matching</label>
+          <select name="match" defaultValue={match || ""} className="rounded-lg border border-line px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple">
+            <option value="">Any match state</option>
+            <option value="proposed">Matched — no response yet</option>
+            <option value="provider_accepted">Service accepted — awaiting survivor</option>
+            <option value="accepted">Both accepted</option>
+            <option value="declined">Declined</option>
+            <option value="completed">Completed</option>
+          </select>
+        </div>
+        <div>
           <label className="block text-xs font-semibold mb-1 text-muted">View</label>
           <select name="self" defaultValue={selfOnly ? "1" : ""} className="rounded-lg border border-line px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple">
             <option value="">All reports</option>
@@ -257,7 +305,7 @@ async function AdminReportsContent({ searchParams }: { searchParams: Promise<Rec
       <Suspense fallback={<div className="rounded-2xl border border-line bg-surface shadow-[0_1px_2px_rgba(28,21,34,0.04)] p-12 text-center text-muted animate-pulse">Loading reports...</div>}>
         <ReportsTable
           page={page} county={county} urgency={urgency} verif={verif} reporter={reporter} channel={channel}
-          selfOnly={selfOnly} currentUserId={currentUserId}
+          match={match} selfOnly={selfOnly} currentUserId={currentUserId}
         />
       </Suspense>
     </div>

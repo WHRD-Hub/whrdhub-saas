@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
+import { recomputeAllMatches } from "@/app/actions/mentorship";
 
 function slugify(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60) || "org";
@@ -160,6 +161,14 @@ export async function completeOnboarding(input: OnboardingInput) {
   );
   if (mentErr) return { error: mentErr.message };
 
+  // Pair them straight away — femtorship matching waits on no approval.
+  try {
+    await recomputeAllMatches("auto");
+  } catch {
+    /* best effort; their profile is saved regardless */
+  }
+
   revalidatePath("/dashboard");
+  revalidatePath("/hub/femtorship");
   return { ok: true };
 }

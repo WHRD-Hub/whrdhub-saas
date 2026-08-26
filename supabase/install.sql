@@ -1238,6 +1238,16 @@ begin
 
   with matched as (
     select s.id,
+           -- A rough confidence figure, so a coordinator can see at a glance
+           -- which suggestion is the strong one: local beats national beats
+           -- out-of-county, and urgency lifts the whole set.
+           (case
+              when r.county is not null and s.county = r.county then 80
+              when s.county is null then 60
+              else 35
+            end
+            + case r.urgency::text when 'immediate' then 15 when 'within_week' then 5 else 0 end
+           ) as score,
            case
              when r.county is not null and s.county = r.county
                then 'Matched: ' || s.category::text || ' support in ' || r.county
@@ -1258,8 +1268,8 @@ begin
         )
       )
   )
-  insert into public.report_services (report_id, service_id, assigned_by, note)
-  select r.id, m.id, r.verified_by, m.note from matched m
+  insert into public.report_services (report_id, service_id, assigned_by, note, match_status, match_score)
+  select r.id, m.id, r.verified_by, m.note, 'proposed', m.score from matched m
   on conflict (report_id, service_id) do nothing;
 
   get diagnostics n = row_count;
@@ -1753,6 +1763,186 @@ grant execute on function public.suspend_member(uuid, text)   to authenticated;
 grant execute on function public.unsuspend_member(uuid)       to authenticated;
 grant execute on function public.ban_account(uuid, text)      to authenticated;
 grant execute on function public.unban_account(uuid)          to authenticated;
+
+-- ╔════════════════════════════════════════════════════════════════════════╗
+-- ║  4c. The state of a match                                               ║
+-- ╚════════════════════════════════════════════════════════════════════════╝
+--
+-- A referral is not a single event. It is proposed, someone responds, and only
+-- then is anybody actually being helped. Without that distinction the console
+-- shows a wall of "matched" cases and nobody can tell which ones are moving.
+--
+--   proposed   The engine matched a service. Nobody has responded yet. This is
+--              the state that matters most: a case can sit here silently.
+--   provider   The support service accepted and is ready for the survivor.
+--   accepted   The survivor confirmed. Both sides are engaged.
+--   declined   One side said no. The case goes back into the pool.
+--   completed  The support was delivered.
+--   cancelled  Withdrawn, usually on the survivor's request.
+--
+-- The two response timestamps are kept separately because "who moved first"
+-- is exactly the question a coordinator is asking.
+
+do $$ begin
+  create type public.match_state as enum
+    ('proposed','provider_accepted','accepted','declined','completed','cancelled');
+exception when duplicate_object then null; end $$;
+
+alter table public.report_services
+  add column if not exists match_status         public.match_state default 'proposed',
+  add column if not exists match_score          integer,
+  add column if not exists provider_responded_at timestamptz,
+  add column if not exists survivor_responded_at timestamptz,
+  add column if not exists declined_reason      text,
+  add column if not exists cascade_level        integer default 0;
+
+update public.report_services set match_status = 'proposed' where match_status is null;
+
+create index if not exists report_services_status_idx
+  on public.report_services (match_status, assigned_at desc);
+
+/**
+ * Respond to a match.
+ *
+ * The survivor and the support service both use this, and who the caller is
+ * decides which half of the state moves. A survivor accepting a proposal that
+ * the provider has not seen still counts as the survivor accepting; the case
+ * only reaches 'accepted' once both are in.
+ */
+create or replace function public.respond_to_match(
+  referral uuid,
+  decision text,
+  reason text default null
+)
+returns text language plpgsql security definer set search_path = public as $$
+declare
+  caller     uuid := auth.uid();
+  rs         public.report_services%rowtype;
+  owner      uuid;
+  responder  boolean;
+  next_state public.match_state;
+begin
+  if caller is null then raise exception 'Not signed in'; end if;
+  if decision not in ('accept','decline') then
+    raise exception 'A match is either accepted or declined';
+  end if;
+
+  select * into rs from public.report_services where id = referral;
+  if not found then raise exception 'That referral no longer exists'; end if;
+
+  select user_id into owner from public.reports where id = rs.report_id;
+  responder := public.can_triage_reports(caller);
+
+  if owner is distinct from caller and not responder then
+    raise exception 'This referral is not yours to respond to';
+  end if;
+
+  if decision = 'decline' then
+    next_state := 'declined';
+    update public.report_services
+       set match_status = next_state,
+           declined_reason = reason,
+           provider_responded_at = case when responder then now() else provider_responded_at end,
+           survivor_responded_at = case when not responder then now() else survivor_responded_at end
+     where id = referral;
+    return next_state::text;
+  end if;
+
+  -- Accepting. The survivor's yes outranks the provider's: once she is in, the
+  -- match is live regardless of which side moved first.
+  if owner = caller and not responder then
+    next_state := 'accepted';
+    update public.report_services
+       set match_status = next_state, survivor_responded_at = now()
+     where id = referral;
+  else
+    next_state := case when rs.survivor_responded_at is not null
+                       then 'accepted'::public.match_state
+                       else 'provider_accepted'::public.match_state end;
+    update public.report_services
+       set match_status = next_state, provider_responded_at = now()
+     where id = referral;
+  end if;
+
+  return next_state::text;
+end $$;
+
+grant execute on function public.respond_to_match(uuid, text, text) to authenticated;
+
+-- Tell the reporter when a service accepts, so the first move is visible to her.
+create or replace function public.notify_match_progress()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare
+  v_user uuid;
+  v_name text;
+begin
+  if NEW.match_status is not distinct from OLD.match_status then return NEW; end if;
+
+  select user_id into v_user from public.reports where id = NEW.report_id;
+  if v_user is null then return NEW; end if;
+  select name into v_name from public.services where id = NEW.service_id;
+
+  if NEW.match_status = 'provider_accepted' then
+    insert into public.notifications (user_id, report_id, type, service_name, title, body)
+    values (v_user, NEW.report_id, 'match_accepted', v_name,
+            coalesce(v_name, 'A support service') || ' is ready to help',
+            'They have accepted your referral. Confirm to go ahead.');
+  elsif NEW.match_status = 'declined' then
+    insert into public.notifications (user_id, report_id, type, service_name, title, body)
+    values (v_user, NEW.report_id, 'match_declined', v_name,
+            'A referral was not taken up',
+            coalesce(NEW.declined_reason, 'We are looking for another service for you.'));
+  end if;
+  return NEW;
+end $$;
+
+drop trigger if exists trg_match_progress on public.report_services;
+create trigger trg_match_progress after update on public.report_services
+  for each row execute function public.notify_match_progress();
+
+/**
+ * Headline numbers for the matching console.
+ *
+ * `awaiting_response` is the one that matters: matched, and nobody has moved.
+ */
+create or replace function public.matching_overview()
+returns json language sql security definer set search_path = public as $$
+  select json_build_object(
+    'referrals',          (select count(*) from public.report_services rs
+                            join public.reports r on r.id = rs.report_id where r.deleted_at is null),
+    'awaiting_response',  (select count(*) from public.report_services rs
+                            join public.reports r on r.id = rs.report_id
+                           where r.deleted_at is null and rs.match_status = 'proposed'),
+    'provider_accepted',  (select count(*) from public.report_services rs
+                            join public.reports r on r.id = rs.report_id
+                           where r.deleted_at is null and rs.match_status = 'provider_accepted'),
+    'accepted',           (select count(*) from public.report_services rs
+                            join public.reports r on r.id = rs.report_id
+                           where r.deleted_at is null and rs.match_status = 'accepted'),
+    'declined',           (select count(*) from public.report_services rs
+                            join public.reports r on r.id = rs.report_id
+                           where r.deleted_at is null and rs.match_status = 'declined'),
+    'completed',          (select count(*) from public.report_services rs
+                            join public.reports r on r.id = rs.report_id
+                           where r.deleted_at is null and rs.match_status = 'completed'),
+    'reports_matched',    (select count(distinct rs.report_id) from public.report_services rs
+                            join public.reports r on r.id = rs.report_id where r.deleted_at is null),
+    'reports_unmatched',  (select count(*) from public.reports r
+                           where r.deleted_at is null
+                             and not exists (select 1 from public.report_services rs where rs.report_id = r.id)),
+    'stale_proposals',    (select count(*) from public.report_services rs
+                            join public.reports r on r.id = rs.report_id
+                           where r.deleted_at is null and rs.match_status = 'proposed'
+                             and rs.assigned_at < now() - interval '24 hours')
+  );
+$$;
+
+-- The reporter must be able to act on her own referrals, not only read them.
+drop policy if exists rs_own_read on public.report_services;
+create policy rs_own_read on public.report_services for select using (
+  exists (select 1 from public.reports r
+           where r.id = report_id and r.user_id = auth.uid() and r.deleted_at is null)
+);
 
 -- ╔════════════════════════════════════════════════════════════════════════╗
 -- ║  5. Triggers                                                            ║
@@ -2525,3 +2715,80 @@ where not exists (
   select 1 from public.listening_results lr
    where lr.source = v.source and lr.source_id = v.source_id
 );
+
+-- ── Referral states, so the matching console shows a real spread ────────────
+--
+-- Filing a report matches it automatically, which leaves every demo referral
+-- sitting at "proposed". That is one true state out of six and makes the
+-- console look broken. These updates walk the seeded cases through the
+-- lifecycle so each state is represented: one where nobody has responded, one
+-- the service has accepted and the survivor has not, one both sides are in,
+-- one declined, and one finished.
+
+do $$
+declare
+  r_urgent   uuid;
+  r_threats  uuid;
+  r_work     uuid;
+  r_ussd     uuid;
+  ref        uuid;
+begin
+  select id into r_urgent  from public.reports where description like '[DEMO] Coordinated pile-on%' limit 1;
+  select id into r_threats from public.reports where description like '[DEMO] Threats at a community%' limit 1;
+  select id into r_work    from public.reports where description like '[DEMO] Ongoing intimidation%' limit 1;
+  select id into r_ussd    from public.reports where description like '[DEMO] Report filed over USSD%' limit 1;
+
+  -- The urgent pile-on: matched four hours ago, still nobody has responded.
+  -- This is the case a coordinator should be chasing.
+  if r_urgent is not null then
+    update public.report_services
+       set match_status = 'proposed', assigned_at = now() - interval '30 hours'
+     where report_id = r_urgent;
+  end if;
+
+  -- Threats in Kitui: the legal desk has accepted, the survivor has not yet
+  -- confirmed. Waiting on her, not on the service.
+  if r_threats is not null then
+    select rs.id into ref
+      from public.report_services rs join public.services s on s.id = rs.service_id
+     where rs.report_id = r_threats and s.category::text = 'legal'
+     limit 1;
+    if ref is not null then
+      update public.report_services
+         set match_status = 'provider_accepted',
+             provider_responded_at = now() - interval '20 hours'
+       where id = ref;
+    end if;
+
+    -- And the shelter referral was declined: no bed free.
+    select rs.id into ref
+      from public.report_services rs join public.services s on s.id = rs.service_id
+     where rs.report_id = r_threats and s.category::text = 'shelter'
+     limit 1;
+    if ref is not null then
+      update public.report_services
+         set match_status = 'declined',
+             provider_responded_at = now() - interval '18 hours',
+             declined_reason = 'No bed available this week. Referred on to the national safe house.'
+       where id = ref;
+    end if;
+  end if;
+
+  -- Workplace case: both sides are in and the work is under way.
+  if r_work is not null then
+    update public.report_services
+       set match_status = 'accepted',
+           provider_responded_at = now() - interval '8 days',
+           survivor_responded_at = now() - interval '7 days'
+     where report_id = r_work;
+  end if;
+
+  -- The USSD case closed out.
+  if r_ussd is not null then
+    update public.report_services
+       set match_status = 'completed',
+           provider_responded_at = now() - interval '20 days',
+           survivor_responded_at = now() - interval '19 days'
+     where report_id = r_ussd;
+  end if;
+end $$;

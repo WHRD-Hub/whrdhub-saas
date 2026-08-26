@@ -38,11 +38,16 @@ function StatCard({
 /**
  * The Hub's view of femtorship.
  *
- * Matching is a Hub responsibility — the RLS on mentorship_matches has always
- * said so — but until now there was no screen for it, so the only way to pair
- * anyone was for a member to happen to open their own page. This is where the
- * Hub sees the pools, runs the matcher, and watches what people do with the
- * suggestions.
+ * The Hub watches femtorship; it does not gate it. Matching runs by itself the
+ * moment a member saves her answers, so a woman who asks for a femtor is paired
+ * within seconds rather than whenever an administrator next remembers to press
+ * a button. Nothing on this screen has to happen for a pairing to exist — the
+ * button below only recomputes suggestions early, which is useful after a batch
+ * of new members and pointless otherwise.
+ *
+ * What the Hub is here for is the gap: who asked and got nothing. That is the
+ * amber panel further down, and it is the only thing on this page that needs a
+ * person.
  *
  * Names are shown here and nowhere else: members see a suggestion without an
  * identity until both sides accept.
@@ -158,8 +163,9 @@ export default async function HubFemtorshipPage() {
           </h1>
           <p className="mt-1 max-w-prose text-sm text-muted">
             Who is offering to femtor, who is asking for one, and how the pairings are
-            going. Running the matcher recomputes suggestions for everyone; it never
-            disturbs a connection two people have already accepted.
+            going. Pairings are made automatically as members complete their answers —
+            nothing here waits on the Hub. Recomputing suggestions early is safe: it
+            never disturbs a connection two people have already accepted.
           </p>
         </div>
         <RunMatching />
@@ -182,9 +188,10 @@ export default async function HubFemtorshipPage() {
             suggestion
           </h2>
           <p className="mt-1 max-w-prose text-sm text-amber-900">
-            They asked for a femtor and the matcher has not found one. Usually that means
-            nobody has offered support in the areas they need. Run the matcher after new
-            members join, or reach out to them directly.
+            They asked for a femtor and the matcher has not found one. That is almost
+            always a supply problem: nobody has offered support in the areas they need.
+            Recomputing will not conjure a femtor — reach out to these women directly, or
+            recruit femtors in those areas.
           </p>
           <ul className="mt-3 flex flex-wrap gap-2">
             {waiting.slice(0, 12).map((p) => {

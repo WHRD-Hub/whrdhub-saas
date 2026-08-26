@@ -413,11 +413,12 @@ suspension, because the network's decision was never the Hub's to reverse.
 
 ## Femtorship
 
-Matching has always been a Hub responsibility — the RLS on
-`mentorship_matches` says only a Hub admin may write one — but there was no
-screen for it, so the only way anyone got paired was if a member happened to
-open their own page. `/hub/femtorship` is that screen: the mentor and mentee
-pools, the pairings and what people did with them, and the matcher itself.
+Writing a pairing has always been restricted — the RLS on
+`mentorship_matches` says only a Hub admin may — but there was no screen for
+it, so the only way anyone got paired was if a member happened to open their
+own page. `/hub/femtorship` is that screen: the mentor and mentee pools, the
+pairings and what people did with them. (Since the next section, matching also
+runs by itself; the Hub watches it rather than gating it.)
 
 It leads with the thing the Hub most needs to see: **people who asked for a
 femtor and have no suggestion at all**, which usually means nobody has offered
@@ -444,3 +445,105 @@ Still one script. `supabase/install.sql` gained:
 moderation alone — that a plain member cannot suspend, that a network admin
 cannot ban, that a banned account cannot act, that banning deletes nothing, and
 that lifting a ban does not lift a suspension.
+
+---
+
+# Data use, and matching in the open
+
+## A public data-use page
+
+`/data` is a public page — no session, no network, listed in the footer and in
+the middleware's allowlist — covering what the Hub collects, why, how long it
+keeps it, who it is shared with, and how to get it back or get rid of it.
+`/data#deletion` is the anchor: deleting your account from the app in four
+steps, or by writing to `data@whrdhub.org` with the subject *Delete my data*.
+It states plainly what deletion removes, and what it cannot remove — other
+people's posts that quote you, anonymous aggregates already published, records
+the law requires be kept, and backups, which are overwritten within thirty
+days.
+
+It also says, in the Hub's own words, that the Hub is a **data controller**
+under the Kenya Data Protection Act 2019 and answerable to the **ODPC**: the
+lawful bases it relies on (s.30), the data-subject rights it must honour, the
+72-hour breach-notification duty, and how to complain to the Commissioner if
+the Hub gets it wrong. The ODPC's contact details on the page are the real
+ones.
+
+One thing on that page is deliberately unfinished. The registered address and
+the ODPC registration number are placeholders with a note saying so: **do not
+publish a registration number you have not been granted.**
+
+The page exists partly because Facebook's app review asks for a public data-use
+and deletion URL. It reads as a page for the women who use the Hub, because
+that is who it is for.
+
+## Femtorship matching runs itself
+
+A woman who fills in her femtorship answers is paired within seconds.
+`recomputeAllMatches("auto")` runs from `saveProfile` and from onboarding, in a
+try/catch so a matcher failure can never cost her the answers she just typed.
+
+The Hub still has `/hub/femtorship`, but its job there changed: it watches. The
+button recomputes suggestions early — useful after a batch of new members,
+pointless otherwise — and the page now says so. The one thing on that screen
+that still needs a person is the amber panel: women who asked for a femtor and
+got nothing, which is a supply problem no button can solve.
+
+## Referrals have states now
+
+"Matched" was doing too much work. A referral sitting untouched for three days
+and one where both sides are actively talking looked identical in the console.
+`report_services` gained `match_status` (`proposed` → `provider_accepted` →
+`accepted`, or `declined` / `completed` / `cancelled`), `match_score`, separate
+`provider_responded_at` and `survivor_responded_at`, `declined_reason` and
+`cascade_level`.
+
+`respond_to_match(referral, decision, reason)` is how either side answers, and
+**the survivor's answer outranks the service's**. She can accept a proposal the
+service has not looked at yet and the referral is accepted — a service cannot
+mark itself as helping her, and she does not have to wait for it to notice her
+before she can say yes.
+
+She acts on this from her own report page: *Yes, connect me* / *Not this one*,
+with no confirmation dialogue, because a woman who has already decided should
+not have to decide twice.
+
+## The Hub can see it
+
+**`/hub/reporting/matching`** is the new screen:
+
+* counters straight from `matching_overview()` — awaiting response, service
+  accepted, both accepted, cases matched and unmatched;
+* an alert for **stale proposals**: anything open more than 24 hours with no
+  response from either side, because a silent referral is indistinguishable
+  from no referral;
+* every matched case with its referrals and their states, sorted so cases
+  waiting on somebody come first;
+* **a simulation.** The matcher is a database function, so the only way to see
+  what it does was to file a report and read a table afterwards. The simulation
+  steps a worked example through the pipeline — candidate pool, hard filters,
+  service relevance, proximity, urgency, load balancing, selection — showing
+  what each stage adds or takes away and why, then the state machine the
+  referral enters. Two scenarios: an urgent Nairobi case with local services,
+  and a Turkana case where almost nothing is local and the fallback carries it.
+  It touches no real data. It is built out of CSS and plain React: the graph
+  and animation libraries the reference implementation used are not
+  installable here, and the Hub ships no dependency it cannot audit.
+
+The reports list gained a **Matching** column and filter, so "show me
+everything matched that nobody has answered" is one dropdown.
+
+## Database
+
+Still one script. `supabase/install.sql` gained the `match_state` enum, the six
+new `report_services` columns, `respond_to_match()`, `notify_match_progress()`,
+`matching_overview()`, and a rewritten `rs_own_read` so a reporter can act on
+her own referrals rather than only read them. The seed walks ten referrals
+through the lifecycle so a fresh project shows a realistic spread rather than
+an empty console.
+
+`npm run db:test` is at 101 assertions. The new file, `50_match_states.sql`,
+asserts that a referral starts as proposed, that a stranger can neither see nor
+answer it, that the survivor's accept lands on `accepted` and is timestamped,
+that a decline keeps its reason, and that a deleted report drops out of the
+Hub's matching numbers.

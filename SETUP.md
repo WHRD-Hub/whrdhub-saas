@@ -44,8 +44,9 @@ npm run db:test
 
 Needs a local PostgreSQL 16 and nothing else. It builds a throwaway database,
 applies `install.sql` three times to prove it is idempotent, and runs 66
-assertions covering row-level security, deletion, membership approval and
-referral matching. See `supabase/tests/README.md`.
+assertions covering row-level security, deletion, membership approval,
+moderation, referral matching and the referral state machine. See
+`supabase/tests/README.md`.
 
 ## 3. Configure Supabase Auth
 

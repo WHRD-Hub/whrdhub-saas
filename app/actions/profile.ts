@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
 import { deleteOwnContent as softDeleteOwnContent } from "@/app/actions/lifecycle";
 import { deleteMyAccount } from "@/app/actions/account";
+import { recomputeAllMatches } from "@/app/actions/mentorship";
 
 async function requireUser() {
   const supabase = await createClient();
@@ -71,7 +72,19 @@ export async function saveFemtorship(input: {
     { onConflict: "user_id" },
   );
   if (error) return { error: error.message };
+
+  // Femtorship matching needs nobody's approval, so answering the questionnaire
+  // is what triggers it. A new femtee is paired within seconds instead of
+  // waiting for an administrator to run a batch. A failure here is not the
+  // member's problem: their answers are saved either way.
+  try {
+    await recomputeAllMatches("auto");
+  } catch {
+    /* matching is best effort */
+  }
+
   revalidatePath("/mentorship");
+  revalidatePath("/hub/femtorship");
   return { ok: true };
 }
 

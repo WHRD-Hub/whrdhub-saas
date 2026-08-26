@@ -46,7 +46,7 @@ export function RunMatching() {
     setMsg(null);
     const res = await recomputeAllMatches();
     setBusy(false);
-    setMsg(res?.error ? res.error : `Matching complete: ${res?.count ?? 0} suggestions.`);
+    setMsg(res?.error ? res.error : `Recomputed — ${res?.count ?? 0} suggestions.`);
     router.refresh();
   };
 
@@ -57,7 +57,7 @@ export function RunMatching() {
         disabled={busy}
         className="inline-flex items-center gap-1.5 rounded-xl bg-purple text-white px-4 py-2 text-sm font-semibold disabled:opacity-50"
       >
-        {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />} Run matching
+        {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />} Recompute suggestions
       </button>
       {msg && <span className="text-xs text-muted">{msg}</span>}
     </div>

@@ -8,6 +8,7 @@ import {
   ShieldCheck, Building2, Users, GitBranch, ChevronLeft, ChevronRight, Search, Bell,
   Megaphone, ClipboardCheck, Sparkles, LogOut, ChevronDown,
   BarChart2, RadioTower, Map as MapIcon, LifeBuoy, Trash2, UserX, UserCog, Gavel,
+  Workflow,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
@@ -24,7 +25,7 @@ const ICONS = {
   matching: GitBranch, reports: FileText, queue: ClipboardCheck, blogs: BookOpen,
   // Reporting console
   triage: ShieldCheck, analytics: BarChart2, listening: RadioTower, map: MapIcon,
-  support: LifeBuoy, linkages: GitBranch,
+  support: LifeBuoy, linkages: GitBranch, matchflow: Workflow,
   deleted: Trash2, accounts: UserX, account: UserCog, moderation: Gavel,
 } as const;
 

@@ -100,6 +100,7 @@ export default async function HubLayout({ children }: { children: React.ReactNod
       badge: reportsUrgent || reportsPending || undefined,
       section: "Reporting",
     },
+    { label: "Matching", href: "/hub/reporting/matching", icon: "matchflow", section: "Reporting" },
     { label: "Incident map", href: "/hub/reporting/map", icon: "map", section: "Reporting" },
     ...(access?.canAdminister
       ? ([

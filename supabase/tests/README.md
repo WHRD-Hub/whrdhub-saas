@@ -29,6 +29,8 @@ real project, where Supabase provides all of it.
 | `20_rls_assertions.sql` | Report visibility per role · content visibility · soft delete and who may purge · comments · membership approval · account deletion |
 | `30_matching.sql` | Verifying a report assigns support services and notifies the reporter, and does not duplicate on re-save |
 | `31_matching_county.sql` | Referrals prefer the reporter's county, fall back to national, and never answer a request with nothing |
+| `40_moderation.sql` | A network suspends, only the Hub bans, neither reaches past its own level, and lifting one does not lift the other |
+| `50_match_states.sql` | A referral starts as proposed · a stranger can neither see nor answer it · the survivor's accept is decisive and timestamped · a decline keeps its reason · a deleted report leaves the Hub's matching numbers |
 
 ## Adding a test
 

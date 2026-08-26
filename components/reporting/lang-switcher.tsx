@@ -60,7 +60,7 @@ export function LangSwitcher({ variant = "compact", className = "" }: LangSwitch
         <div
           role="listbox"
           aria-label="Select language"
-          className="absolute right-0 top-full mt-1.5 z-[200] min-w-[180px] bg-white border border-line rounded-xl shadow-lg overflow-hidden"
+          className="absolute right-0 top-full mt-1.5 z-[200] min-w-[180px] bg-surface border border-line rounded-xl shadow-lg overflow-hidden"
         >
           {SUPPORTED.map((lang: Language) => {
             const meta = LANGUAGE_META[lang];

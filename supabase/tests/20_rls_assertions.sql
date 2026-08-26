@@ -78,33 +78,50 @@ begin
   perform pg_temp.check('hub admin sees both',
     pg_temp.as_user(hubadmin, q_posts), 2);
 
-  raise notice '=== SOFT DELETE ===';
-  perform pg_temp.check_txt('author soft-deletes their own post',
-    pg_temp.do_as(member, format('update public.posts set deleted_at = now() where id = %L', P_APPROVED)), 'ok');
-  perform pg_temp.check('deleted post leaves the public feed',
+  raise notice '=== DELETING YOUR OWN CONTENT ===';
+  perform pg_temp.check_txt('author deletes their own post',
+    pg_temp.do_as(member, format('select public.delete_own_content(''post'', %L)', P_APPROVED)), 'ok');
+  perform pg_temp.check('it leaves the public feed',
     pg_temp.as_user(stranger, q_posts), 0);
-  perform pg_temp.check('author still sees it, marked deleted',
-    pg_temp.as_user(member, q_posts), 2);
-  perform pg_temp.check('...and it reads as deleted in their own view',
-    pg_temp.as_user(member, format(
-      'select count(*) from public.posts where id = %L and deleted_at is not null', P_APPROVED)), 1);
-  perform pg_temp.check('hub admin still sees it in full',
+  perform pg_temp.check('it leaves the author''s own account too',
+    pg_temp.as_user(member, q_posts), 1);
+  perform pg_temp.check('the hub still sees it in full',
     pg_temp.as_user(hubadmin, q_posts), 2);
-  perform pg_temp.check('deleted_by was stamped automatically',
+  perform pg_temp.check('deleted_by was recorded',
     pg_temp.as_user(hubadmin, format(
       'select count(*) from public.posts where id = %L and deleted_by = %L', P_APPROVED, member)), 1);
-  perform pg_temp.check_txt('author cannot purge a post',
+  perform pg_temp.check_txt('one member cannot delete another''s post',
+    pg_temp.do_as(stranger, format('select public.delete_own_content(''post'', %L)', P_PENDING)), 'denied');
+  perform pg_temp.check_txt('an author cannot purge a row',
     pg_temp.do_as(member, format('delete from public.posts where id = %L', P_APPROVED)), 'ok');
-  perform pg_temp.check('...post survives the author''s delete attempt',
+  perform pg_temp.check('...the post survives that attempt',
     pg_temp.as_user(hubadmin, q_posts), 2);
+  perform pg_temp.check_txt('only the hub can restore',
+    pg_temp.do_as(member, format('select public.restore_content(''post'', %L)', P_APPROVED)), 'denied');
   perform pg_temp.check_txt('hub admin restores it',
-    pg_temp.do_as(hubadmin, format('update public.posts set deleted_at = null where id = %L', P_APPROVED)), 'ok');
+    pg_temp.do_as(hubadmin, format('select public.restore_content(''post'', %L)', P_APPROVED)), 'ok');
   perform pg_temp.check('restored post is public again',
     pg_temp.as_user(stranger, q_posts), 1);
   perform pg_temp.check_txt('hub admin purges permanently',
     pg_temp.do_as(hubadmin, format('delete from public.posts where id = %L', P_PENDING)), 'ok');
   perform pg_temp.check('...and it is gone',
     pg_temp.as_user(hubadmin, q_posts), 1);
+
+  raise notice '=== DELETING YOUR OWN REPORT ===';
+  perform pg_temp.check('the reporter can see their report',
+    pg_temp.as_user(anonrep, 'select count(*) from public.reports'), 1);
+  perform pg_temp.check_txt('the reporter deletes it',
+    pg_temp.do_as(anonrep, format('select public.delete_own_content(''report'', %L)', R_ANON)), 'ok');
+  perform pg_temp.check('it leaves their account',
+    pg_temp.as_user(anonrep, 'select count(*) from public.reports'), 0);
+  perform pg_temp.check('a triage defender no longer sees it either',
+    pg_temp.as_user(defender, 'select count(*) from public.reports'), 1);
+  perform pg_temp.check('the hub still sees it',
+    pg_temp.as_user(hubadmin, 'select count(*) from public.reports'), 2);
+  perform pg_temp.check_txt('hub admin restores the report',
+    pg_temp.do_as(hubadmin, format('select public.restore_content(''report'', %L)', R_ANON)), 'ok');
+  perform pg_temp.check('the reporter has it back',
+    pg_temp.as_user(anonrep, 'select count(*) from public.reports'), 1);
 
   raise notice '=== COMMENTS ===';
   perform pg_temp.check_txt('member comments on an approved post',
@@ -117,12 +134,33 @@ begin
       P_APPROVED, member)), 'denied');
   perform pg_temp.check('the comment is public',
     pg_temp.as_user(stranger, 'select count(*) from public.post_comments'), 1);
-  perform pg_temp.check_txt('author soft-deletes their comment',
-    pg_temp.do_as(member, 'update public.post_comments set deleted_at = now()'), 'ok');
-  perform pg_temp.check('deleted comment is hidden publicly',
+  perform pg_temp.check_txt('author deletes their comment',
+    pg_temp.do_as(member,
+      'select public.delete_own_content(''comment'', (select id from public.post_comments limit 1))'), 'ok');
+  perform pg_temp.check('the deleted comment is gone for everyone',
     pg_temp.as_user(stranger, 'select count(*) from public.post_comments'), 0);
-  perform pg_temp.check('hub admin still reads it',
+  perform pg_temp.check('...including its author',
+    pg_temp.as_user(member, 'select count(*) from public.post_comments'), 0);
+  perform pg_temp.check('the hub still reads it',
     pg_temp.as_user(hubadmin, 'select count(*) from public.post_comments'), 1);
+
+  raise notice '=== WHO MAY POST ===';
+  perform pg_temp.check_txt('a member of an organisation may post',
+    pg_temp.do_as(orgadmin, format(
+      'insert into public.posts (author_id, body, status) values (%L, ''TEST member post'', ''pending'')',
+      orgadmin)), 'ok');
+  perform pg_temp.check_txt('someone in no network cannot post',
+    pg_temp.do_as(stranger, format(
+      'insert into public.posts (author_id, body, status) values (%L, ''TEST outsider post'', ''pending'')',
+      stranger)), 'denied');
+  perform pg_temp.check_txt('a member cannot publish straight to the feed',
+    pg_temp.do_as(orgadmin, format(
+      'insert into public.posts (author_id, body, status) values (%L, ''TEST sneaky'', ''approved'')',
+      orgadmin)), 'denied');
+  perform pg_temp.check_txt('a hub admin publishes directly',
+    pg_temp.do_as(hubadmin, format(
+      'insert into public.posts (author_id, body, status) values (%L, ''TEST hub post'', ''approved'')',
+      hubadmin)), 'ok');
 
   raise notice '=== MEMBERSHIP VERIFICATION ===';
   perform pg_temp.check_txt('reporter-origin account requests to join a CBO',
@@ -156,9 +194,13 @@ begin
   perform pg_temp.check_txt('a user deletes their own account',
     pg_temp.do_as(member, format('select public.delete_account(%L, ''no longer needed'')', member)), 'ok');
   perform pg_temp.check('their content left the public surfaces',
-    pg_temp.as_user(stranger, q_posts), 0);
+    pg_temp.as_user(stranger, format(
+      'select count(*) from public.posts where author_id = %L', member)), 0);
   perform pg_temp.check('the hub still sees the content',
-    pg_temp.as_user(hubadmin, q_posts), 1);
+    pg_temp.as_user(hubadmin, format(
+      'select count(*) from public.posts where author_id = %L', member)), 1);
+  perform pg_temp.check('their reports went too',
+    pg_temp.as_user(member, 'select count(*) from public.reports'), 0);
   perform pg_temp.check('the deleted profile is hidden from other members',
     pg_temp.as_user(stranger, format('select count(*) from public.profiles where id = %L', member)), 0);
   perform pg_temp.check('the hub still sees the deleted account',

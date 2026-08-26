@@ -26,7 +26,6 @@ begin
                               status, verification_status, reporter_type, channel)
   values (array['online_harassment'],'m1','Kitui', array['legal'],'no_rush','submitted','pending','anonymous','web')
   returning id into r1;
-  update public.reports set verification_status = 'verified' where id = r1;
   perform pg_temp.expect('Kitui + legal gets the local desk and the national body',
     pg_temp.names(r1), 'FIDA Kenya legal aid, Kitui paralegal desk');
 
@@ -35,7 +34,6 @@ begin
                               status, verification_status, reporter_type, channel)
   values (array['online_harassment'],'m2','Nairobi', array['legal'],'no_rush','submitted','pending','anonymous','web')
   returning id into r2;
-  update public.reports set verification_status = 'verified' where id = r2;
   perform pg_temp.expect('Nairobi + legal falls back to national', pg_temp.names(r2), 'FIDA Kenya legal aid');
 
   -- Meru asks for medical: only Nairobi and Mombasa have one, and neither is
@@ -44,7 +42,6 @@ begin
                               status, verification_status, reporter_type, channel)
   values (array['physical_violence'],'m3','Meru', array['medical'],'immediate','submitted','pending','anonymous','web')
   returning id into r3;
-  update public.reports set verification_status = 'verified' where id = r3;
   if pg_temp.names(r3) = '(none)' then
     raise exception 'FAIL a county with no local or national service got nothing';
   end if;
@@ -55,7 +52,6 @@ begin
                               status, verification_status, reporter_type, channel)
   values (array['physical_violence'],'m4','Nakuru', array['shelter','digital_security'],'immediate','submitted','pending','anonymous','web')
   returning id into r4;
-  update public.reports set verification_status = 'verified' where id = r4;
   perform pg_temp.expect('Nakuru gets its local shelter, the national safe house and the clinic',
     pg_temp.names(r4), 'Digital security clinic, Nakuru emergency shelter, Safe house placement');
 

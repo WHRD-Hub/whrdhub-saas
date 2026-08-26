@@ -83,9 +83,9 @@ async function AnalyticsContent() {
   const monthlyTrend = Object.entries(months).map(([month, v]) => ({ month, ...v }));
 
   return (
-    <div className="p-8 space-y-8">
+    <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-black text-ink mb-1 flex items-center gap-2">
+        <h1 className="text-2xl font-black text-ink flex items-center gap-2">
           <BarChart2 className="w-6 h-6 text-purple" />
           Analytics
         </h1>
@@ -102,7 +102,7 @@ async function AnalyticsContent() {
           { label: "Immediate urgency",  value: urgencyBreakdown[0].count },
           { label: "Incident types",     value: incidentBreakdown.length },
         ].map(({ label, value }) => (
-          <div key={label} className="bg-white rounded-xl border border-line p-4">
+          <div key={label} className="rounded-2xl border border-line bg-surface shadow-[0_1px_2px_rgba(28,21,34,0.04)] p-4">
             <p className="text-2xl font-black">{value}</p>
             <p className="text-xs text-muted mt-0.5">{label}</p>
           </div>
@@ -128,9 +128,9 @@ async function AnalyticsContent() {
 export default function AnalyticsPage() {
   return (
     <Suspense fallback={
-      <div className="p-8 grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         {[...Array(8)].map((_, i) => (
-          <div key={i} className="bg-white rounded-xl border h-32 animate-pulse" />
+          <div key={i} className="rounded-2xl border border-line bg-surface shadow-[0_1px_2px_rgba(28,21,34,0.04)] h-32 animate-pulse" />
         ))}
       </div>
     }>

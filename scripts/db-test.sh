@@ -23,10 +23,9 @@ run() {
 
 echo "Schema:"
 run "$DIR/tests/00_supabase_shim.sql"
-run "$DIR/schema/bootstrap.sql"
-run "$DIR/schema/bootstrap.sql"   # again: the schema must be idempotent
-run "$DIR/schema/seed.sql"
-run "$DIR/schema/seed.sql"        # again: seeding must not duplicate
+run "$DIR/install.sql"
+run "$DIR/install.sql"   # again: the whole script must be idempotent
+run "$DIR/install.sql"   # and again, because twice is not a pattern
 
 echo "Assertions:"
 # The assertion files change state as they go (they delete and purge rows), so

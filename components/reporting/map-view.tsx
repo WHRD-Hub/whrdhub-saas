@@ -108,7 +108,7 @@ export function MapView({ reports }: { reports: Report[] }) {
   return (
     <div className="flex h-full">
       {/* Sidebar */}
-      <div className={`${sidebarOpen ? "w-72" : "w-0"} transition-all duration-300 bg-white border-r border-line overflow-hidden shrink-0`}>
+      <div className={`${sidebarOpen ? "w-72" : "w-0"} transition-all duration-300 bg-surface border-r border-line overflow-hidden shrink-0`}>
         <div className="w-72 h-full flex flex-col">
           <div className="p-4 border-b border-line">
             <h2 className="font-bold text-sm">Incidents on Map</h2>
@@ -161,11 +161,11 @@ export function MapView({ reports }: { reports: Report[] }) {
         <div ref={mapRef} className="absolute inset-0" />
         <button
           onClick={() => setSidebarOpen(!sidebarOpen)}
-          className="absolute top-3 left-3 z-[1000] bg-white/95 backdrop-blur-sm rounded-lg shadow-lg border border-line px-2.5 py-1.5 text-xs font-medium hover:bg-white transition-colors"
+          className="absolute top-3 left-3 z-[1000] bg-surface/95 backdrop-blur-sm rounded-lg shadow-lg border border-line px-2.5 py-1.5 text-xs font-medium hover:bg-surface transition-colors"
         >
           {sidebarOpen ? "Hide list" : "Show list"}
         </button>
-        <div className="absolute bottom-4 right-4 bg-white/95 backdrop-blur-sm rounded-xl shadow-lg border border-line p-3 z-[1000] space-y-1.5 text-xs">
+        <div className="absolute bottom-4 right-4 bg-surface/95 backdrop-blur-sm rounded-xl shadow-lg border border-line p-3 z-[1000] space-y-1.5 text-xs">
           <p className="font-bold text-xs mb-1.5">Legend</p>
           {Object.entries(URGENCY_COLORS).map(([key, color]) => (
             <div key={key} className="flex items-center gap-2">

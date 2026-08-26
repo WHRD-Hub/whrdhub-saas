@@ -60,7 +60,7 @@ async function ReportsTable({ page, county, urgency, verif, reporter, channel, s
 
   return (
     <div className="space-y-4">
-      <div className="bg-white rounded-xl border border-line overflow-x-auto">
+      <div className="rounded-2xl border border-line bg-surface shadow-[0_1px_2px_rgba(28,21,34,0.04)] overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow className="bg-paper">
@@ -183,12 +183,12 @@ async function AdminReportsContent({ searchParams }: { searchParams: Promise<Rec
   return (
     <div className="p-4 sm:p-8 space-y-6">
       <div>
-        <h1 className="text-2xl font-black text-ink mb-1">All Reports</h1>
+        <h1 className="text-2xl font-black text-ink">All Reports</h1>
         <p className="text-muted text-sm">Review, filter, and fact-check incoming reports.</p>
       </div>
 
       {/* Filters */}
-      <form method="GET" className="bg-white rounded-xl border border-line p-4 flex flex-wrap gap-3 items-end">
+      <form method="GET" className="rounded-2xl border border-line bg-surface shadow-[0_1px_2px_rgba(28,21,34,0.04)] p-4 flex flex-wrap gap-3 items-end">
         <div>
           <label className="block text-xs font-semibold mb-1 text-muted">County</label>
           <select name="county" defaultValue={county || ""} className="rounded-lg border border-line px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple">
@@ -254,7 +254,7 @@ async function AdminReportsContent({ searchParams }: { searchParams: Promise<Rec
         </div>
       )}
 
-      <Suspense fallback={<div className="bg-white rounded-xl border border-line p-12 text-center text-muted animate-pulse">Loading reports...</div>}>
+      <Suspense fallback={<div className="rounded-2xl border border-line bg-surface shadow-[0_1px_2px_rgba(28,21,34,0.04)] p-12 text-center text-muted animate-pulse">Loading reports...</div>}>
         <ReportsTable
           page={page} county={county} urgency={urgency} verif={verif} reporter={reporter} channel={channel}
           selfOnly={selfOnly} currentUserId={currentUserId}

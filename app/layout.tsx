@@ -8,6 +8,7 @@ import { GuestReactionSync } from "@/components/guest-reaction-sync";
 import { Providers } from "./providers";
 import { ServiceWorkerRegistrar } from "@/components/pwa/service-worker-registrar";
 import { OfflineSyncManager } from "@/components/pwa/offline-sync-manager";
+import { InstallPrompt } from "@/components/pwa/install-prompt";
 import { SITE_URL, SITE_NAME, SITE_TAGLINE, SITE_DESCRIPTION } from "@/lib/seo";
 
 const geistSans = Geist({
@@ -74,6 +75,7 @@ export default function RootLayout({
         <GuestReactionSync />
         <ServiceWorkerRegistrar />
         <OfflineSyncManager />
+        <InstallPrompt />
       </body>
     </html>
   );

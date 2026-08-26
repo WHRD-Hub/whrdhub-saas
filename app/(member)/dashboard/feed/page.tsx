@@ -16,7 +16,8 @@ export default async function MemberFeedPage() {
     supabase.from("county_networks").select("name, slug").eq("is_active", true).order("name"),
   ]);
 
-  const canPost = !!user && !user.isDeleted;
+  // Writing to the feed is a member's act; the database enforces the same rule.
+  const canPost = !!user && !user.isDeleted && user.canPost;
 
   // Inside the dashboard shell the sidebar is already the navigation, so the
   // feed's own rails are suppressed by the -mx pull and max-width below.

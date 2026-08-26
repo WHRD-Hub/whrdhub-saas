@@ -137,8 +137,8 @@ async function ReportDetail({ id }: { id: string }) {
         {/* Main report content */}
         <div className="lg:col-span-2 space-y-5">
           {/* 5Ws+H */}
-          <div className="bg-white rounded-xl border border-line p-6 space-y-5">
-            <h2 className="font-bold text-base flex items-center gap-2"><Shield className="w-4 h-4 text-purple" />Incident Details (5Ws + H)</h2>
+          <div className="rounded-2xl border border-line bg-surface shadow-[0_1px_2px_rgba(28,21,34,0.04)] p-6 space-y-5">
+            <h2 className="font-black text-ink text-base flex items-center gap-2"><Shield className="w-4 h-4 text-purple" />Incident Details (5Ws + H)</h2>
 
             <div>
               <p className="text-xs font-semibold text-muted uppercase mb-1.5">WHAT - Incident Types</p>
@@ -212,7 +212,7 @@ async function ReportDetail({ id }: { id: string }) {
           </div>
 
           {/* Support requested */}
-          <div className="bg-white rounded-xl border border-line p-6 space-y-3">
+          <div className="rounded-2xl border border-line bg-surface shadow-[0_1px_2px_rgba(28,21,34,0.04)] p-6 space-y-3">
             <h2 className="font-bold text-base">Support Requested</h2>
             <div className="flex flex-wrap gap-1.5">
               {(report.support_needed as string[]).map(s => <Badge key={s} variant="secondary">{s.replace(/_/g, " ")}</Badge>)}
@@ -239,7 +239,7 @@ async function ReportDetail({ id }: { id: string }) {
         {/* Sidebar */}
         <div className="space-y-5">
           {/* Reporter info */}
-          <div className="bg-white rounded-xl border border-line p-5 space-y-3">
+          <div className="rounded-2xl border border-line bg-surface shadow-[0_1px_2px_rgba(28,21,34,0.04)] p-5 space-y-3">
             <h3 className="font-bold text-sm flex items-center gap-2"><User className="w-4 h-4 text-purple" />Reporter</h3>
             <div className="space-y-2 text-sm">
               <div className="flex items-center gap-2">
@@ -259,7 +259,7 @@ async function ReportDetail({ id }: { id: string }) {
           </div>
 
           {/* Assigned services */}
-          <div className="bg-white rounded-xl border border-line p-5 space-y-4">
+          <div className="rounded-2xl border border-line bg-surface shadow-[0_1px_2px_rgba(28,21,34,0.04)] p-5 space-y-4">
             <h3 className="font-bold text-sm flex items-center gap-2"><Briefcase className="w-4 h-4 text-purple" />Assigned Services</h3>
             {!assignedServices?.length ? (
               <p className="text-xs text-muted">No services assigned yet.</p>
@@ -300,7 +300,7 @@ async function ReportDetail({ id }: { id: string }) {
 
           {/* Audit log */}
           {auditLog && auditLog.length > 0 && (
-            <div className="bg-white rounded-xl border border-line p-5 space-y-3">
+            <div className="rounded-2xl border border-line bg-surface shadow-[0_1px_2px_rgba(28,21,34,0.04)] p-5 space-y-3">
               <h3 className="font-bold text-sm">Audit Trail</h3>
               <div className="space-y-2">
                 {auditLog.map((log, i) => {

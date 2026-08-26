@@ -40,9 +40,15 @@ function isIos(): boolean {
 }
 
 /**
- * Suggests installing the app to the home screen. On Chromium browsers it uses
- * the native `beforeinstallprompt` flow; on iOS Safari (no such event) it shows
- * the manual "Add to Home Screen" instructions.
+ * Offers to install the app to the home screen.
+ *
+ * Mounted at the app root, so it appears on any page a visitor opens. On
+ * Chromium it rides the native `beforeinstallprompt` event, which only fires
+ * once the browser considers the app installable; on iOS Safari, which has no
+ * such event, it shows the manual "Add to Home Screen" steps instead.
+ *
+ * Installing matters more here than it does for most sites: the installed app
+ * is what lets someone file a report with no signal.
  */
 export function InstallPrompt() {
   const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
@@ -67,9 +73,10 @@ export function InstallPrompt() {
     window.addEventListener("appinstalled", onInstalled);
 
     // iOS never fires beforeinstallprompt — offer manual instructions instead.
+    // The delay keeps this from landing on top of the language chooser.
     let iosTimer: ReturnType<typeof setTimeout> | undefined;
     if (isIos() && !isStandalone()) {
-      iosTimer = setTimeout(() => setVisible(true), 1500);
+      iosTimer = setTimeout(() => setVisible(true), 4000);
     }
 
     return () => {
@@ -107,21 +114,22 @@ export function InstallPrompt() {
     <div
       role="region"
       aria-label="Install WHRD Hub"
-      className="rounded-2xl border border-purple/20 bg-purple/5 p-4 sm:p-5 shadow-sm"
+      className="rise fixed inset-x-3 bottom-3 z-[90] mx-auto max-w-md rounded-2xl border border-purple/20 bg-surface p-4 shadow-2xl sm:inset-x-auto sm:right-4 sm:bottom-4"
     >
       <div className="flex items-start gap-3 sm:gap-4">
         <div className="w-11 h-11 shrink-0 rounded-xl bg-purple/10 text-purple flex items-center justify-center">
           <Download className="w-5 h-5" />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="font-bold text-sm text-ink">Install WHRD Hub</p>
-          <p className="text-xs text-muted mt-0.5 leading-relaxed">
-            Add the app to your home screen for faster, more private access &mdash; and
-            to report even when you&apos;re offline.
+          <p className="text-sm font-bold text-ink">Install WHRD Hub</p>
+          <p className="mt-0.5 text-xs leading-relaxed text-muted">
+            Add it to your home screen. It opens faster, looks like any other app on your
+            phone, and lets you write a report or a post with no signal &mdash; they send
+            themselves once you are back online.
           </p>
 
           {showIosHelp ? (
-            <div className="mt-3 rounded-xl bg-white border border-line p-3 text-xs text-muted space-y-1.5">
+            <div className="mt-3 space-y-1.5 rounded-xl border border-line bg-paper p-3 text-xs text-muted">
               <p className="font-semibold text-ink">On iPhone / iPad:</p>
               <p className="flex items-center gap-1.5">
                 1. Tap the Share icon <Share className="w-3.5 h-3.5 inline" /> in Safari.

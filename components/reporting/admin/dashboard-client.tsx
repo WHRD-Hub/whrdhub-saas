@@ -30,23 +30,29 @@ const CHANNEL_BADGE: Record<string, "secondary" | "info" | "success" | "warning"
   web: "secondary", ussd: "warning", api: "info", mobile: "success",
 };
 
-const PURPLE = "hsl(271, 76%, 31%)";
-const GOLD = "hsl(39, 78%, 46%)";
+const PURPLE = "#734e9e";
+const GOLD = "#ce2087";
 const COLORS = [PURPLE, GOLD, "#10b981", "#3b82f6", "#f43f5e", "#8b5cf6", "#f97316", "#06b6d4"];
 
 const URGENCY_ORDER = ["immediate", "within_week", "no_rush"];
 const URGENCY_LABELS: Record<string, string> = { immediate: "Immediate", within_week: "Within Week", no_rush: "No Rush" };
 
-function StatCard({ label, value, icon: Icon, color }: { label: string; value: number; icon: React.ElementType; color: string }) {
+/**
+ * The Hub's stat tile: a pastel surface with a white icon chip, matching the
+ * management cards on the community overview so the two consoles read as one.
+ */
+function StatCard({
+  label, value, icon: Icon, bg, ic,
+}: {
+  label: string; value: number; icon: React.ElementType; bg: string; ic: string;
+}) {
   return (
-    <div className="bg-surface rounded-2xl border border-line p-5 flex items-center gap-4">
-      <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${color}`}>
-        <Icon className="w-5 h-5" />
+    <div className={`rounded-2xl ${bg} p-5`}>
+      <div className={`grid h-10 w-10 place-items-center rounded-xl bg-surface ${ic}`}>
+        <Icon className="h-5 w-5" />
       </div>
-      <div>
-        <p className="text-2xl font-black">{value}</p>
-        <p className="text-xs text-muted">{label}</p>
-      </div>
+      <p className="mt-4 text-3xl font-black leading-none text-ink">{value}</p>
+      <p className="mt-1.5 text-xs text-ink/55">{label}</p>
     </div>
   );
 }
@@ -131,7 +137,7 @@ export function AdminDashboardClient({ reports }: { reports: Report[] }) {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-black text-ink mb-1">Reporting dashboard</h1>
+          <h1 className="text-2xl font-black text-ink">Reporting dashboard</h1>
           <p className="text-muted text-sm">Every report that has reached the Hub, across web, USSD and mobile.</p>
         </div>
         <Button href="/report" size="sm" className="self-start sm:self-auto">
@@ -141,27 +147,27 @@ export function AdminDashboardClient({ reports }: { reports: Report[] }) {
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
-        <StatCard label="Total Reports" value={total} icon={FileText} color="text-purple bg-purple/10" />
-        <StatCard label="Pending Review" value={pending} icon={Clock} color="text-yellow-600 bg-yellow-100" />
-        <StatCard label="Immediate Urgency" value={immediate} icon={AlertTriangle} color="text-red-600 bg-red-100" />
-        <StatCard label="Verified" value={verified} icon={CheckCircle} color="text-green-600 bg-green-100" />
-        <StatCard label="USSD Reports" value={ussdCount} icon={Smartphone} color="text-amber-600 bg-amber-100" />
-        <StatCard label="Anonymous" value={anonymous} icon={Shield} color="text-purple-600 bg-purple-100" />
-        <StatCard label="Authenticated" value={authenticated} icon={FileText} color="text-blue-600 bg-blue-100" />
+        <StatCard label="Reports in total" value={total} icon={FileText} bg="bg-purple-050" ic="text-purple" />
+        <StatCard label="Awaiting fact-check" value={pending} icon={Clock} bg="bg-amber-50" ic="text-amber-700" />
+        <StatCard label="Marked immediate" value={immediate} icon={AlertTriangle} bg="bg-rose-50" ic="text-rose-600" />
+        <StatCard label="Verified" value={verified} icon={CheckCircle} bg="bg-emerald-50" ic="text-emerald-700" />
+        <StatCard label="Filed over USSD" value={ussdCount} icon={Smartphone} bg="bg-cyan-050" ic="text-cyan-700" />
+        <StatCard label="Anonymous" value={anonymous} icon={Shield} bg="bg-magenta-050" ic="text-magenta-700" />
+        <StatCard label="With an account" value={authenticated} icon={FileText} bg="bg-purple-050" ic="text-purple" />
       </div>
 
       {/* Filters */}
-      <div className="bg-surface rounded-2xl border border-line p-4 flex flex-wrap gap-3 items-end">
+      <div className="flex flex-wrap items-end gap-3 rounded-2xl border border-line bg-surface p-4 shadow-[0_1px_2px_rgba(28,21,34,0.04)]">
         <div>
-          <label className="block text-xs font-semibold mb-1 text-muted">County</label>
-          <select value={countyFilter} onChange={e => setCountyFilter(e.target.value)} className="rounded-lg border border-line px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple">
+          <label className="mb-1 block text-xs font-semibold text-muted">County</label>
+          <select value={countyFilter} onChange={e => setCountyFilter(e.target.value)} className="h-10 rounded-xl border border-line bg-surface px-3 text-sm text-ink focus:border-purple/40 focus:outline-none focus:ring-2 focus:ring-purple/30">
             <option value="">All counties</option>
             {uniqueCounties.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
         </div>
         <div>
-          <label className="block text-xs font-semibold mb-1 text-muted">Urgency</label>
-          <select value={urgencyFilter} onChange={e => setUrgencyFilter(e.target.value)} className="rounded-lg border border-line px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple">
+          <label className="mb-1 block text-xs font-semibold text-muted">Urgency</label>
+          <select value={urgencyFilter} onChange={e => setUrgencyFilter(e.target.value)} className="h-10 rounded-xl border border-line bg-surface px-3 text-sm text-ink focus:border-purple/40 focus:outline-none focus:ring-2 focus:ring-purple/30">
             <option value="">All</option>
             <option value="immediate">Immediate</option>
             <option value="within_week">Within Week</option>
@@ -169,8 +175,8 @@ export function AdminDashboardClient({ reports }: { reports: Report[] }) {
           </select>
         </div>
         <div>
-          <label className="block text-xs font-semibold mb-1 text-muted">Fact-Check</label>
-          <select value={verifFilter} onChange={e => setVerifFilter(e.target.value)} className="rounded-lg border border-line px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple">
+          <label className="mb-1 block text-xs font-semibold text-muted">Fact-Check</label>
+          <select value={verifFilter} onChange={e => setVerifFilter(e.target.value)} className="h-10 rounded-xl border border-line bg-surface px-3 text-sm text-ink focus:border-purple/40 focus:outline-none focus:ring-2 focus:ring-purple/30">
             <option value="">All</option>
             <option value="pending">Pending</option>
             <option value="verified">Verified</option>
@@ -179,8 +185,8 @@ export function AdminDashboardClient({ reports }: { reports: Report[] }) {
           </select>
         </div>
         <div>
-          <label className="block text-xs font-semibold mb-1 text-muted">Channel</label>
-          <select value={channelFilter} onChange={e => setChannelFilter(e.target.value)} className="rounded-lg border border-line px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple">
+          <label className="mb-1 block text-xs font-semibold text-muted">Channel</label>
+          <select value={channelFilter} onChange={e => setChannelFilter(e.target.value)} className="h-10 rounded-xl border border-line bg-surface px-3 text-sm text-ink focus:border-purple/40 focus:outline-none focus:ring-2 focus:ring-purple/30">
             <option value="">All channels</option>
             <option value="web">Web</option>
             <option value="ussd">USSD</option>
@@ -196,7 +202,7 @@ export function AdminDashboardClient({ reports }: { reports: Report[] }) {
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         <div className="bg-surface rounded-2xl border border-line p-5">
-          <h3 className="font-bold text-sm mb-4">Incidents by Type</h3>
+          <h3 className="font-black text-ink text-[15px] mb-4">Incidents by Type</h3>
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={incidentBreakdown} layout="vertical" margin={{ left: 60 }}>
               <CartesianGrid strokeDasharray="3 3" horizontal={false} />
@@ -208,7 +214,7 @@ export function AdminDashboardClient({ reports }: { reports: Report[] }) {
           </ResponsiveContainer>
         </div>
         <div className="bg-surface rounded-2xl border border-line p-5">
-          <h3 className="font-bold text-sm mb-4">Anonymous vs Authenticated</h3>
+          <h3 className="font-black text-ink text-[15px] mb-4">Anonymous vs Authenticated</h3>
           <ResponsiveContainer width="100%" height={220}>
             <PieChart>
               <Pie data={[{ name: "Anonymous", value: anonymous }, { name: "Authenticated", value: authenticated }]} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80}
@@ -220,7 +226,7 @@ export function AdminDashboardClient({ reports }: { reports: Report[] }) {
           </ResponsiveContainer>
         </div>
         <div className="bg-surface rounded-2xl border border-line p-5">
-          <h3 className="font-bold text-sm mb-4">Reports by County</h3>
+          <h3 className="font-black text-ink text-[15px] mb-4">Reports by County</h3>
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={countyBreakdown.slice(0, 8)}>
               <CartesianGrid strokeDasharray="3 3" />
@@ -232,7 +238,7 @@ export function AdminDashboardClient({ reports }: { reports: Report[] }) {
           </ResponsiveContainer>
         </div>
         <div className="bg-surface rounded-2xl border border-line p-5">
-          <h3 className="font-bold text-sm mb-4">Monthly Trend</h3>
+          <h3 className="font-black text-ink text-[15px] mb-4">Monthly Trend</h3>
           <ResponsiveContainer width="100%" height={220}>
             <LineChart data={monthlyTrend}>
               <CartesianGrid strokeDasharray="3 3" />
@@ -244,7 +250,7 @@ export function AdminDashboardClient({ reports }: { reports: Report[] }) {
           </ResponsiveContainer>
         </div>
         <div className="bg-surface rounded-2xl border border-line p-5">
-          <h3 className="font-bold text-sm mb-4">Urgency Levels</h3>
+          <h3 className="font-black text-ink text-[15px] mb-4">Urgency Levels</h3>
           <ResponsiveContainer width="100%" height={180}>
             <BarChart data={urgencyBreakdown}>
               <CartesianGrid strokeDasharray="3 3" />
@@ -260,7 +266,7 @@ export function AdminDashboardClient({ reports }: { reports: Report[] }) {
           </ResponsiveContainer>
         </div>
         <div className="bg-surface rounded-2xl border border-line p-5">
-          <h3 className="font-bold text-sm mb-4">Verification Status</h3>
+          <h3 className="font-black text-ink text-[15px] mb-4">Verification Status</h3>
           <ResponsiveContainer width="100%" height={180}>
             <PieChart>
               <Pie data={verificationBreakdown} dataKey="count" nameKey="name" cx="50%" cy="50%" outerRadius={70}
@@ -276,7 +282,7 @@ export function AdminDashboardClient({ reports }: { reports: Report[] }) {
       {/* Reports table */}
       <div>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-bold">All Reports</h2>
+          <h2 className="text-lg font-black text-ink">All Reports</h2>
           <Button variant="outline" size="sm" asChild>
             <Link href="/hub/reporting/reports"><ExternalLink className="w-3.5 h-3.5 mr-1.5" />Full report list</Link>
           </Button>
@@ -285,19 +291,19 @@ export function AdminDashboardClient({ reports }: { reports: Report[] }) {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-paper border-b border-line">
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted uppercase tracking-wider">Date</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted uppercase tracking-wider">Incident</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted uppercase tracking-wider">County</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted uppercase tracking-wider">
+                <tr className="border-b border-line bg-paper">
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted">Date</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted">Incident</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted">County</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted">
                     <button onClick={() => toggleSort("urgency")} className="flex items-center gap-1 hover:text-ink">
                       Urgency <ArrowUpDown className="w-3 h-3" />
                     </button>
                   </th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted uppercase tracking-wider">Status</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted uppercase tracking-wider">Fact-Check</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted uppercase tracking-wider">Channel</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted uppercase tracking-wider">Reporter</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted">Status</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted">Fact-Check</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted">Channel</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted">Reporter</th>
                   <th className="text-right px-4 py-3" />
                 </tr>
               </thead>
@@ -305,7 +311,7 @@ export function AdminDashboardClient({ reports }: { reports: Report[] }) {
                 {filtered.length === 0 ? (
                   <tr><td colSpan={9} className="text-center py-12 text-muted">No reports match current filters</td></tr>
                 ) : filtered.slice(0, 20).map(r => (
-                  <tr key={r.id} className="hover:bg-paper transition-colors">
+                  <tr key={r.id} className="transition-colors hover:bg-paper">
                     <td className="px-4 py-3 text-xs text-muted whitespace-nowrap">
                       {new Date(r.created_at).toLocaleDateString("en-KE", { day: "numeric", month: "short", year: "numeric" })}
                     </td>

@@ -19,8 +19,8 @@ interface Item {
   status: string | null;
 }
 
-const ICON = { post: FileText, blog: BookOpen, comment: MessageCircle } as const;
-const KIND_LABEL = { post: "Post", blog: "Story", comment: "Comment" } as const;
+const ICON: Record<string, typeof FileText> = { post: FileText, blog: BookOpen, comment: MessageCircle };
+const KIND_LABEL: Record<string, string> = { post: "Post", blog: "Story", comment: "Comment" };
 
 /**
  * Everything members and admins have deleted, kept where the Hub can still

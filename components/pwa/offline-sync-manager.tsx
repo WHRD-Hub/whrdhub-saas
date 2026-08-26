@@ -2,62 +2,68 @@
 
 import { useEffect } from "react";
 import { toast } from "@/components/ui/toast";
-import { submitReport } from "@/app/actions/report-submit";
+import { submitReport, type ReportData } from "@/app/actions/report-submit";
+import { createPost } from "@/app/actions/content";
 import {
-  getQueuedReports,
-  removeQueuedReport,
-  updateQueuedReport,
-} from "@/lib/offline/report-queue";
+  getOutbox,
+  removeFromOutbox,
+  updateOutboxItem,
+  OUTBOX_CHANGED_EVENT,
+  type OutboxItem,
+  type QueuedPost,
+} from "@/lib/offline/outbox";
 
-// Dispatched whenever the queue size changes so any UI (badges, banners) can react.
-export const QUEUE_CHANGED_EVENT = "whrd-queue-changed";
-
-function announceQueueChange() {
-  if (typeof window !== "undefined") {
-    window.dispatchEvent(new Event(QUEUE_CHANGED_EVENT));
-  }
-}
+// Kept under the old name for the report form, which imports it to nudge the UI.
+export const QUEUE_CHANGED_EVENT = OUTBOX_CHANGED_EVENT;
 
 let flushing = false;
 
 /**
- * Attempts to submit every queued report. Safe to call repeatedly.
- * - Authenticated reports that fail because there is no session are left in the
- *   queue (they'll go through once the user logs in again).
- * - Other failures are retried on the next trigger.
+ * Send everything waiting in the outbox. Safe to call repeatedly.
+ *
+ * Items are attempted oldest first so a queue drains in the order it was
+ * written. A report that needs a session it does not have yet is left where it
+ * is rather than being discarded — the person may simply not have signed back
+ * in. Anything else that fails keeps its error and is retried on the next
+ * trigger.
  */
-export async function flushOfflineQueue(): Promise<void> {
+export async function flushOutbox(): Promise<void> {
   if (flushing) return;
   if (typeof navigator !== "undefined" && navigator.onLine === false) return;
   flushing = true;
-  let submitted = 0;
+
+  let reportsSent = 0;
+  let postsSent = 0;
 
   try {
-    const queue = await getQueuedReports();
+    const queue = await getOutbox();
     for (const item of queue) {
       try {
-        const result = await submitReport(item.payload);
-        if (result.success) {
-          await removeQueuedReport(item.localId);
-          submitted += 1;
-          announceQueueChange();
-        } else {
-          // No session yet for an authenticated report — keep it and stop.
-          if (item.payload.is_authenticated) {
-            item.attempts += 1;
-            item.lastError = result.error;
-            await updateQueuedReport(item);
-            break;
+        if (item.kind === "report") {
+          const result = await submitReport(item.payload as ReportData);
+          if (result.success) {
+            await removeFromOutbox(item.localId);
+            reportsSent += 1;
+            continue;
           }
-          item.attempts += 1;
-          item.lastError = result.error;
-          await updateQueuedReport(item);
+          await note(item, result.error);
+          // No session yet for an account-bound report: stop and try later.
+          if ((item.payload as ReportData).is_authenticated) break;
+        } else {
+          const post = item.payload as QueuedPost;
+          const result = await createPost(post.body, [], { pinned: post.pinned });
+          if (result?.ok) {
+            await removeFromOutbox(item.localId);
+            postsSent += 1;
+            continue;
+          }
+          await note(item, result?.error);
+          // Not signed in, or no longer a member: leave it and stop.
+          break;
         }
       } catch (err) {
-        // Network dropped mid-flush; stop and retry later.
-        item.attempts += 1;
-        item.lastError = err instanceof Error ? err.message : String(err);
-        await updateQueuedReport(item);
+        // The connection dropped mid-flush. Stop; the next trigger resumes.
+        await note(item, err instanceof Error ? err.message : String(err));
         break;
       }
     }
@@ -65,28 +71,39 @@ export async function flushOfflineQueue(): Promise<void> {
     flushing = false;
   }
 
-  if (submitted > 0) {
+  if (reportsSent > 0) {
     toast.success(
-      submitted === 1
+      reportsSent === 1
         ? "Your saved report has been submitted."
-        : `${submitted} saved reports have been submitted.`
+        : `${reportsSent} saved reports have been submitted.`,
     );
+  }
+  if (postsSent > 0) {
+    toast.success(postsSent === 1 ? "Your post has been sent." : `${postsSent} posts have been sent.`);
   }
 }
 
+async function note(item: OutboxItem, error?: string) {
+  item.attempts += 1;
+  item.lastError = error;
+  await updateOutboxItem(item);
+}
+
+/** The old name, still imported by the report form. */
+export const flushOfflineQueue = flushOutbox;
+
 /**
- * Mounted once at the app root. Triggers a flush on load, when the network
- * comes back, when the tab becomes visible, and when the service worker's
- * Background Sync fires.
+ * Mounted once at the app root. Flushes on load, when the network returns,
+ * when the tab becomes visible again, and when the service worker's Background
+ * Sync fires.
  */
 export function OfflineSyncManager() {
   useEffect(() => {
     let cancelled = false;
     const run = () => {
-      if (!cancelled) void flushOfflineQueue();
+      if (!cancelled) void flushOutbox();
     };
 
-    // Initial attempt shortly after load.
     const t = setTimeout(run, 1200);
 
     const onOnline = () => run();

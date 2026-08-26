@@ -42,7 +42,7 @@ export function ListeningView({ connected, keywords, results }: { connected: boo
   const shown = results.filter((r) => r.status === tab);
 
   return (
-    <div className="p-4 sm:p-6 max-w-6xl mx-auto space-y-6">
+    <div className="mx-auto max-w-6xl space-y-6">
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>

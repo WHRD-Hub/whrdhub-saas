@@ -1,18 +1,19 @@
 import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { Badge } from "@/components/ui/badge";
-import { Briefcase, Phone, Mail, Globe } from "lucide-react";
+import { Briefcase, Phone, Mail, Globe, LifeBuoy } from "lucide-react";
 import { AddServiceForm } from "@/components/reporting/admin/add-service-form";
+import { Pill } from "@/components/ui/pill";
 
-const CATEGORY_COLORS: Record<string, string> = {
-  legal: "bg-blue-100 text-blue-800",
-  medical: "bg-green-100 text-green-800",
-  psychosocial: "bg-purple-100 text-purple-800",
-  shelter: "bg-orange-100 text-orange-800",
-  digital_security: "bg-gray-100 text-gray-800",
-  financial: "bg-yellow-100 text-yellow-800",
-  referral: "bg-pink-100 text-pink-800",
-  other: "bg-gray-100 text-gray-600",
+const CATEGORY_TONE: Record<string, "purple" | "cyan" | "magenta" | "green" | "amber" | "slate"> = {
+  legal: "purple",
+  medical: "magenta",
+  psychosocial: "cyan",
+  shelter: "green",
+  digital_security: "purple",
+  financial: "amber",
+  referral: "cyan",
+  other: "slate",
 };
 
 async function ServicesList() {
@@ -25,7 +26,7 @@ async function ServicesList() {
 
   if (!services?.length) {
     return (
-      <div className="bg-white rounded-xl border border-line p-12 text-center">
+      <div className="rounded-2xl border border-line bg-surface shadow-[0_1px_2px_rgba(28,21,34,0.04)] p-12 text-center">
         <Briefcase className="w-10 h-10 text-muted mx-auto mb-3" />
         <p className="font-semibold">No services yet</p>
         <p className="text-sm text-muted mt-1">Add support services using the form above.</p>
@@ -48,15 +49,15 @@ async function ServicesList() {
           </h3>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {svcs.map(s => (
-              <div key={s.id} className="bg-white rounded-xl border border-line p-4 space-y-3">
+              <div key={s.id} className="rounded-2xl border border-line bg-surface shadow-[0_1px_2px_rgba(28,21,34,0.04)] p-4 space-y-3">
                 <div className="flex items-start justify-between gap-2">
                   <div>
-                    <p className="font-semibold text-sm">{s.name}</p>
+                    <p className="text-sm font-bold text-ink">{s.name}</p>
                     {s.organization && <p className="text-xs text-muted">{s.organization}</p>}
                   </div>
-                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ${CATEGORY_COLORS[s.category] || CATEGORY_COLORS.other}`}>
+                  <Pill tone={CATEGORY_TONE[s.category] ?? "slate"} className="shrink-0">
                     {s.category.replace(/_/g, " ")}
-                  </span>
+                  </Pill>
                 </div>
                 {s.description && <p className="text-xs text-muted">{s.description}</p>}
                 <div className="space-y-1 text-xs text-muted">
@@ -82,10 +83,16 @@ async function ServicesList() {
 
 export default function AdminServicesPage() {
   return (
-    <div className="p-8 space-y-8">
+    <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-black text-ink mb-1">Support Services</h1>
-        <p className="text-muted text-sm">Manage services that can be assigned to verified reports.</p>
+        <h1 className="flex items-center gap-2 text-2xl font-black text-ink">
+          <LifeBuoy className="h-6 w-6 text-purple" /> Support services
+        </h1>
+        <p className="mt-1 max-w-prose text-sm text-muted">
+          The directory the referral matcher draws on. A report is matched against these
+          the moment it is filed, so a category with no active service means that request
+          goes unanswered.
+        </p>
       </div>
       <AddServiceForm />
       <Suspense fallback={<div className="text-center text-muted py-8">Loading services...</div>}>

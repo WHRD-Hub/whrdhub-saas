@@ -4,7 +4,7 @@ import { useCallback, useRef, useState } from "react";
 import Link from "next/link";
 import {
   BadgeCheck, Globe2, MoreHorizontal, X, ThumbsUp, MessageCircle,
-  Share2, Pin, BookOpen, Trash2, RotateCcw, Clock, Ban, Loader2,
+  Share2, Pin, BookOpen, Trash2, Clock, Loader2,
 } from "lucide-react";
 import { useReaction } from "@/lib/use-reaction";
 import { promptSignIn } from "@/lib/guest-reactions";
@@ -12,7 +12,7 @@ import { timeAgo, cn } from "@/lib/utils";
 import { Avatar } from "@/components/ui/field";
 import { MediaBlock } from "@/components/feed/media-block";
 import { CommentThread } from "@/components/feed/comment-thread";
-import { deleteOwnContent, restoreOwnContent, adminSoftDelete } from "@/app/actions/lifecycle";
+import { deleteOwnContent, adminSoftDelete } from "@/app/actions/lifecycle";
 import { toast } from "@/components/ui/toast";
 import type { FeedItem } from "@/lib/feed";
 
@@ -42,17 +42,6 @@ function Body({ text }: { text: string }) {
 }
 
 function StateBanner({ item }: { item: FeedItem }) {
-  if (item.deleted) {
-    return (
-      <div className="flex items-start gap-2 border-b border-line bg-rose-50 px-4 py-2.5 text-xs text-rose-900">
-        <Ban className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-        <span>
-          <span className="font-bold">Deleted.</span> Only you and the Hub can see this.
-          {item.deletedReason ? ` ${item.deletedReason}` : ""}
-        </span>
-      </div>
-    );
-  }
   if (item.pending) {
     return (
       <div className="flex items-start gap-2 border-b border-line bg-amber-50 px-4 py-2.5 text-xs text-amber-900">
@@ -133,7 +122,6 @@ export function PostCard({
       id={item.id}
       className={cn(
         "overflow-hidden rounded-xl border border-line bg-surface shadow-[0_1px_2px_rgba(28,21,34,0.06)]",
-        item.deleted && "opacity-75",
       )}
     >
       <StateBanner item={item} />
@@ -186,23 +174,15 @@ export function PostCard({
             <>
               <div className="fixed inset-0 z-10" onClick={() => setMenu(false)} aria-hidden />
               <div className="absolute right-0 top-full z-20 mt-1 w-60 rounded-xl border border-line bg-surface p-1.5 shadow-lg">
-                {item.mine && !item.deleted && (
+                {item.mine && (
                   <button
-                    onClick={() => run(() => deleteOwnContent(kind, item.id), "Deleted. You can restore it from your profile.")}
+                    onClick={() => run(() => deleteOwnContent(kind, item.id), `Your ${kind} was deleted.`)}
                     className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-semibold text-rose-600 hover:bg-rose-50"
                   >
                     <Trash2 className="h-4 w-4" /> Delete {kind}
                   </button>
                 )}
-                {item.mine && item.deleted && (
-                  <button
-                    onClick={() => run(() => restoreOwnContent(kind, item.id), "Restored.")}
-                    className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-semibold text-ink/80 hover:bg-purple-050"
-                  >
-                    <RotateCcw className="h-4 w-4" /> Restore
-                  </button>
-                )}
-                {isHubAdmin && !item.mine && !item.deleted && (
+                {isHubAdmin && !item.mine && (
                   <button
                     onClick={() => run(() => adminSoftDelete(kind, item.id), "Removed from the feed.")}
                     className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-semibold text-rose-600 hover:bg-rose-50"
@@ -301,7 +281,7 @@ export function PostCard({
           <ThumbsUp className={cn("h-5 w-5", reacted && "fill-current")} /> Support
         </button>
         <button
-          onClick={() => (signedIn ? setShowComments((s) => !s) : promptSignIn())}
+          onClick={() => (signedIn ? setShowComments((s) => !s) : promptSignIn("comment"))}
           className="flex flex-1 items-center justify-center gap-2 rounded-lg py-2 text-sm font-semibold text-ink/70 transition-colors hover:bg-purple-050"
         >
           <MessageCircle className="h-5 w-5" /> Comment

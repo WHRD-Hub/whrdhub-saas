@@ -60,9 +60,14 @@ export function clearGuestLikes() {
   }
 }
 
-/** Fire this to ask the app to show the "sign in to keep supporting" prompt. */
-export function promptSignIn() {
+/** Why the sign-in prompt appeared, so its copy can say the right thing. */
+export type SignInReason = "support-limit" | "comment" | "post";
+
+export const SIGNIN_EVENT = "whrd-signin-prompt";
+
+/** Ask the app to show the sign-in prompt. */
+export function promptSignIn(reason: SignInReason = "support-limit") {
   if (typeof window !== "undefined") {
-    window.dispatchEvent(new Event("whrd-signin-prompt"));
+    window.dispatchEvent(new CustomEvent<SignInReason>(SIGNIN_EVENT, { detail: reason }));
   }
 }

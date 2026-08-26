@@ -19,7 +19,6 @@ export interface FeedComment {
   author: FeedAuthor;
   created_at: string;
   mine: boolean;
-  deleted: boolean;
 }
 
 export interface FeedItem {
@@ -44,9 +43,6 @@ export interface FeedItem {
   mine: boolean;
   /** Awaiting Hub review — only ever visible to the author. */
   pending: boolean;
-  /** Soft-deleted. Shown to the author, greyed out, and to Hub admins. */
-  deleted: boolean;
-  deletedReason: string | null;
 }
 
 type Row = {
@@ -124,12 +120,14 @@ export async function getFeed(limit = 40, userId?: string): Promise<FeedItem[]> 
     ...((blogs as Row[]) ?? []).map((r) => ({ ...r, kind: "blog" as const })),
   ];
 
-  // A Hub admin can read every row, but the feed is not a moderation queue:
-  // only the reader's own drafts and deletions belong here.
+  // A Hub admin can read every row, but the feed is not a moderation queue: of
+  // their own work, only what is live or awaiting review belongs here. Deleted
+  // rows never reach a member at all — RLS drops them — so this is belt and
+  // braces for the admin case.
   const rows = all.filter(
     (r) =>
-      (r.status === "approved" && !r.deleted_at) ||
-      (!!userId && r.author_id === userId),
+      !r.deleted_at &&
+      (r.status === "approved" || (!!userId && r.author_id === userId)),
   );
 
   const ids = Array.from(new Set(rows.map((r) => r.author_id).filter(Boolean))) as string[];
@@ -195,10 +193,7 @@ export async function getFeed(limit = 40, userId?: string): Promise<FeedItem[]> 
     for (const c of comments ?? []) {
       const pid = c.post_id as string;
       const mine = !!userId && c.author_id === userId;
-      const deleted = !!c.deleted_at;
-      // A deleted comment stays visible to its author, marked; it counts for
-      // nobody else.
-      if (deleted && !mine) continue;
+      if (c.deleted_at) continue;
       const author =
         (c.author_id && authorMap.get(c.author_id as string)) ||
         (c.guest_name
@@ -216,10 +211,9 @@ export async function getFeed(limit = 40, userId?: string): Promise<FeedItem[]> 
         author,
         created_at: c.created_at as string,
         mine,
-        deleted,
       });
       commentsByPost.set(pid, list);
-      if (!deleted) commentTotals.set(pid, (commentTotals.get(pid) ?? 0) + 1);
+      commentTotals.set(pid, (commentTotals.get(pid) ?? 0) + 1);
     }
   }
 
@@ -255,8 +249,6 @@ export async function getFeed(limit = 40, userId?: string): Promise<FeedItem[]> 
       commentCount: commentTotals.get(r.id) ?? 0,
       mine: !!userId && r.author_id === userId,
       pending: r.status === "pending",
-      deleted: !!r.deleted_at,
-      deletedReason: r.deleted_reason ?? null,
     };
   });
 

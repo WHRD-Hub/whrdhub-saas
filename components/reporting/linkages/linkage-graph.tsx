@@ -63,7 +63,7 @@ export function LinkageGraph({
   ];
 
   return (
-    <div className="p-4 sm:p-6 max-w-6xl mx-auto space-y-6">
+    <div className="mx-auto max-w-6xl space-y-6">
       <div>
         <h1 className="text-2xl font-black text-ink flex items-center gap-2"><GitBranch className="w-6 h-6 text-purple" /> Referral Linkages</h1>
         <p className="text-sm text-muted mt-1">How reports connect to the service providers they are referred to, by county and support type.</p>

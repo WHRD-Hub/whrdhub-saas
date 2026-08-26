@@ -6,6 +6,7 @@ import { Youtube, Pin, Share2, Image as ImageIcon, Video, Smile, PenLine } from 
 import { Avatar } from "@/components/ui/field";
 import { PostCard } from "@/components/feed/post-card";
 import { FeedRail } from "@/components/feed/feed-rail";
+import { PendingPosts } from "@/components/feed/pending-posts";
 import type { FeedItem } from "@/lib/feed";
 
 interface CountyChip {
@@ -41,11 +42,13 @@ function ComposerCard({
   userName,
   avatarUrl,
   signedIn,
+  canPost,
   onOpen,
 }: {
   userName?: string | null;
   avatarUrl?: string | null;
   signedIn: boolean;
+  canPost: boolean;
   onOpen: () => void;
 }) {
   const firstName = (userName || "").trim().split(/\s+/)[0];
@@ -53,12 +56,32 @@ function ComposerCard({
   if (!signedIn) {
     return (
       <div className="rounded-xl border border-line bg-surface p-4 shadow-[0_1px_2px_rgba(28,21,34,0.06)]">
-        <p className="text-sm text-ink">
+        <p className="text-sm leading-relaxed text-ink">
+          You can read the feed and support posts without an account.{" "}
           <Link href="/login" className="font-bold text-purple hover:underline">
             Sign in
           </Link>{" "}
-          to post, comment and support other defenders.
+          to comment, and join a county network to post.
         </p>
+      </div>
+    );
+  }
+
+  // Signed in but not yet a member of any network.
+  if (!canPost) {
+    return (
+      <div className="rounded-xl border border-line bg-surface p-4 shadow-[0_1px_2px_rgba(28,21,34,0.06)]">
+        <p className="text-sm font-semibold text-ink">Posting is for network members</p>
+        <p className="mt-1 text-sm leading-relaxed text-muted">
+          Ask to join a county network and you can share updates and publish stories.
+          You can support and comment on posts in the meantime.
+        </p>
+        <Link
+          href="/organizations"
+          className="mt-3 inline-flex h-10 items-center rounded-xl bg-purple px-4 text-sm font-bold text-white hover:bg-purple-600"
+        >
+          Find a network
+        </Link>
       </div>
     );
   }
@@ -163,6 +186,7 @@ export function FeedView({
   videos,
   signedIn,
   isHubAdmin = false,
+  canPost = false,
   userName,
   avatarUrl,
   counties = [],
@@ -172,6 +196,7 @@ export function FeedView({
   videos: string[];
   signedIn: boolean;
   isHubAdmin?: boolean;
+  canPost?: boolean;
   userName?: string | null;
   avatarUrl?: string | null;
   counties?: CountyChip[];
@@ -212,8 +237,11 @@ export function FeedView({
           userName={userName}
           avatarUrl={avatarUrl}
           signedIn={signedIn}
+          canPost={canPost}
           onOpen={onCompose}
         />
+
+        {signedIn && <PendingPosts userName={userName} avatarUrl={avatarUrl} />}
 
         {stream.length === 0 && (
           <div className="rounded-xl border border-dashed border-line bg-surface p-10 text-center">

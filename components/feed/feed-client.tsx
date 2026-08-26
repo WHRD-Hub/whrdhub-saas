@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { X } from "lucide-react";
 import { Composer } from "@/components/composer";
+import { promptSignIn } from "@/lib/guest-reactions";
 import { FeedView } from "@/components/feed/feed-view";
 import type { FeedItem } from "@/lib/feed";
 
@@ -57,7 +58,7 @@ export function FeedClient({
 
   const onCompose = () => {
     if (!signedIn) {
-      router.push("/login?next=/feed");
+      promptSignIn("post");
       return;
     }
     setOpen(true);
@@ -73,6 +74,7 @@ export function FeedClient({
         userName={userName}
         avatarUrl={avatarUrl}
         counties={counties}
+        canPost={canPost}
         onCompose={onCompose}
       />
 

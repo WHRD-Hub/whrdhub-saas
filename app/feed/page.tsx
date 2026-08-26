@@ -27,9 +27,10 @@ export default async function FeedPage() {
       .order("name"),
   ]);
 
-  // Anyone with an account may submit to the feed. Member posts go out as
-  // pending and reach the feed once a Hub admin has reviewed them.
-  const canPost = !!user && !user.isDeleted;
+  // Writing to the feed is a member's act: an approved place in a county
+  // network's organisation, or Hub staff. Everyone else can read and support.
+  // The database enforces the same rule; this only decides what the UI offers.
+  const canPost = !!user && !user.isDeleted && user.canPost;
 
   return (
     <div className="min-h-screen bg-paper">

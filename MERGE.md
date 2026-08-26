@@ -78,8 +78,11 @@ can still become full members later by completing onboarding.
 
 ## Database
 
-Run **`supabase/013_merge_reporting_platform.sql`** once. It is idempotent and
-drops nothing. It:
+> Superseded. Everything below was folded into the single
+> **`supabase/install.sql`** described in part two. The historical file is kept
+> in `supabase/legacy/` and does not need to be run.
+
+Migration `013` was the one that:
 
 1. Ensures both profile shapes exist on the one `profiles` table.
 2. Adds `can_administer_reports()` / `can_triage_reports()` and rewrites the
@@ -97,8 +100,7 @@ drops nothing. It:
    onboarded.
 
 The reporting platform's own historical migrations are kept in
-`supabase/reporting/` so a fresh project can be built from this repo alone.
-See the README in that folder for the ordering.
+`supabase/legacy/reporting/`.
 
 ## Environment
 
@@ -215,86 +217,117 @@ carries a note saying which of the three it was.
 
 ## Deleting things
 
-Two operations, deliberately named differently in the UI.
+**For the person, delete means delete.** Their post, story, comment or report
+leaves the feed and leaves their account. No banner, no "the Hub can still see
+this", no restore control — being told your delete only half worked is worse
+than not having the button.
 
-**Delete** — anyone, on their own post, story or comment. A soft delete. The
-item leaves the feed at once, stays in the author's own view marked *Deleted*
-with a Restore control, and stays fully readable by Hub admins at
-`/hub/deleted`.
+Underneath it is a soft delete, so the Hub keeps the record for safeguarding at
+`/hub/deleted`, `/hub/reporting/deleted` and `/hub/accounts`. That is a
+back-office fact and is deliberately never surfaced to the author.
 
-**Delete permanently** — Hub admins only, from the deleted views, behind a
-typed `DELETE` confirmation. This is the only thing in the system that destroys
-a row.
+**Delete permanently** is the Hub's, from those views, behind a typed `DELETE`.
+It is the only thing in the system that destroys a row. Restoring is the Hub's
+too, for the obvious reason that the author can no longer see the item.
 
-Reports work the same way but only an administrator can delete one, always with
-a reason: the reporter loses sight of the case, so the record of why has to
-survive. Deleted cases live at `/hub/reporting/deleted`.
+Deleting your account soft-deletes your profile, posts, stories, comments **and
+reports**, closes your memberships, and signs you out. The auth user and the
+content stay, so the Hub can still answer a question about them later.
 
-**Accounts.** `/dashboard/account` → *Delete your account*. The profile is
-marked deleted, every post, story and comment is soft-deleted, memberships are
-closed, and the session ends. The auth user and all the content are kept, and
-`/hub/accounts` shows deleted accounts with a count of what was in each. The
-dialog says plainly that reports are **not** deleted: an open case belongs to
-the response team, and letting an account closure erase a safeguarding record
-would be the wrong default.
+### Why the delete runs through a database function
 
-A deleted account keeps a technically valid session until it is signed out, so
-every authenticated layout checks the flag and redirects to `/account-deleted`,
-which signs the session out on arrival.
+Not a preference. PostgreSQL applies SELECT policies to the *updated* row, so
+an author-run `UPDATE ... SET deleted_at = now()` on a row whose SELECT policy
+hides deleted rows from the author is rejected: the write would move the row out
+of the writer's own visibility. `delete_own_content()` is `SECURITY DEFINER`
+and does the ownership check itself, which is what makes "gone from your
+account" possible at all.
 
-## Why deleted content stays visible to its author
+## Who can do what on the feed
 
-Not a UI choice — a database constraint that turned out to be the right
-behaviour. PostgreSQL applies SELECT policies to the *new* row of an UPDATE. A
-policy that hid deleted rows from their author would make the author's own
-delete impossible: the write that sets `deleted_at` would move the row out of
-their visibility and be rejected. Keeping the author's read access is both
-necessary and what "content sits as deleted on their view" asks for.
+| | Read | Support | Comment | Post |
+| --- | --- | --- | --- | --- |
+| Signed out | yes | up to 3, held in the browser | no | no |
+| Signed in, no network | yes | yes | yes | no |
+| Network member | yes | yes | yes | yes, for review |
+| Hub admin | yes | yes | yes | yes, published |
+
+Supporting is deliberately open. A signed-out visitor can support three posts;
+those are kept in `localStorage` and written to their account the moment they
+sign in, so nothing they did is lost. The fourth attempt raises the sign-in
+prompt, whose wording depends on why it appeared. Commenting carries a name, so
+it needs an account. Posting is a member's act, enforced by
+`can_post_to_feed()` in the insert policy rather than merely hidden in the UI.
+
+## Referral matching
+
+Matching runs the moment a report is filed, not when someone gets round to
+verifying it. Somebody describing an immediate threat should not wait on
+fact-checking before the response team — and she herself — can see which
+shelter and which legal desk are the right ones.
+
+For each kind of support asked for she gets every service in her own county
+**and** every service that operates nationally: the local desk is reachable,
+the national body has reach, and withholding either helps nobody. Other
+counties' services are excluded, unless that category has neither a local nor a
+national service, in which case the nearest available one is assigned rather
+than answering with nothing. Each referral records which of the three it was.
+
+## Progressive web app
+
+The Hub is installable, and that matters more here than for most sites: the
+installed app is what lets someone write a report where there is no signal.
+
+* **Install prompt.** A banner on any page, riding Chromium's
+  `beforeinstallprompt`; on iOS Safari, which has no such event, it shows the
+  manual Add to Home Screen steps. Dismissing holds it back for 14 days.
+* **Offline outbox.** `lib/offline/outbox.ts`, an IndexedDB store holding two
+  kinds of thing: reports filed with no connection, and feed posts composed
+  offline. A queued post appears at the top of your own feed marked "Sending",
+  the way an unsent message does in a chat app, and goes out by itself when the
+  connection returns — Background Sync where the browser supports it, with the
+  `online` event, tab visibility and app load as reliable fallbacks.
+* **Media needs a connection**, so an offline post is text and the composer
+  says so rather than silently dropping a photo.
+* **The service worker caches nothing sensitive.** Static assets and an offline
+  fallback page only; navigations are network-first. No authenticated HTML and
+  no report content is ever persisted.
 
 ## Database
 
-Two more migrations, both idempotent:
+**One script.** `supabase/install.sql`. Paste it into the SQL editor of a
+Supabase project and the database is ready: extensions, 14 types, 20 tables
+with every index and constraint, 30 functions, 12 triggers, 65 RLS policies,
+4 storage buckets with their policies, grants, and the seed content that makes
+a fresh project look like a working product rather than an empty shell.
 
-* **`014_community_lifecycle.sql`** — soft-delete columns on posts, blogs,
-  reports and resources; the `post_comments` table; membership status with
-  `is_org_admin()` / `my_admin_org_ids()`; `delete_account()` and
-  `restore_account()`; rewritten RLS for all of the above; county-aware
-  referral matching; storage policy for report evidence routed through the
-  shared role function; explicit grants so the schema also stands up on a plain
-  Postgres.
-* **`015_seed_demo_content.sql`** — support services covering every category
-  (without these, verifying a report assigns nothing), example reports,
-  comments, publications and listening signals. Creates no auth users on
-  purpose: seeded content carries a display name on the row instead, so the
-  seed cannot manufacture accounts anyone could sign into.
+It is idempotent, so the same file is also how you bring an existing project up
+to date. Nothing else to run, no order to remember.
 
-### Standing up a new project
+The old incremental migrations sit in `supabase/legacy/` for provenance only.
+The single script is verified to produce a schema identical to running that
+whole sequence — same 263 columns, 58 indexes, 73 constraints.
 
-```bash
-# 1. paste supabase/schema/bootstrap.sql into the SQL editor   (schema)
-# 2. paste supabase/schema/seed.sql                            (demo content, optional)
+After running it, make yourself an administrator:
+
+```sql
+update public.profiles set is_hub_admin = true
+where id = (select id from auth.users where email = 'you@example.com');
 ```
 
-Both are generated from the numbered migrations by `npm run db:bundle`, so they
-cannot drift from the real migration history. Both are idempotent — re-running
-`bootstrap.sql` is also how you bring an **existing** project up to date.
-
-Order matters and the bundle encodes it: the reporting schema owns `profiles`,
-so it must exist before the Hub schema extends it. Hub-first is not a supported
-order and will fail on `relation "public.profiles" does not exist`.
-
-### Testing the database
+### Testing it
 
 ```bash
 npm run db:test     # needs a local PostgreSQL 16, nothing else
 ```
 
-Creates a throwaway database, applies `bootstrap.sql` **twice** and `seed.sql`
-**twice** (proving idempotency), then runs 56 assertions that sign in as six
-different users and check what each can actually see and do — report visibility
-per role, soft delete and who may purge, comments, membership approval, account
-deletion, and referral matching. `supabase/tests/README.md` explains how to add
-one.
+Creates a throwaway database, applies `install.sql` **three times** to prove
+idempotency, then runs 66 assertions that sign in as six different users and
+check what each can actually see and do: report visibility per role, who may
+post, delete and purge, comments, membership approval, account deletion, and
+referral matching including its county preference.
+`supabase/tests/README.md` explains how to add one.
+
 
 ## Bugs found and fixed in this pass
 
@@ -317,8 +350,13 @@ one.
 
 ## Known follow-ups
 
-* `npm i leaflet @types/leaflet` and un-CDN the map.
+* `npm i leaflet @types/leaflet` and switch `loadLeaflet()` back to a bundled
+  `import("leaflet")`; the shape it returns is identical.
 * Comment replies are modelled (`post_comments.parent_id`) but the UI renders a
   single flat level. Threading is a UI change only.
+* Offline posts are text. Queuing an attachment means holding the blob in
+  IndexedDB and uploading it at flush time — doable, but it changes the storage
+  budget on the device, so it is a deliberate next step rather than an
+  oversight.
 * `profiles.onboarding_completed` (reporting) and `profiles.hub_onboarded`
   (Hub) both survive; only the latter drives redirects.

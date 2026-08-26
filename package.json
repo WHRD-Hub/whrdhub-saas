@@ -7,7 +7,6 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "db:bundle": "node scripts/build-schema-bundle.mjs",
     "db:test": "bash scripts/db-test.sh"
   },
   "dependencies": {

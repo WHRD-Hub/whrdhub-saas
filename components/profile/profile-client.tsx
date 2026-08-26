@@ -3,22 +3,19 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { User, Heart, Activity, Shield, Eye, Loader2, Trash2, FileText, BookOpen, ExternalLink, ShieldCheck, ArrowUpRight, Pencil, RotateCcw } from "lucide-react";
+import { User, Heart, Activity, Shield, Eye, Loader2, Trash2, FileText, BookOpen, ExternalLink, ShieldCheck, ArrowUpRight, Pencil } from "lucide-react";
 import { Input, Label, Textarea } from "@/components/ui/field";
 import { cn } from "@/lib/utils";
 import { CONTENT_STATUS_META } from "@/lib/data";
 import { Pill } from "@/components/ui/pill";
 import { updateProfile } from "@/app/actions/profile";
-import { deleteOwnContent, restoreOwnContent } from "@/app/actions/lifecycle";
+import { deleteOwnContent } from "@/app/actions/lifecycle";
 import { FemtorshipForm } from "@/components/femtorship/femtorship-form";
 import { AccessibilityControls } from "@/components/accessibility-controls";
 import { RoleSwitcher } from "@/components/dashboard/role-switcher";
 
 interface County { id: string; name: string; is_active: boolean }
-interface Content {
-  id: string; title?: string; body?: string; slug?: string | null;
-  status: string; created_at?: string; deleted_at?: string | null;
-}
+interface Content { id: string; title?: string; body?: string; slug?: string | null; status: string; created_at?: string }
 type Fem = Record<string, unknown> | null;
 type Prof = { full_name: string; title: string; bio: string; email: string; county_network_id: string };
 
@@ -146,18 +143,10 @@ function ActivitySection({ posts, blogs, reacted }: { posts: Content[]; blogs: C
   const [tab, setTab] = useState<"posts" | "stories" | "supported">("posts");
   const [busy, setBusy] = useState<string | null>(null);
 
-  // Deleting is reversible: the item leaves the feed but stays here, marked,
-  // so it says so rather than warning about something permanent.
   const del = async (kind: "post" | "blog", id: string) => {
+    if (!confirm(`Delete this ${kind === "blog" ? "story" : "post"}?`)) return;
     setBusy(id);
     await deleteOwnContent(kind, id);
-    setBusy(null);
-    router.refresh();
-  };
-
-  const undo = async (kind: "post" | "blog", id: string) => {
-    setBusy(id);
-    await restoreOwnContent(kind, id);
     setBusy(null);
     router.refresh();
   };
@@ -183,24 +172,13 @@ function ActivitySection({ posts, blogs, reacted }: { posts: Content[]; blogs: C
         posts.length === 0 ? <p className="text-sm text-muted">No posts yet.</p> : (
           <div className="divide-y divide-line">
             {posts.map((p) => (
-              <div key={p.id} className={`flex items-center gap-3 py-3 ${p.deleted_at ? "opacity-60" : ""}`}>
+              <div key={p.id} className="flex items-center gap-3 py-3">
                 <FileText className="w-4 h-4 text-cyan-700 shrink-0" />
                 <p className="text-sm text-ink truncate flex-1">{p.body?.slice(0, 80) || "Post"}</p>
-                {p.deleted_at ? (
-                  <>
-                    <Pill tone="red">Deleted</Pill>
-                    <button onClick={() => undo("post", p.id)} disabled={busy === p.id} className="inline-flex items-center gap-1 px-1.5 text-xs font-bold text-purple hover:text-purple-700">
-                      {busy === p.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />} Restore
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <Pill tone={CONTENT_STATUS_META[p.status]?.tone ?? "slate"}>{CONTENT_STATUS_META[p.status]?.label ?? p.status}</Pill>
-                    <button onClick={() => del("post", p.id)} disabled={busy === p.id} className="text-muted hover:text-rose-600 p-1" aria-label="Delete">
-                      {busy === p.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                    </button>
-                  </>
-                )}
+                <Pill tone={CONTENT_STATUS_META[p.status]?.tone ?? "slate"}>{CONTENT_STATUS_META[p.status]?.label ?? p.status}</Pill>
+                <button onClick={() => del("post", p.id)} disabled={busy === p.id} className="text-muted hover:text-rose-600 p-1" aria-label="Delete">
+                  {busy === p.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                </button>
               </div>
             ))}
           </div>
@@ -211,29 +189,18 @@ function ActivitySection({ posts, blogs, reacted }: { posts: Content[]; blogs: C
         blogs.length === 0 ? <p className="text-sm text-muted">No stories yet.</p> : (
           <div className="divide-y divide-line">
             {blogs.map((b) => (
-              <div key={b.id} className={`flex items-center gap-3 py-3 ${b.deleted_at ? "opacity-60" : ""}`}>
+              <div key={b.id} className="flex items-center gap-3 py-3">
                 <BookOpen className="w-4 h-4 text-purple shrink-0" />
                 <p className="text-sm text-ink truncate flex-1 font-medium">{b.title}</p>
-                {b.deleted_at ? (
-                  <>
-                    <Pill tone="red">Deleted</Pill>
-                    <button onClick={() => undo("blog", b.id)} disabled={busy === b.id} className="inline-flex items-center gap-1 px-1.5 text-xs font-bold text-purple hover:text-purple-700">
-                      {busy === b.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />} Restore
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <Pill tone={CONTENT_STATUS_META[b.status]?.tone ?? "slate"}>{CONTENT_STATUS_META[b.status]?.label ?? b.status}</Pill>
-                    {(b.status === "draft" || b.status === "rejected") && (
-                      <Link href={`/dashboard/write/${b.id}`} className="inline-flex items-center gap-1 text-xs font-bold text-purple hover:text-purple-700 px-1.5">
-                        <Pencil className="w-3.5 h-3.5" /> {b.status === "rejected" ? "Revise" : "Edit"}
-                      </Link>
-                    )}
-                    <button onClick={() => del("blog", b.id)} disabled={busy === b.id} className="text-muted hover:text-rose-600 p-1" aria-label="Delete">
-                      {busy === b.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                    </button>
-                  </>
+                <Pill tone={CONTENT_STATUS_META[b.status]?.tone ?? "slate"}>{CONTENT_STATUS_META[b.status]?.label ?? b.status}</Pill>
+                {(b.status === "draft" || b.status === "rejected") && (
+                  <Link href={`/dashboard/write/${b.id}`} className="inline-flex items-center gap-1 text-xs font-bold text-purple hover:text-purple-700 px-1.5">
+                    <Pencil className="w-3.5 h-3.5" /> {b.status === "rejected" ? "Revise" : "Edit"}
+                  </Link>
                 )}
+                <button onClick={() => del("blog", b.id)} disabled={busy === b.id} className="text-muted hover:text-rose-600 p-1" aria-label="Delete">
+                  {busy === b.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                </button>
               </div>
             ))}
           </div>

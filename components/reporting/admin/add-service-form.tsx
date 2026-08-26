@@ -35,7 +35,7 @@ export function AddServiceForm() {
   };
 
   return (
-    <div className="bg-white rounded-xl border border-line overflow-hidden">
+    <div className="rounded-2xl border border-line bg-surface shadow-[0_1px_2px_rgba(28,21,34,0.04)] overflow-hidden">
       <button type="button" onClick={() => setOpen(!open)}
         className="w-full flex items-center justify-between p-5 hover:bg-paper transition-colors">
         <div className="flex items-center gap-2">

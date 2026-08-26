@@ -48,7 +48,7 @@ function Pill({
           ? danger
             ? "bg-rose-600 text-white border-rose-600 shadow-sm"
             : "bg-purple text-white border-purple shadow-sm"
-          : "bg-white border-line text-ink"
+          : "bg-surface border-line text-ink"
         }`}
       style={{ willChange: "transform" }}
     >
@@ -63,7 +63,7 @@ function Card({ title, subtitle, children }: {
   title?: string; subtitle?: string; children: React.ReactNode;
 }) {
   return (
-    <div className="bg-white rounded-xl sm:rounded-2xl border border-line shadow-sm p-4 sm:p-6 md:p-8 space-y-4 sm:space-y-5">
+    <div className="bg-surface rounded-xl sm:rounded-2xl border border-line shadow-sm p-4 sm:p-6 md:p-8 space-y-4 sm:space-y-5">
       {title && (
         <div className="space-y-0.5">
           <h2 className="font-bold text-base text-ink">{title}</h2>
@@ -377,7 +377,7 @@ export default function ReportForm({ isAuthenticated = false, userEmail }: Repor
   if (offlineSaved) {
     return (
       <div className="w-full max-w-2xl mx-auto">
-        <div className="bg-white rounded-2xl border border-line shadow-sm p-6 sm:p-8 text-center space-y-4">
+        <div className="bg-surface rounded-2xl border border-line shadow-sm p-6 sm:p-8 text-center space-y-4">
           <div className="w-14 h-14 rounded-2xl bg-purple/10 text-purple flex items-center justify-center mx-auto">
             <Check className="w-7 h-7" />
           </div>
@@ -623,7 +623,7 @@ export default function ReportForm({ isAuthenticated = false, userEmail }: Repor
             {screenshotFiles.length > 0 && (
               <div className="space-y-1.5 mt-2">
                 {screenshotFiles.map((f, i) => (
-                  <div key={`${f.name}-${i}`} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white border border-line text-sm">
+                  <div key={`${f.name}-${i}`} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-surface border border-line text-sm">
                     <ImageIcon className="w-3.5 h-3.5 text-muted shrink-0" />
                     <span className="flex-1 truncate">{f.name}</span>
                     <span className="text-xs text-muted">{(f.size / 1024).toFixed(0)} KB</span>
@@ -694,7 +694,7 @@ export default function ReportForm({ isAuthenticated = false, userEmail }: Repor
                       ? opt.danger
                         ? "bg-rose-600 text-white border-rose-600"
                         : "bg-purple text-white border-purple"
-                      : `bg-white border-line hover:border-purple/30 ${opt.danger ? "hover:border-rose-600/30" : ""}`
+                      : `bg-surface border-line hover:border-purple/30 ${opt.danger ? "hover:border-rose-600/30" : ""}`
                     }`}
                 >
                   <span className="font-semibold">{label}</span>

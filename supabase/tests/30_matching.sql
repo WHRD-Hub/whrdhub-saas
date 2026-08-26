@@ -1,6 +1,8 @@
--- Verifying a report is what triggers referral matching and notifies the
--- reporter. County preference is asserted separately in 31_matching_county.sql;
--- this file covers the invariants that hold whatever the county is.
+-- Filing a report is what triggers referral matching and notifies the reporter
+-- - not verification. Someone describing an immediate threat should not wait on
+-- fact-checking to be told which shelter to call. County preference is asserted
+-- separately in 31_matching_county.sql; this file covers the invariants that
+-- hold whatever the county is.
 \set ON_ERROR_STOP on
 set client_min_messages = notice;
 
@@ -35,20 +37,15 @@ begin
 
   raise notice '=== MATCHING ===';
 
-  select count(*) into n from public.report_services where report_id = rid;
-  perform pg_temp.check('nothing is assigned before verification', n, 0);
-
-  select count(*) into n from public.notifications where report_id = rid;
-  perform pg_temp.check('no notification before verification', n, 0);
-
-  -- Verifying the report is what triggers the match.
-  update public.reports set verification_status = 'verified' where id = rid;
-
+  -- No second step: the referral is already there.
   select count(*) into assigned from public.report_services where report_id = rid;
   if assigned = 0 then
-    raise exception 'FAIL verifying a report assigned no support at all';
+    raise exception 'FAIL filing a report assigned no support at all';
   end if;
-  raise notice 'pass  verification assigned support = %', assigned;
+  raise notice 'pass  filing the report assigned support immediately = %', assigned;
+
+  select count(*) into n from public.notifications where report_id = rid;
+  perform pg_temp.check('the reporter was told straight away', n, assigned);
 
   -- Every category the reporter asked for is answered.
   select count(distinct s.category) into n
@@ -69,19 +66,16 @@ begin
   select count(*) into n from public.report_services where report_id = rid and note is null;
   perform pg_temp.check('every referral explains why it was matched', n, 0);
 
-  select count(*) into n from public.notifications where report_id = rid;
-  perform pg_temp.check('the reporter was notified once per assigned service', n, assigned);
-
   select count(*) into n from public.notifications
    where report_id = rid and read = false and is_read = false
      and title is not null and link is not null;
   perform pg_temp.check('notifications carry both read flags plus title and link', n, assigned);
 
-  -- Re-saving a verified report must not pile up duplicate referrals.
-  update public.reports set status = 'under_review' where id = rid;
+  -- Verifying later, and re-saving, must not pile up duplicate referrals.
   update public.reports set verification_status = 'verified' where id = rid;
+  update public.reports set status = 'under_review' where id = rid;
   select count(*) into n from public.report_services where report_id = rid;
-  perform pg_temp.check('re-saving a verified report does not duplicate referrals', n, assigned);
+  perform pg_temp.check('verifying and re-saving does not duplicate referrals', n, assigned);
 
   raise notice '=== MATCHING ASSERTIONS PASSED ===';
 end $$;

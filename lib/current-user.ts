@@ -32,6 +32,11 @@ export interface CurrentUser {
   isDeleted: boolean;
   /** Still on a generated username and an unreachable placeholder address. */
   needsClaiming: boolean;
+  /**
+   * May write to the feed: an approved membership of a county network's
+   * organisation, or Hub staff. Reading and supporting need no membership.
+   */
+  canPost: boolean;
   profile: HubProfile | null;
   membership: {
     organization_id: string;
@@ -73,6 +78,12 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
       !!p && !p.hub_onboarded && !p.is_hub_admin && (p.is_anonymous === true || p.user_type === "reporter"),
     isDeleted: !!p?.account_deleted_at,
     needsClaiming: !!p?.is_anonymous && !p.claimed_at,
+    canPost:
+      !p?.account_deleted_at &&
+      (!!p?.is_hub_admin ||
+        p?.user_type === "admin" ||
+        p?.user_type === "defender" ||
+        !!membership),
     profile: p,
     membership: membership
       ? {

@@ -1,11 +1,11 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Send, Trash2, RotateCcw, Loader2 } from "lucide-react";
+import { Send, Trash2, Loader2 } from "lucide-react";
 import { Avatar } from "@/components/ui/field";
-import { timeAgo, cn } from "@/lib/utils";
+import { timeAgo } from "@/lib/utils";
 import { addComment } from "@/app/actions/comments";
-import { deleteOwnContent, restoreOwnContent, adminSoftDelete } from "@/app/actions/lifecycle";
+import { deleteOwnContent, adminSoftDelete } from "@/app/actions/lifecycle";
 import { toast } from "@/components/ui/toast";
 import { promptSignIn } from "@/lib/guest-reactions";
 import type { FeedComment } from "@/lib/feed";
@@ -13,10 +13,9 @@ import type { FeedComment } from "@/lib/feed";
 /**
  * Comments under a feed post.
  *
- * Optimistic: a new comment appears immediately and is reconciled with the
- * server id when the action returns, so the thread never feels laggy on a slow
- * connection. Deleting follows the same rule as every other kind of content —
- * the author still sees theirs, marked.
+ * Commenting needs an account, unlike supporting a post. New comments appear
+ * immediately and are reconciled with the server id when the action returns,
+ * so the thread never feels laggy on a slow connection.
  */
 export function CommentThread({
   postId,
@@ -35,18 +34,16 @@ export function CommentThread({
   const [draft, setDraft] = useState("");
   const [pending, startTransition] = useTransition();
 
-  const live = comments.filter((c) => !c.deleted);
-
   const update = (next: FeedComment[]) => {
     setComments(next);
-    onCountChange?.(next.filter((c) => !c.deleted).length);
+    onCountChange?.(next.length);
   };
 
   const submit = () => {
     const body = draft.trim();
     if (!body) return;
     if (!signedIn) {
-      promptSignIn();
+      promptSignIn("comment");
       return;
     }
 
@@ -57,7 +54,6 @@ export function CommentThread({
       author: { id: null, name: "You", title: null, avatar_url: null },
       created_at: new Date().toISOString(),
       mine: true,
-      deleted: false,
     };
     update([...comments, optimistic]);
     setDraft("");
@@ -79,25 +75,14 @@ export function CommentThread({
   };
 
   const remove = (c: FeedComment) => {
-    const action = c.mine
-      ? deleteOwnContent("comment", c.id)
-      : adminSoftDelete("comment", c.id);
-    update(comments.map((x) => (x.id === c.id ? { ...x, deleted: true } : x)));
+    const before = comments;
+    update(comments.filter((x) => x.id !== c.id));
     startTransition(async () => {
-      const res = await action;
+      const res = c.mine
+        ? await deleteOwnContent("comment", c.id)
+        : await adminSoftDelete("comment", c.id);
       if (res?.error) {
-        update(comments.map((x) => (x.id === c.id ? { ...x, deleted: false } : x)));
-        toast.error(res.error);
-      }
-    });
-  };
-
-  const restore = (c: FeedComment) => {
-    update(comments.map((x) => (x.id === c.id ? { ...x, deleted: false } : x)));
-    startTransition(async () => {
-      const res = await restoreOwnContent("comment", c.id);
-      if (res?.error) {
-        update(comments.map((x) => (x.id === c.id ? { ...x, deleted: true } : x)));
+        update(before);
         toast.error(res.error);
       }
     });
@@ -116,35 +101,19 @@ export function CommentThread({
           <li key={c.id} className="flex items-start gap-2">
             <Avatar name={c.author.name} src={c.author.avatar_url} size={32} />
             <div className="min-w-0 flex-1">
-              <div
-                className={cn(
-                  "rounded-2xl bg-surface px-3 py-2",
-                  c.deleted && "border border-dashed border-rose-200 bg-rose-50",
-                )}
-              >
+              <div className="rounded-2xl bg-surface px-3 py-2">
                 <p className="text-[13px] font-semibold text-ink">{c.author.name}</p>
                 <p className="whitespace-pre-wrap text-sm leading-snug text-ink/90">{c.body}</p>
               </div>
               <p className="mt-1 flex items-center gap-3 px-3 text-[11px] text-muted">
                 <span>{timeAgo(c.created_at)}</span>
-                {c.deleted ? (
-                  <>
-                    <span className="font-semibold text-rose-600">Deleted</span>
-                    {c.mine && (
-                      <button onClick={() => restore(c)} className="inline-flex items-center gap-1 font-semibold hover:underline">
-                        <RotateCcw className="h-3 w-3" /> Restore
-                      </button>
-                    )}
-                  </>
-                ) : (
-                  (c.mine || isHubAdmin) && (
-                    <button
-                      onClick={() => remove(c)}
-                      className="inline-flex items-center gap-1 font-semibold hover:text-rose-600 hover:underline"
-                    >
-                      <Trash2 className="h-3 w-3" /> Delete
-                    </button>
-                  )
+                {(c.mine || isHubAdmin) && (
+                  <button
+                    onClick={() => remove(c)}
+                    className="inline-flex items-center gap-1 font-semibold hover:text-rose-600 hover:underline"
+                  >
+                    <Trash2 className="h-3 w-3" /> Delete
+                  </button>
                 )}
               </p>
             </div>
@@ -180,11 +149,6 @@ export function CommentThread({
         </div>
       </div>
 
-      {live.length === 0 && comments.length > 0 && (
-        <p className="mt-2 px-1 text-[11px] text-muted">
-          Deleted comments are only visible to you and the Hub.
-        </p>
-      )}
     </div>
   );
 }

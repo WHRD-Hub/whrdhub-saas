@@ -5,8 +5,8 @@ import {
   PieChart, Pie, Cell, Legend, LineChart, Line,
 } from "recharts";
 
-const PURPLE = "hsl(271, 76%, 31%)";
-const GOLD = "hsl(39, 78%, 46%)";
+const PURPLE = "#734e9e";
+const GOLD = "#ce2087";
 const COLORS = [PURPLE, GOLD, "#10b981", "#3b82f6", "#f43f5e", "#8b5cf6", "#f97316", "#06b6d4"];
 
 interface ChartData {
@@ -24,8 +24,8 @@ export function ReportsCharts({ data }: { data: ChartData }) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       {/* Incident types bar chart */}
-      <div className="bg-white rounded-xl border border-line p-5">
-        <h3 className="font-bold text-sm mb-4">Incidents by Type</h3>
+      <div className="rounded-2xl border border-line bg-surface shadow-[0_1px_2px_rgba(28,21,34,0.04)] p-5">
+        <h3 className="font-black text-ink text-[15px] mb-4">Incidents by Type</h3>
         <ResponsiveContainer width="100%" height={220}>
           <BarChart data={data.incidentBreakdown} layout="vertical" margin={{ left: 60 }}>
             <CartesianGrid strokeDasharray="3 3" horizontal={false} />
@@ -38,8 +38,8 @@ export function ReportsCharts({ data }: { data: ChartData }) {
       </div>
 
       {/* Reporter type pie */}
-      <div className="bg-white rounded-xl border border-line p-5">
-        <h3 className="font-bold text-sm mb-4">Anonymous vs Authenticated Reports</h3>
+      <div className="rounded-2xl border border-line bg-surface shadow-[0_1px_2px_rgba(28,21,34,0.04)] p-5">
+        <h3 className="font-black text-ink text-[15px] mb-4">Anonymous vs Authenticated Reports</h3>
         <ResponsiveContainer width="100%" height={220}>
           <PieChart>
             <Pie data={data.reporterTypeBreakdown} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label={({ name, percent }: { name?: string; percent?: number }) => `${name ?? ""} ${((percent ?? 0) * 100).toFixed(0)}%`}>
@@ -52,8 +52,8 @@ export function ReportsCharts({ data }: { data: ChartData }) {
       </div>
 
       {/* County breakdown */}
-      <div className="bg-white rounded-xl border border-line p-5">
-        <h3 className="font-bold text-sm mb-4">Reports by County</h3>
+      <div className="rounded-2xl border border-line bg-surface shadow-[0_1px_2px_rgba(28,21,34,0.04)] p-5">
+        <h3 className="font-black text-ink text-[15px] mb-4">Reports by County</h3>
         <ResponsiveContainer width="100%" height={220}>
           <BarChart data={data.countyBreakdown.slice(0, 8)}>
             <CartesianGrid strokeDasharray="3 3" />
@@ -66,8 +66,8 @@ export function ReportsCharts({ data }: { data: ChartData }) {
       </div>
 
       {/* Monthly trend */}
-      <div className="bg-white rounded-xl border border-line p-5">
-        <h3 className="font-bold text-sm mb-4">Monthly Trend (Anonymous vs Authenticated)</h3>
+      <div className="rounded-2xl border border-line bg-surface shadow-[0_1px_2px_rgba(28,21,34,0.04)] p-5">
+        <h3 className="font-black text-ink text-[15px] mb-4">Monthly Trend (Anonymous vs Authenticated)</h3>
         <ResponsiveContainer width="100%" height={220}>
           <LineChart data={data.monthlyTrend}>
             <CartesianGrid strokeDasharray="3 3" />
@@ -82,8 +82,8 @@ export function ReportsCharts({ data }: { data: ChartData }) {
       </div>
 
       {/* Urgency breakdown */}
-      <div className="bg-white rounded-xl border border-line p-5">
-        <h3 className="font-bold text-sm mb-4">Urgency Levels</h3>
+      <div className="rounded-2xl border border-line bg-surface shadow-[0_1px_2px_rgba(28,21,34,0.04)] p-5">
+        <h3 className="font-black text-ink text-[15px] mb-4">Urgency Levels</h3>
         <ResponsiveContainer width="100%" height={180}>
           <BarChart data={data.urgencyBreakdown}>
             <CartesianGrid strokeDasharray="3 3" />
@@ -100,8 +100,8 @@ export function ReportsCharts({ data }: { data: ChartData }) {
       </div>
 
       {/* Verification status */}
-      <div className="bg-white rounded-xl border border-line p-5">
-        <h3 className="font-bold text-sm mb-4">Fact-Check / Verification Status</h3>
+      <div className="rounded-2xl border border-line bg-surface shadow-[0_1px_2px_rgba(28,21,34,0.04)] p-5">
+        <h3 className="font-black text-ink text-[15px] mb-4">Fact-Check / Verification Status</h3>
         <ResponsiveContainer width="100%" height={180}>
           <PieChart>
             <Pie data={data.verificationBreakdown} dataKey="count" nameKey="name" cx="50%" cy="50%" outerRadius={70} label={({ name, percent }: { name?: string; percent?: number }) => `${name ?? ""} ${((percent ?? 0)*100).toFixed(0)}%`}>
@@ -114,8 +114,8 @@ export function ReportsCharts({ data }: { data: ChartData }) {
 
       {/* Attack nature */}
       {data.attackNatureBreakdown && data.attackNatureBreakdown.length > 0 && (
-        <div className="bg-white rounded-xl border border-line p-5">
-          <h3 className="font-bold text-sm mb-4">Attack Nature Classification</h3>
+        <div className="rounded-2xl border border-line bg-surface shadow-[0_1px_2px_rgba(28,21,34,0.04)] p-5">
+          <h3 className="font-black text-ink text-[15px] mb-4">Attack Nature Classification</h3>
           <ResponsiveContainer width="100%" height={180}>
             <PieChart>
               <Pie data={data.attackNatureBreakdown} dataKey="count" nameKey="name" cx="50%" cy="50%" outerRadius={70}
@@ -131,7 +131,7 @@ export function ReportsCharts({ data }: { data: ChartData }) {
 
       {/* Top derogatory words */}
       {data.derogatoryWordBreakdown && data.derogatoryWordBreakdown.length > 0 && (
-        <div className="bg-white rounded-xl border border-line p-5 lg:col-span-2">
+        <div className="rounded-2xl border border-line bg-surface shadow-[0_1px_2px_rgba(28,21,34,0.04)] p-5 lg:col-span-2">
           <h3 className="font-bold text-sm mb-1">Top Derogatory Words / Hate Speech Terms</h3>
           <p className="text-xs text-muted mb-4">Frequency of hate speech terms logged by admins during fact-checking</p>
           <ResponsiveContainer width="100%" height={180}>

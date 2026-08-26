@@ -7,7 +7,7 @@
  * back to the offline page only when the network is unavailable.
  */
 
-const VERSION = "whrd-v1";
+const VERSION = "whrd-v2";
 const STATIC_CACHE = `${VERSION}-static`;
 const OFFLINE_URL = "/offline";
 
@@ -107,7 +107,9 @@ self.addEventListener("fetch", (event) => {
 // submit directly from the SW (submission needs the app's auth/session), so we
 // ask any open client to flush its offline queue.
 self.addEventListener("sync", (event) => {
-  if (event.tag === "whrd-sync-reports") {
+  // "whrd-sync-reports" is the tag an older build registered; both are honoured
+  // so a queue written before an update still drains.
+  if (event.tag === "whrd-sync-outbox" || event.tag === "whrd-sync-reports") {
     event.waitUntil(notifyClientsToSync());
   }
 });

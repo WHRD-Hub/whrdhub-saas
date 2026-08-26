@@ -11,11 +11,21 @@ export interface HubProfile {
   is_hub_admin: boolean;
   hub_onboarded: boolean;
   county_network_id: string | null;
+  /** Reporting platform fields, now part of the same profile row. */
+  is_anonymous: boolean | null;
+  user_type: "reporter" | "defender" | "admin" | null;
+  preferred_language: string | null;
 }
 
 export interface CurrentUser {
   id: string;
   email: string | null;
+  /**
+   * True for the credentialed-but-anonymous accounts the report form creates.
+   * These people have no Hub community profile and must never be pushed
+   * through Hub member onboarding — their home is /dashboard/reports.
+   */
+  isReporterOnly: boolean;
   profile: HubProfile | null;
   membership: {
     organization_id: string;
@@ -35,7 +45,7 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
   const { data: profile } = await supabase
     .from("profiles")
     .select(
-      "id, email, full_name, username, title, bio, avatar_url, is_hub_admin, hub_onboarded, county_network_id",
+      "id, email, full_name, username, title, bio, avatar_url, is_hub_admin, hub_onboarded, county_network_id, is_anonymous, user_type, preferred_language",
     )
     .eq("id", user.id)
     .single();
@@ -47,10 +57,14 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
     .limit(1)
     .maybeSingle();
 
+  const p = (profile as HubProfile) ?? null;
+
   return {
     id: user.id,
     email: user.email ?? null,
-    profile: (profile as HubProfile) ?? null,
+    isReporterOnly:
+      !!p && !p.hub_onboarded && !p.is_hub_admin && (p.is_anonymous === true || p.user_type === "reporter"),
+    profile: p,
     membership: membership
       ? {
           organization_id: membership.organization_id as string,

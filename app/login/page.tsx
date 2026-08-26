@@ -68,8 +68,8 @@ function LoginForm() {
       </form>
 
       <p className="mt-5 text-xs text-muted text-center">
-        Also use this account on the{" "}
-        <a href="https://whrdhub.vercel.app" className="text-purple-700 font-semibold">reporting platform</a>.
+        Need to report abuse? You can do that{" "}
+        <Link href="/report" className="text-purple-700 font-semibold">without an account</Link>.
       </p>
     </AuthShell>
   );

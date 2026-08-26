@@ -1,15 +1,21 @@
 /**
- * Cross-platform links and the public navigation tree.
- * The nav mirrors whrdhub.org. Marketing pages that we host live under the
- * SaaS; everything else deep-links back to whrdhub.org for now.
+ * Site-wide links and the public navigation tree.
+ * The nav mirrors whrdhub.org. Marketing pages that we host live here;
+ * everything else deep-links back to whrdhub.org for now.
  */
 
-export const REPORTING_URL =
-  process.env.NEXT_PUBLIC_REPORTING_URL || "https://whrdhub.vercel.app";
-
+/**
+ * The reporting platform now lives inside this app, so these are internal
+ * routes. NEXT_PUBLIC_REPORTING_URL is kept only so an old deployment can be
+ * pointed at during a cut-over; it is not used for navigation any more.
+ */
 export const links = {
-  reportAbuse: `${REPORTING_URL}/report`,
-  reportingDashboard: `${REPORTING_URL}/dashboard`,
+  /** Public, anonymous-friendly report form. */
+  reportAbuse: "/report",
+  /** A member's own reports. */
+  reportingDashboard: "/dashboard/reports",
+  /** The response team's reporting console. */
+  reportingConsole: "/hub/reporting",
   donate: "https://whrdhub.org/donate-now/",
 };
 

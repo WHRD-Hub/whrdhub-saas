@@ -42,6 +42,16 @@ export async function updateSession(request: NextRequest) {
     "/", "/login", "/signup", "/auth", "/feed",
     "/blog", "/about", "/our-work", "/organizations", "/counties", "/contact",
     "/partners", "/activity-images", "/press", "/resources", "/newsletter", "/opportunities",
+    "/privacy-policy", "/terms-of-use",
+    // Reporting: filing a report must work without an account. The form creates
+    // an anonymous credentialed account on submit, so gating this behind login
+    // would defeat the purpose of the platform.
+    "/report", "/offline",
+    // Machine callers authenticate themselves inside the route handler:
+    // Africa's Talking (USSD), Meta (signed webhook) and the chat assistant.
+    "/api/ussd", "/api/meta", "/api/chat",
+    // PWA plumbing.
+    "/manifest.webmanifest", "/sw.js",
   ];
   const path = request.nextUrl.pathname;
   const isPublic = publicPaths.some((p) => path === p || path.startsWith(p + "/"));

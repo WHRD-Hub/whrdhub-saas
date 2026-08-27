@@ -12,6 +12,12 @@ You need a local PostgreSQL 16 and nothing else — no Supabase, no network.
 npm run db:test
 ```
 
+`install.sql` is applied both statement-by-statement and as a single
+transaction. The Supabase SQL editor does the latter, and the difference is not
+cosmetic: `ALTER TYPE ... ADD VALUE` succeeds under the first and makes the
+whole script fail under the second, because PostgreSQL refuses to let a
+transaction use an enum value it just added.
+
 That script creates a throwaway database, applies `00_supabase_shim.sql` (a
 minimal local stand-in for the parts of Supabase the schema depends on:
 `auth.users`, `auth.uid()`, `storage.*` and the anon/authenticated/service_role

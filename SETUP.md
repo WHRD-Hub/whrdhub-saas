@@ -26,6 +26,11 @@ services, stories, posts and publications in it.
 
 It is idempotent. Run it again any time — that is also how you apply an update.
 
+If your project was created before the suspension feature existed, the script
+stops immediately with the one line to run first. That is deliberate:
+PostgreSQL will not let a transaction use an enum value that the same
+transaction added, and the SQL editor is one transaction.
+
 Then make yourself an administrator:
 
 ```sql
@@ -42,11 +47,13 @@ are kept for provenance and do not need to be run.
 npm run db:test
 ```
 
-Needs a local PostgreSQL 16 and nothing else. It builds a throwaway database,
-applies `install.sql` three times to prove it is idempotent, and runs 66
-assertions covering row-level security, deletion, membership approval,
-moderation, referral matching and the referral state machine. See
-`supabase/tests/README.md`.
+Needs a local PostgreSQL 16 and nothing else. It builds a throwaway database
+and applies `install.sql` four times to prove it is idempotent — twice
+statement-by-statement and twice wrapped in a single transaction, because that
+is how the Supabase SQL editor runs a pasted script and the two are not
+equivalent. Then it runs 101 assertions covering row-level security, deletion,
+membership approval, moderation, referral matching and the referral state
+machine. See `supabase/tests/README.md`.
 
 ## 3. Configure Supabase Auth
 

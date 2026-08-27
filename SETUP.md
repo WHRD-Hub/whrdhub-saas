@@ -154,11 +154,17 @@ your plan so the form refuses a file it cannot store, with an explanation,
 rather than failing mid-upload.
 
 A report that will not fit is nearly always carrying its photographs at print
-resolution:
+resolution. `scripts/compress-pdf.sh` shrinks one:
 
 ```bash
-scripts/compress-pdf.sh report.pdf 45
+scripts/compress-pdf.sh report.pdf 45      # writes report-web.pdf
 ```
+
+**This is a local utility, not part of the deployment.** It is not installed
+anywhere, does not run on Vercel and is not part of the build — it is a tool
+for whoever prepares a document, run on their own machine before they upload
+it. It needs ghostscript locally (`apt install ghostscript`, `brew install
+ghostscript`, or WSL on Windows).
 
 It downsamples images only as far as it must to hit the target, leaves the text
 layer searchable and selectable, and writes `report-web.pdf` beside the
@@ -166,6 +172,15 @@ original without touching it. On a 351 MB, 127-page test document it produced
 38.9 MB at 150 dpi in 25 seconds. That is also the version most readers want:
 the audience here is often on mobile data, where a 100 MB download is a barrier
 in itself.
+
+If the person publishing documents is not comfortable at a command line — which
+is the normal case — do not build a workflow around this script. Either compress
+with a desktop or web tool before uploading, or move the project to Supabase
+Pro, which raises the per-object ceiling to 500 GB and removes the chore
+entirely. Compression in the browser at upload time is not a real option for
+PDFs: downsampling the images without destroying the searchable text layer
+needs tooling that does not exist client-side, and rasterising the pages would
+make the report uncitable.
 
 **Roles.** `profiles.is_hub_admin` makes someone a Hub administrator;
 `profiles.user_type` of `defender` gives reporting triage access without the

@@ -101,6 +101,8 @@ NEXT_PUBLIC_SITE_URL=
 
 AT_USERNAME=            # Africa's Talking, for USSD confirmation SMS
 AT_API_KEY=
+NEXT_PUBLIC_MAX_UPLOAD_MB=50   # match your Supabase plan: 50 on Free, higher on Pro
+
 OPENROUTER_API_KEY=     # the in-app resource assistant
 META_APP_SECRET=        # online listening
 META_PAGE_ID=
@@ -144,6 +146,26 @@ bucket and is still reached by a signed, expiring URL. The trade is bandwidth â€
 every download now passes through the app, so if the publication library grows
 heavy, Supabase's Custom Domain add-on serves the same files straight from
 their CDN under a subdomain of yours instead.
+
+**Upload limits are set by the plan, not the bucket.** Supabase caps each
+object at 50 MB on the Free plan and 500 GB on Pro, and that ceiling wins over
+whatever a bucket is configured for. Set `NEXT_PUBLIC_MAX_UPLOAD_MB` to match
+your plan so the form refuses a file it cannot store, with an explanation,
+rather than failing mid-upload.
+
+A report that will not fit is nearly always carrying its photographs at print
+resolution:
+
+```bash
+scripts/compress-pdf.sh report.pdf 45
+```
+
+It downsamples images only as far as it must to hit the target, leaves the text
+layer searchable and selectable, and writes `report-web.pdf` beside the
+original without touching it. On a 351 MB, 127-page test document it produced
+38.9 MB at 150 dpi in 25 seconds. That is also the version most readers want:
+the audience here is often on mobile data, where a 100 MB download is a barrier
+in itself.
 
 **Roles.** `profiles.is_hub_admin` makes someone a Hub administrator;
 `profiles.user_type` of `defender` gives reporting triage access without the

@@ -11,6 +11,7 @@ import { StorageCheck } from "@/components/hub/storage-check";
 import { createResource, updateResource, deleteResource } from "@/app/actions/resources";
 import { cn } from "@/lib/utils";
 import { hubFile } from "@/lib/file-url";
+import { MAX_UPLOAD_MB } from "@/lib/upload-limits";
 
 const blank = {
   title: "",
@@ -269,7 +270,6 @@ export function ResourceForm({ item }: { item?: ResourceItem }) {
             bucket="publications"
             folder="covers"
             accept="image/*"
-            maxMb={100}
           />
           <Input
             className="mt-2"
@@ -281,14 +281,18 @@ export function ResourceForm({ item }: { item?: ResourceItem }) {
 
         <div>
           <Label>The document</Label>
-          <p className="text-xs text-muted mb-2">Upload the PDF, or paste a link to one already online.</p>
+          <p className="text-xs text-muted mb-2">
+            Upload the PDF, or paste a link to one already online. Up to {MAX_UPLOAD_MB} MB —
+            a larger report almost always shrinks below that with{" "}
+            <code className="rounded bg-paper px-1">scripts/compress-pdf.sh</code>, which
+            downsamples its photographs and leaves the text searchable.
+          </p>
           <MediaUploader
             value={fileValue}
             onChange={(v) => set("file_url", v.slice(-1)[0]?.url ?? "")}
             bucket="publications"
             folder="documents"
             accept=".pdf,.doc,.docx,.ppt,.pptx,application/pdf"
-            maxMb={100}
           />
           <Input
             className="mt-2"

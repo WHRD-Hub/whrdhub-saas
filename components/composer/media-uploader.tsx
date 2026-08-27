@@ -4,6 +4,7 @@ import { useState, useRef } from "react";
 import { ImagePlus, FileText, Video, X, Loader2, UploadCloud, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { hubFile } from "@/lib/file-url";
+import { MAX_UPLOAD_MB, tooLargeMessage } from "@/lib/upload-limits";
 
 export interface MediaItem {
   type: "image" | "video" | "document";
@@ -87,7 +88,7 @@ export function MediaUploader({
   bucket = "media",
   folder,
   accept = "image/*,video/*,.pdf,.doc,.docx,.ppt,.pptx",
-  maxMb = 50,
+  maxMb = MAX_UPLOAD_MB,
 }: {
   value: MediaItem[];
   onChange: (v: MediaItem[]) => void;
@@ -128,7 +129,8 @@ export function MediaUploader({
       for (const file of list) {
         try {
           if (file.size > maxMb * 1024 * 1024) {
-            mark(file.name, "failed", `Larger than ${maxMb} MB.`);
+            // Say what to do about it, not just that it failed.
+            mark(file.name, "failed", tooLargeMessage(file.size));
             continue;
           }
 

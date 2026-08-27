@@ -133,6 +133,18 @@ written offline are held in an IndexedDB outbox and send themselves when the
 connection returns. The service worker deliberately caches no authenticated
 HTML and no report content.
 
+**Files are served from this domain, not Supabase's.** Uploads live in Supabase
+Storage, which hands back an absolute URL on its own host — so without help, a
+visitor opening one of the Hub's own publications sees `<ref>.supabase.co` in
+the address bar. A rewrite in `next.config.ts` proxies `/files/*` to the public
+storage endpoint and `hubFile()` in `lib/file-url.ts` maps stored URLs onto it
+at render time, so nothing in the database needs rewriting and URLs saved
+before this keep working. Report evidence is untouched: it lives in a private
+bucket and is still reached by a signed, expiring URL. The trade is bandwidth —
+every download now passes through the app, so if the publication library grows
+heavy, Supabase's Custom Domain add-on serves the same files straight from
+their CDN under a subdomain of yours instead.
+
 **Roles.** `profiles.is_hub_admin` makes someone a Hub administrator;
 `profiles.user_type` of `defender` gives reporting triage access without the
 community console. An organisation can have any number of admins, appointed by

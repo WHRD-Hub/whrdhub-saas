@@ -3,6 +3,7 @@ import { PageShell } from "@/components/page-hero";
 import { pageMeta } from "@/lib/seo";
 import { getPublishedNewsletters} from "@/lib/resources";
 import { resourceDate } from "@/lib/resource-types";
+import { hubFile } from "@/lib/file-url";
 
 export const metadata = pageMeta({
   title: "Newsletter",
@@ -35,7 +36,7 @@ export default async function NewsletterPage() {
           <div className="rounded-3xl overflow-hidden border border-line shadow-xl shadow-purple/10 bg-paper grid place-items-center">
             {latest.cover_image_url ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={latest.cover_image_url} alt={latest.title} className="w-full object-cover" />
+              <img src={hubFile(latest.cover_image_url)} alt={latest.title} className="w-full object-cover" />
             ) : (
               <Mail className="w-12 h-12 text-muted my-20" />
             )}
@@ -50,7 +51,7 @@ export default async function NewsletterPage() {
                 "Read about the work happening across the movement: the trainings, the convenings, the partnerships, and the defenders at the heart of it all."}
             </p>
             <a
-              href={latest.file_url}
+              href={hubFile(latest.file_url)}
               target="_blank"
               rel="noopener noreferrer"
               className="mt-6 inline-flex items-center gap-2 rounded-xl bg-purple text-white px-6 py-3.5 text-sm font-bold hover:bg-purple-600"
@@ -84,7 +85,7 @@ export default async function NewsletterPage() {
             {past.map((n) => (
               <a
                 key={n.id}
-                href={n.file_url}
+                href={hubFile(n.file_url)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="group rounded-2xl border border-line bg-surface overflow-hidden hover:shadow-md transition-shadow flex flex-col"
@@ -93,7 +94,7 @@ export default async function NewsletterPage() {
                   {n.cover_image_url ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
-                      src={n.cover_image_url}
+                      src={hubFile(n.cover_image_url)}
                       alt=""
                       className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                     />

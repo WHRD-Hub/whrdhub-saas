@@ -3,6 +3,7 @@
 import { useState, useRef } from "react";
 import { ImagePlus, FileText, Video, X, Loader2, UploadCloud, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { hubFile } from "@/lib/file-url";
 
 export interface MediaItem {
   type: "image" | "video" | "document";
@@ -239,7 +240,7 @@ export function MediaUploader({
             <div key={i} className="relative rounded-lg border border-line overflow-hidden bg-paper group">
               {m.type === "image" ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={m.url} alt={m.name} className="w-full h-24 object-cover" />
+                <img src={hubFile(m.url)} alt={m.name} className="w-full h-24 object-cover" />
               ) : m.type === "video" ? (
                 <div className="w-full h-24 flex items-center justify-center bg-black text-white"><Video className="w-6 h-6" /></div>
               ) : (

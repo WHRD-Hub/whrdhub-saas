@@ -10,6 +10,7 @@ import { RESOURCE_KINDS, type ResourceItem } from "@/lib/resource-types";
 import { StorageCheck } from "@/components/hub/storage-check";
 import { createResource, updateResource, deleteResource } from "@/app/actions/resources";
 import { cn } from "@/lib/utils";
+import { hubFile } from "@/lib/file-url";
 
 const blank = {
   title: "",
@@ -336,7 +337,7 @@ export function ResourceForm({ item }: { item?: ResourceItem }) {
             <div className="aspect-[3/4] bg-paper overflow-hidden grid place-items-center">
               {d.cover_image_url ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={d.cover_image_url} alt="" className="w-full h-full object-cover" />
+                <img src={hubFile(d.cover_image_url)} alt="" className="w-full h-full object-cover" />
               ) : (
                 <FileText className="w-8 h-8 text-muted" />
               )}

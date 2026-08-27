@@ -3,6 +3,7 @@ import { PageShell } from "@/components/page-hero";
 import { pageMeta } from "@/lib/seo";
 import { getPublishedResources, getPublishedNewsletters} from "@/lib/resources";
 import { resourceDate } from "@/lib/resource-types";
+import { hubFile } from "@/lib/file-url";
 
 export const metadata = pageMeta({
   title: "Resources & Downloads",
@@ -36,7 +37,7 @@ export default async function ResourcesPage() {
           {items.map((r) => (
             <a
               key={r.id}
-              href={r.file_url}
+              href={hubFile(r.file_url)}
               target="_blank"
               rel="noopener noreferrer"
               className="group rounded-2xl border border-line bg-surface overflow-hidden hover:shadow-md transition-shadow flex flex-col"
@@ -45,7 +46,7 @@ export default async function ResourcesPage() {
                 {r.cover_image_url ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
-                    src={r.cover_image_url}
+                    src={hubFile(r.cover_image_url)}
                     alt=""
                     className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                   />
@@ -73,7 +74,7 @@ export default async function ResourcesPage() {
           <div className="bg-paper grid place-items-center">
             {latest.cover_image_url ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={latest.cover_image_url} alt="" className="w-full h-full object-cover" />
+              <img src={hubFile(latest.cover_image_url)} alt="" className="w-full h-full object-cover" />
             ) : (
               <Mail className="w-8 h-8 text-muted" />
             )}
@@ -87,7 +88,7 @@ export default async function ResourcesPage() {
             </p>
             <div className="mt-5 flex flex-wrap items-center gap-3">
               <a
-                href={latest.file_url}
+                href={hubFile(latest.file_url)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 rounded-xl bg-purple text-white px-5 py-3 text-sm font-bold hover:bg-purple-600"

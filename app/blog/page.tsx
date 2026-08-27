@@ -5,6 +5,7 @@ import { SiteFooter } from "@/components/site-footer";
 import { createClient } from "@/lib/supabase/server";
 import { timeAgo } from "@/lib/utils";
 import { pageMeta } from "@/lib/seo";
+import { hubFile } from "@/lib/file-url";
 
 export const metadata = pageMeta({
   title: "Stories",
@@ -55,7 +56,7 @@ export default async function BlogIndex() {
                 >
                   {b.cover_image_url ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={b.cover_image_url} alt="" className="h-40 w-full object-cover" />
+                    <img src={hubFile(b.cover_image_url)} alt="" className="h-40 w-full object-cover" />
                   ) : (
                     <div className="h-40 w-full brand-wash" />
                   )}

@@ -1,5 +1,6 @@
 import { FileText, Download } from "lucide-react";
 import type { MediaItem } from "@/lib/feed";
+import { hubFile } from "@/lib/file-url";
 
 /** Returns the YouTube video id if the URL is a YouTube link, else null. */
 function youTubeId(url: string): string | null {
@@ -20,7 +21,7 @@ export function MediaBlock({ media }: { media: MediaItem[] }) {
         <div className={`grid gap-1.5 ${images.length === 1 ? "grid-cols-1" : "grid-cols-2"}`}>
           {images.map((m, i) => (
             // eslint-disable-next-line @next/next/no-img-element
-            <img key={i} src={m.url} alt={m.name} className={`w-full object-cover rounded-xl border border-line ${images.length === 1 ? "max-h-[26rem]" : "h-40"}`} />
+            <img key={i} src={hubFile(m.url)} alt={m.name} className={`w-full object-cover rounded-xl border border-line ${images.length === 1 ? "max-h-[26rem]" : "h-40"}`} />
           ))}
         </div>
       )}
@@ -39,14 +40,14 @@ export function MediaBlock({ media }: { media: MediaItem[] }) {
             />
           </div>
         ) : (
-          <video key={i} src={m.url} controls className="w-full rounded-xl border border-line bg-black max-h-[26rem]" preload="metadata">
+          <video key={i} src={hubFile(m.url)} controls className="w-full rounded-xl border border-line bg-black max-h-[26rem]" preload="metadata">
             Your browser does not support video.
           </video>
         );
       })}
 
       {docs.map((m, i) => (
-        <a key={i} href={m.url} target="_blank" rel="noopener noreferrer"
+        <a key={i} href={hubFile(m.url)} target="_blank" rel="noopener noreferrer"
           className="flex items-center gap-3 rounded-xl border border-line bg-paper p-3 hover:bg-purple-050 transition-colors">
           <span className="w-10 h-10 rounded-lg bg-purple-050 text-purple grid place-items-center shrink-0"><FileText className="w-5 h-5" /></span>
           <span className="min-w-0 flex-1"><span className="block text-sm font-semibold text-ink truncate">{m.name}</span><span className="text-xs text-muted">Document</span></span>

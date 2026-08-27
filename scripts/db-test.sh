@@ -21,11 +21,28 @@ run() {
   fi
 }
 
+# The Supabase SQL editor wraps a pasted script in ONE transaction, and psql
+# does not unless told to. That difference hides a whole class of bug -- most
+# painfully `ALTER TYPE ... ADD VALUE`, whose new value PostgreSQL refuses to
+# let the same transaction use. So the script is proved both ways: statement by
+# statement, and as a single transaction the way an operator will actually run
+# it.
+run_txn() {
+  printf '  %-34s' "$(basename "$1") (one transaction)"
+  if psql -q -1 -v ON_ERROR_STOP=1 -d "$DB" -f "$1" > /tmp/whrd-db-test.log 2>&1; then
+    echo "ok"
+  else
+    echo "FAILED"
+    grep -v '^NOTICE' /tmp/whrd-db-test.log | head -20
+    exit 1
+  fi
+}
+
 echo "Schema:"
 run "$DIR/tests/00_supabase_shim.sql"
-run "$DIR/install.sql"
-run "$DIR/install.sql"   # again: the whole script must be idempotent
-run "$DIR/install.sql"   # and again, because twice is not a pattern
+run_txn "$DIR/install.sql"   # exactly how the Supabase SQL editor runs it
+run "$DIR/install.sql"       # again: the whole script must be idempotent
+run_txn "$DIR/install.sql"   # and again, in one transaction, because twice is not a pattern
 
 echo "Assertions:"
 # The assertion files change state as they go (they delete and purge rows), so

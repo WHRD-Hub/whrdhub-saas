@@ -53,11 +53,31 @@ do $$ begin create type public.service_category_enum    as enum ('legal','medica
 do $$ begin create type public.verification_state       as enum ('pending','verified','rejected','needs_more_info'); exception when duplicate_object then null; end $$;
 do $$ begin create type public.content_state            as enum ('draft','pending','approved','rejected'); exception when duplicate_object then null; end $$;
 do $$ begin create type public.membership_role          as enum ('member','org_admin'); exception when duplicate_object then null; end $$;
-do $$ begin create type public.membership_state         as enum ('pending','approved','rejected'); exception when duplicate_object then null; end $$;
--- 'suspended' was added after the first release, so it is appended rather than
--- redefined: an enum value cannot be added inside a transaction that uses it,
--- hence its own statement.
-do $$ begin alter type public.membership_state add value if not exists 'suspended'; exception when others then null; end $$;
+-- 'suspended' joined membership_state after the first release. It is listed in
+-- the CREATE rather than appended with ALTER TYPE, because PostgreSQL refuses
+-- to *use* an enum value that the current transaction added -- and the Supabase
+-- SQL editor runs this whole file as one transaction. Appending it here would
+-- make a fresh install fail the moment a later function mentions 'suspended'.
+do $$ begin create type public.membership_state         as enum ('pending','approved','rejected','suspended'); exception when duplicate_object then null; end $$;
+
+-- The one case the line above cannot cover: a project created by an older copy
+-- of this script, whose membership_state has no 'suspended'. Adding it has to
+-- happen in a transaction of its own, so this stops with instructions rather
+-- than failing 1,500 lines later with a message about enum safety.
+do $$
+begin
+  if not exists (
+    select 1 from pg_enum e join pg_type t on t.oid = e.enumtypid
+     where t.typnamespace = 'public'::regnamespace
+       and t.typname = 'membership_state'
+       and e.enumlabel = 'suspended'
+  ) then
+    raise exception
+      'This project predates the suspension feature: membership_state has no ''suspended'' value.'
+      using hint = 'Run this one line on its own, then run this script again: '
+                   'ALTER TYPE public.membership_state ADD VALUE IF NOT EXISTS ''suspended'';';
+  end if;
+end $$;
 
 
 -- ╔════════════════════════════════════════════════════════════════════════╗

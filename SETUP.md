@@ -57,9 +57,35 @@ machine. See `supabase/tests/README.md`.
 
 ## 3. Configure Supabase Auth
 
-* Enable the **Google** provider and add `<your-domain>/auth/callback` as a
-  redirect URL.
-* Add `<your-domain>` to the allowed redirect URLs for email confirmation.
+Under **Authentication -> URL Configuration**:
+
+* **Site URL**: `https://<your-domain>`. A new project defaults this to
+  `http://localhost:3000`, and getting it wrong is not obvious, because of the
+  next point.
+* **Redirect URLs**: add every origin the app is served from.
+
+  ```
+  https://<your-domain>/auth/callback
+  http://localhost:3000/**                 # local development
+  https://*-<your-team>.vercel.app/**      # preview deployments, if you use them
+  ```
+
+  If both the apex and `www` serve the site, list both. The app asks to come
+  back to `window.location.origin`, so the origin the visitor is actually on is
+  the one that must be allow-listed.
+
+**Why this matters more than it looks.** Supabase does not error on a redirect
+URL that is not on the list. It silently falls back to the Site URL. A missing
+entry plus the default Site URL sends everyone who signs in on the live site to
+`localhost:3000`, with nothing in the logs to explain it.
+
+Under **Authentication -> Providers**, enable **Google**. Its authorised
+redirect URI belongs in the Google Cloud Console, and it is Supabase's own
+callback, not your domain:
+
+```
+https://<project-ref>.supabase.co/auth/v1/callback
+```
 
 ## 4. Environment
 

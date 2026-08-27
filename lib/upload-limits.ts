@@ -22,17 +22,15 @@ export function formatMb(bytes: number): string {
 /**
  * What to tell someone whose file is too big.
  *
- * A publication is usually oversized because its photographs are embedded at
- * print resolution, so the fix is nearly always compression rather than a
- * smaller document — and saying so is more useful than quoting a number,
- * particularly to a reader on mobile data who would struggle with the large
- * version anyway.
+ * This is the message of last resort. An oversized PDF is compressed in the
+ * browser first (see lib/pdf/shrink.ts), so by the time anyone reads this,
+ * either the file is not a PDF or compressing it did not free enough — which
+ * means its weight is not in its photographs.
  */
 export function tooLargeMessage(bytes: number): string {
   return (
     `That file is ${formatMb(bytes)} MB and the limit is ${MAX_UPLOAD_MB} MB. ` +
-    `Most reports this size are carrying print-resolution photographs — running ` +
-    `scripts/compress-pdf.sh on it usually brings it under the limit without any ` +
-    `visible loss, and makes it far quicker to open on a phone.`
+    `If it is a scanned document, every page is one large picture and there is ` +
+    `little to compress — splitting it into parts is the way through.`
   );
 }

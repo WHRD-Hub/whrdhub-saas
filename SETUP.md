@@ -147,40 +147,40 @@ every download now passes through the app, so if the publication library grows
 heavy, Supabase's Custom Domain add-on serves the same files straight from
 their CDN under a subdomain of yours instead.
 
-**Upload limits are set by the plan, not the bucket.** Supabase caps each
-object at 50 MB on the Free plan and 500 GB on Pro, and that ceiling wins over
-whatever a bucket is configured for. Set `NEXT_PUBLIC_MAX_UPLOAD_MB` to match
-your plan so the form refuses a file it cannot store, with an explanation,
-rather than failing mid-upload.
+**Oversized PDFs are compressed in the browser, before they upload.** Supabase
+caps each object at 50 MB on the Free plan and 500 GB on Pro, and that ceiling
+wins over whatever a bucket is configured for. Set `NEXT_PUBLIC_MAX_UPLOAD_MB`
+to match your plan.
 
-A report that will not fit is nearly always carrying its photographs at print
-resolution. `scripts/compress-pdf.sh` shrinks one:
+A PDF over the limit is not refused. It is compressed on the spot: the browser
+opens the document, finds the photographs inside it, downsamples them, and
+writes them back. Passes run from gentlest to most aggressive and stop at the
+first that fits, so a document only just over the limit is barely touched.
 
-```bash
-scripts/compress-pdf.sh report.pdf 45      # writes report-web.pdf
-```
+**The text is never touched.** The obvious way to compress a PDF in a browser
+is to render each page to a canvas — which turns every page into a photograph
+and makes the report unsearchable, unquotable and unreadable to a screen
+reader. This works at the object level instead, rewriting only the image
+streams, so a published report stays citable. See `lib/pdf/shrink.ts`.
 
-**This is a local utility, not part of the deployment.** It is not installed
-anywhere, does not run on Vercel and is not part of the build — it is a tool
-for whoever prepares a document, run on their own machine before they upload
-it. It needs ghostscript locally (`apt install ghostscript`, `brew install
-ghostscript`, or WSL on Windows).
+Measured in Chromium on documents built for the purpose:
 
-It downsamples images only as far as it must to hit the target, leaves the text
-layer searchable and selectable, and writes `report-web.pdf` beside the
-original without touching it. On a 351 MB, 127-page test document it produced
-38.9 MB at 150 dpi in 25 seconds. That is also the version most readers want:
-the audience here is often on mobile data, where a 100 MB download is a barrier
-in itself.
+| document | before | after | time |
+| --- | --- | --- | --- |
+| 40 pages, photographic | 110.8 MB | 10.8 MB | 4.7 s |
+| 120 pages, photographic | 332.5 MB | 32.3 MB | 13.2 s |
 
-If the person publishing documents is not comfortable at a command line — which
-is the normal case — do not build a workflow around this script. Either compress
-with a desktop or web tool before uploading, or move the project to Supabase
-Pro, which raises the per-object ceiling to 500 GB and removes the chore
-entirely. Compression in the browser at upload time is not a real option for
-PDFs: downsampling the images without destroying the searchable text layer
-needs tooling that does not exist client-side, and rasterising the pages would
-make the report uncitable.
+Images that are not JPEG — a Flate-compressed bitmap, JPEG 2000, a CCITT fax
+scan — are deliberately left alone: reading them requires interpreting their
+colour space and bit depth, and getting that subtly wrong corrupts the picture
+rather than shrinking it. A document whose weight is not in its photographs
+therefore will not shrink, and the uploader says so instead of failing
+silently. That is usually a scanned report, which is better split into volumes.
+
+Everything runs in the visitor's browser. Nothing is installed on the server
+and nothing passes through Vercel — which is also why it has to work this way:
+a serverless function caps a request body at a few megabytes, so a 100 MB
+upload could never reach one.
 
 **Roles.** `profiles.is_hub_admin` makes someone a Hub administrator;
 `profiles.user_type` of `defender` gives reporting triage access without the

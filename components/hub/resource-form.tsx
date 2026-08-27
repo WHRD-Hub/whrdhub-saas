@@ -282,10 +282,10 @@ export function ResourceForm({ item }: { item?: ResourceItem }) {
         <div>
           <Label>The document</Label>
           <p className="text-xs text-muted mb-2">
-            Upload the PDF, or paste a link to one already online. Up to {MAX_UPLOAD_MB} MB —
-            a larger report almost always shrinks below that with{" "}
-            <code className="rounded bg-paper px-1">scripts/compress-pdf.sh</code>, which
-            downsamples its photographs and leaves the text searchable.
+            Upload the PDF, or paste a link to one already online. A report over{" "}
+            {MAX_UPLOAD_MB} MB is compressed in your browser before it uploads — the
+            photographs are made smaller, the text stays searchable, and the original
+            on your computer is untouched.
           </p>
           <MediaUploader
             value={fileValue}

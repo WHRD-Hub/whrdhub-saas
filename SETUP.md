@@ -88,9 +88,35 @@ both fail quietly if they are wrong.
 **2 messages per hour** and **only to members of the project's organisation**.
 Every other address fails with *Email address not authorized*. So without SMTP
 configured, password reset appears to work -- the page says a link has been
-sent -- and no defender ever receives one. Configure a provider under
-**Project Settings -> Authentication -> SMTP Settings** before this goes near
-real users.
+sent -- and no defender ever receives one.
+
+These emails are sent by Supabase's auth server, not by this app. **The SMTP
+credentials therefore belong in the Supabase dashboard and nowhere else** --
+not in `.env.local`, not in Vercel. The app has no mail library and never
+opens an SMTP connection; putting the token in the project would spread a
+secret without giving anything the ability to use it.
+
+Under **Project Settings -> Authentication -> SMTP Settings**, using Mailtrap's
+sending stream:
+
+| Field | Value |
+| --- | --- |
+| Host | `live.smtp.mailtrap.io` |
+| Port | `587` |
+| Username | `api` |
+| Password | your Mailtrap **sending** token |
+| Sender email | `tech+noreply@whrdhub.org` |
+| Sender name | `WHRD Hub` |
+
+Two things to watch. `live.smtp.mailtrap.io` is the *sending* host --
+`sandbox.smtp.mailtrap.io` captures mail in a test inbox and delivers to
+nobody, which fails exactly like having no SMTP at all. And Mailtrap will not
+send from `whrdhub.org` until that domain is verified in **Sending Domains**,
+which means adding the DNS records it gives you.
+
+While in the dashboard, raise the auth email limit under **Authentication ->
+Rate Limits**. It defaults to 30 an hour across the whole project, which is
+fine until a training day puts forty women through sign-up at once.
 
 **2. The recovery email template must use `token_hash`.** Supabase's default
 template links to `{{ .ConfirmationURL }}`, which returns the session in a URL

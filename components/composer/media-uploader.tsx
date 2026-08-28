@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { hubFile } from "@/lib/file-url";
 import { MAX_UPLOAD_MB, tooLargeMessage, formatMb } from "@/lib/upload-limits";
 import { compressPdfToFit } from "@/lib/pdf/compress-client";
+import { renderFirstPage } from "@/lib/pdf/first-page";
 
 export interface MediaItem {
   type: "image" | "video" | "document";
@@ -90,6 +91,7 @@ export function MediaUploader({
   folder,
   accept = "image/*,video/*,.pdf,.doc,.docx,.ppt,.pptx",
   maxMb = MAX_UPLOAD_MB,
+  onCoverDerived,
 }: {
   value: MediaItem[];
   onChange: (v: MediaItem[]) => void;
@@ -98,6 +100,14 @@ export function MediaUploader({
   folder?: string;
   accept?: string;
   maxMb?: number;
+  /**
+   * Called with a cover rendered from page one of an uploaded PDF.
+   *
+   * A publication without a cover is a grey rectangle in the feed, and the
+   * cover already exists -- it is the first page. Forms that have somewhere to
+   * put one pass this; the rest ignore it and nothing is rendered.
+   */
+  onCoverDerived?: (url: string) => void;
 }) {
   const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -204,6 +214,29 @@ export function MediaUploader({
 
           added.push({ type: kindOf(file), url: pub.publicUrl, name: original.name });
           mark(original.name, "done");
+
+          // Derive a cover from page one, but only when somebody asked for one.
+          // Failure here is silent on purpose: the document is already safely
+          // uploaded, and losing a thumbnail is not worth showing an error over.
+          if (onCoverDerived && file.type === "application/pdf") {
+            mark(original.name, "done", "Making a cover from page one…");
+            try {
+              const page = await renderFirstPage(file);
+              if (page) {
+                const coverPath = `covers/${Date.now()}-${safe.replace(/\.pdf$/i, "")}.jpg`;
+                const { error: coverErr } = await supabase.storage
+                  .from(bucket)
+                  .upload(coverPath, page.blob, { upsert: false, contentType: "image/jpeg" });
+                if (!coverErr) {
+                  const { data: coverPub } = supabase.storage.from(bucket).getPublicUrl(coverPath);
+                  if (coverPub?.publicUrl) onCoverDerived(coverPub.publicUrl);
+                }
+              }
+            } catch (e) {
+              console.error("[MediaUploader] could not derive a cover", e);
+            }
+            mark(original.name, "done");
+          }
         } catch (e) {
           const detail = e instanceof Error ? e.message : "Unexpected error.";
           console.error(`[MediaUploader] unexpected error uploading ${original.name}`, e);

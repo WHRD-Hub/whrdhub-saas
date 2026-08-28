@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "db:test": "bash scripts/db-test.sh"
+    "db:test": "bash scripts/db-test.sh",
+    "prebuild": "node scripts/copy-pdf-worker.mjs",
+    "predev": "node scripts/copy-pdf-worker.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",
@@ -22,6 +24,7 @@
     "lucide-react": "^0.511.0",
     "next": "16.2.12",
     "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "^6.2.108",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "recharts": "^2.15.0",

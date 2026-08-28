@@ -293,6 +293,9 @@ export function ResourceForm({ item }: { item?: ResourceItem }) {
             bucket="publications"
             folder="documents"
             accept=".pdf,.doc,.docx,.ppt,.pptx,application/pdf"
+            // Only fills an empty cover: a cover somebody chose deliberately is
+            // never replaced by a generated one.
+            onCoverDerived={(url) => set("cover_image_url", d.cover_image_url || url)}
           />
           <Input
             className="mt-2"

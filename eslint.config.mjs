@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Vendored by scripts/copy-pdf-worker.mjs on every build. It is a
+    // third-party minified bundle, not source, and linting it produces
+    // seventeen hundred findings about somebody else's code.
+    "public/pdf.worker.min.mjs",
   ]),
 ]);
 

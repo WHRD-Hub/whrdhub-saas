@@ -237,17 +237,34 @@ export async function reviewContent(
 }
 
 /** Admin edits a post/blog before publishing. */
+/**
+ * Edit anybody's content.
+ *
+ * The Hub is answerable for what the platform publishes, so it can correct a
+ * post, a story or a publication regardless of who wrote it. Every edit is
+ * written to the audit log — a power to change someone else's words without a
+ * record of having done so is not one worth having.
+ */
 export async function editContent(
-  kind: "post" | "blog",
+  kind: "post" | "blog" | "resource",
   id: string,
-  patch: { body?: string; title?: string; excerpt?: string; cover_image_url?: string | null },
+  patch: {
+    body?: string; title?: string; excerpt?: string; cover_image_url?: string | null;
+    description?: string;
+  },
 ) {
   const hub = await requireHub();
   if (!hub) return { error: "Only the Hub can edit content." };
   const supabase = await createClient();
-  const table = kind === "post" ? "posts" : "blogs";
+  const table = kind === "post" ? "posts" : kind === "blog" ? "blogs" : "resources";
   const update = kind === "post"
     ? { body: patch.body }
+    : kind === "resource"
+      ? {
+          title: patch.title,
+          description: patch.description ?? patch.excerpt,
+          cover_image_url: patch.cover_image_url ?? null,
+        }
     : { title: patch.title, excerpt: patch.excerpt, body: patch.body, cover_image_url: patch.cover_image_url ?? null };
   const { error } = await supabase.from(table).update(update).eq("id", id);
   if (error) return { error: error.message };
@@ -260,17 +277,32 @@ export async function editContent(
   return { ok: true };
 }
 
-export async function togglePin(kind: "post" | "blog", id: string, pinned: boolean) {
+/**
+ * Pin anybody's content to the top of the feed.
+ *
+ * A publication carries `featured` rather than `pinned` — it predates the feed
+ * and the library still calls it that — but both mean the same thing to a
+ * reader, so the difference is absorbed here rather than leaked into the UI.
+ */
+export async function togglePin(
+  kind: "post" | "blog" | "resource",
+  id: string,
+  pinned: boolean,
+) {
   const hub = await requireHub();
   if (!hub) return { error: "Only the Hub can pin content." };
   const supabase = await createClient();
-  const table = kind === "post" ? "posts" : "blogs";
-  const { error } = await supabase.from(table).update({ pinned }).eq("id", id);
+  const table = kind === "post" ? "posts" : kind === "blog" ? "blogs" : "resources";
+  const { error } = await supabase
+    .from(table)
+    .update(kind === "resource" ? { featured: pinned } : { pinned })
+    .eq("id", id);
   if (error) return { error: error.message };
   await logAudit(kind, id, pinned ? "pinned" : "unpinned");
   revalidatePath("/hub");
   revalidatePath("/hub/posts");
   revalidatePath("/hub/blogs");
+  revalidatePath("/resources");
   revalidatePath("/feed");
   revalidatePath("/");
   return { ok: true };

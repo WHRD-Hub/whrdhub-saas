@@ -46,7 +46,7 @@ export interface FeedComment {
 }
 
 export interface FeedItem {
-  kind: "post" | "blog";
+  kind: "post" | "blog" | "resource";
   id: string;
   slug?: string | null;
   title?: string | null;
@@ -69,6 +69,9 @@ export interface FeedItem {
   mine: boolean;
   /** Awaiting Hub review — only ever visible to the author. */
   pending: boolean;
+  /** Resources only: the document itself, and what kind of thing it is. */
+  fileUrl?: string | null;
+  docKind?: string | null;
 }
 
 type Row = {
@@ -111,6 +114,20 @@ const HUB_AUTHOR: FeedAuthor = {
 /** The Hub's own mark, used when a post belongs to no CBO. */
 const HUB_LOGO = "/main-logo.png";
 
+/** A published document as the feed needs it. */
+type ResourceRow = {
+  id: string;
+  title: string;
+  slug: string | null;
+  description: string | null;
+  kind: string;
+  cover_image_url: string | null;
+  file_url: string;
+  featured: boolean;
+  published_on: string | null;
+  created_at: string;
+};
+
 const FALLBACK_AUTHOR: FeedAuthor = {
   id: null,
   name: "WHRD member",
@@ -129,7 +146,7 @@ const FALLBACK_AUTHOR: FeedAuthor = {
 export async function getFeed(limit = 40, userId?: string): Promise<FeedItem[]> {
   const supabase = await createClient();
 
-  const [{ data: posts }, { data: blogs }] = await Promise.all([
+  const [{ data: posts }, { data: blogs }, { data: resources }] = await Promise.all([
     supabase
       .from("posts")
       .select(
@@ -144,6 +161,13 @@ export async function getFeed(limit = 40, userId?: string): Promise<FeedItem[]> 
       )
       .order("created_at", { ascending: false })
       .limit(limit * 2),
+    supabase
+      .from("resources")
+      .select("id, title, slug, description, kind, cover_image_url, file_url, featured, published_on, created_at")
+      .eq("published", true)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .limit(limit),
   ]);
 
   const all: (Row & { kind: "post" | "blog" })[] = [
@@ -308,6 +332,48 @@ export async function getFeed(limit = 40, userId?: string): Promise<FeedItem[]> 
       pending: r.status === "pending",
     };
   });
+
+  // Publications belong in the feed too.
+  //
+  // A report the Hub spent months on used to appear only in the library, where
+  // somebody had to go looking for it. Adding it here is how the people the
+  // work is for find out it exists.
+  //
+  // Note this is the publications library — resources.kind defaults to
+  // 'Report'. Incident reports filed by survivors are private and are never
+  // surfaced in any feed.
+  const resourceItems: FeedItem[] = ((resources as ResourceRow[]) ?? []).map((r) => ({
+    kind: "resource" as const,
+    id: r.id,
+    slug: r.slug ?? null,
+    title: r.title,
+    body: r.description ?? "",
+    image: r.cover_image_url ?? null,
+    media: [],
+    author: HUB_AUTHOR,
+    byline: {
+      name: "WHRD Hub",
+      logo_url: HUB_LOGO,
+      county: null,
+      isHub: true,
+      person: null,
+    },
+    org: null,
+    county: null,
+    is_hub: true,
+    pinned: r.featured,
+    published_at: r.published_on ?? r.created_at,
+    reactions: 0,
+    reactedByMe: false,
+    comments: [],
+    commentCount: 0,
+    mine: false,
+    pending: false,
+    fileUrl: r.file_url,
+    docKind: r.kind,
+  }));
+
+  items.push(...resourceItems);
 
   items.sort((a, b) => {
     if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;

@@ -79,6 +79,40 @@ URL that is not on the list. It silently falls back to the Site URL. A missing
 entry plus the default Site URL sends everyone who signs in on the live site to
 `localhost:3000`, with nothing in the logs to explain it.
 
+### Which sign-ups need to confirm an email
+
+Three routes in, three different answers, and they are already wired:
+
+* **Email and password** must confirm. Turn **Confirm email** on under
+  **Authentication -> Sign In / Providers -> Email**, and paste
+  `supabase/email-templates/confirm-signup.html` into **Emails -> Confirm
+  signup**. Until she follows the link there is no session, and the sign-up
+  page says so rather than dropping her somewhere she cannot use.
+* **Google** confirms nothing, because Google already has. Supabase sends no
+  email at all for OAuth, so the app sends a welcome itself on first sign-in --
+  once, recorded in `profiles.welcomed_at`. That is the one message this
+  application sends, and the only reason `MAILTRAP_SENDING_TOKEN` belongs in
+  the app's environment as well as in Supabase. Set `MAIL_FROM` alongside it if
+  the sender should differ from `tech+noreply@whrdhub.org`.
+* **Anonymous reporting accounts** never confirm anything. They are created
+  with `admin.createUser({ email_confirm: true })` against an internal
+  `@whrdhub.local` address that receives no mail and belongs to nobody.
+  Requiring confirmation there would mean a woman filing a report at the worst
+  moment of her week being asked to check an inbox that does not exist.
+
+### Signed-in devices
+
+`/profile` lists every session on the account and lets her end any of them.
+These are real sessions read from `auth.sessions`, and ending one deletes the
+row and its refresh tokens -- the device is signed out, not merely forgotten by
+a list. That distinction is the point: a tracking table that only forgets a
+device would tell a woman she had removed an intruder while the intruder kept
+reading.
+
+Both functions are `SECURITY DEFINER` and filter on `auth.uid()` first, because
+`auth.sessions` is readable by nobody otherwise. `supabase/tests/60_sessions.sql`
+asserts the isolation from both directions.
+
 ### Password reset emails
 
 Two settings decide whether the "forgotten password" flow works at all, and

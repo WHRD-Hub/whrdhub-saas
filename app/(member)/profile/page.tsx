@@ -1,6 +1,9 @@
 import { getCurrentUser } from "@/lib/current-user";
 import { createClient } from "@/lib/supabase/server";
 import { ProfileClient } from "@/components/profile/profile-client";
+import { Suspense } from "react";
+import { listSessions } from "@/app/actions/sessions";
+import { Devices } from "@/components/account/devices";
 
 export const metadata = { title: "Profile — WHRD Hub" };
 
@@ -23,6 +26,7 @@ export default async function ProfilePage() {
     .filter(Boolean) as { id: string; body: string; is_hub: boolean; status: string }[];
 
   return (
+    <>
     <ProfileClient
       profile={{
         full_name: user?.profile?.full_name ?? "",
@@ -38,5 +42,19 @@ export default async function ProfilePage() {
       reactedPosts={reactedPosts}
       isAdmin={!!user?.profile?.is_hub_admin}
     />
+
+    {/* Streamed on its own: it reads auth.sessions through an RPC and should
+        not hold up the rest of the profile. */}
+    <div className="mt-6">
+      <Suspense fallback={<div className="h-40 animate-pulse rounded-2xl bg-purple-050/70" />}>
+        <DeviceList />
+      </Suspense>
+    </div>
+    </>
   );
+}
+
+async function DeviceList() {
+  const sessions = await listSessions();
+  return <Devices sessions={sessions} />;
 }

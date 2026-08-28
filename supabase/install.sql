@@ -1963,6 +1963,165 @@ create policy rs_own_read on public.report_services for select using (
   exists (select 1 from public.reports r
            where r.id = report_id and r.user_id = auth.uid() and r.deleted_at is null)
 );
+-- ╔════════════════════════════════════════════════════════════════════════╗
+-- ║  4d. Signed-in devices                                                  ║
+-- ╚════════════════════════════════════════════════════════════════════════╝
+--
+-- Somebody who thinks another person is reading her account needs two things:
+-- to see where it is signed in, and to end those sessions. Supabase exposes
+-- neither through its client library, so both live here.
+--
+-- The sessions are real ones. GoTrue keeps them in auth.sessions, with the
+-- user agent and IP it saw at sign-in, and deleting a row there invalidates
+-- that refresh token -- the device is signed out for good rather than merely
+-- forgotten by a list. A tracking table that only forgets a device would be
+-- worse than nothing here: it would tell a woman she had removed an intruder
+-- while the intruder kept reading.
+--
+-- Both functions are SECURITY DEFINER because auth.sessions is not readable by
+-- anyone else, and both filter on auth.uid() as their first act. There is no
+-- argument by which one account can see or end another's session.
+
+/**
+ * The caller's own sessions, newest activity first.
+ *
+ * Returns the IP and user agent as recorded, and leaves the reading of them to
+ * the application: parsing a user agent into "Chrome on Windows" is
+ * presentation, and presentation that changes with every browser release does
+ * not belong in the database.
+ */
+create or replace function public.my_sessions()
+returns table (
+  id uuid,
+  created_at timestamptz,
+  refreshed_at timestamptz,
+  user_agent text,
+  ip text,
+  is_current boolean
+)
+language plpgsql security definer set search_path = auth, public as $$
+declare
+  me uuid := auth.uid();
+  current_sid uuid;
+begin
+  if me is null then
+    raise exception 'Not signed in';
+  end if;
+
+  -- The access token carries the session it belongs to, so the caller's own
+  -- device can be marked rather than guessed at from timestamps.
+  begin
+    current_sid := nullif(current_setting('request.jwt.claims', true)::json ->> 'session_id', '')::uuid;
+  exception when others then
+    current_sid := null;
+  end;
+
+  return query
+    select s.id,
+           s.created_at,
+           coalesce(s.refreshed_at, s.updated_at, s.created_at) as refreshed_at,
+           s.user_agent,
+           host(s.ip)::text as ip,
+           (s.id = current_sid) as is_current
+      from auth.sessions s
+     where s.user_id = me
+     order by coalesce(s.refreshed_at, s.updated_at, s.created_at) desc;
+end;
+$$;
+
+/**
+ * End one session.
+ *
+ * Refusing to end the current one is deliberate: signing yourself out is the
+ * Sign out button, and conflating the two turns "remove that unfamiliar
+ * device" into "you are now logged out", which reads like the action failed.
+ */
+create or replace function public.revoke_session(target uuid)
+returns boolean
+language plpgsql security definer set search_path = auth, public as $$
+declare
+  me uuid := auth.uid();
+  current_sid uuid;
+  owner uuid;
+begin
+  if me is null then
+    raise exception 'Not signed in';
+  end if;
+
+  select s.user_id into owner from auth.sessions s where s.id = target;
+  -- Same answer whether the session belongs to somebody else or does not
+  -- exist: a distinct error would confirm which session ids are real.
+  if owner is null or owner <> me then
+    raise exception 'That session is not yours to end';
+  end if;
+
+  begin
+    current_sid := nullif(current_setting('request.jwt.claims', true)::json ->> 'session_id', '')::uuid;
+  exception when others then
+    current_sid := null;
+  end;
+
+  if current_sid is not null and target = current_sid then
+    raise exception 'Use Sign out to end the session you are using';
+  end if;
+
+  -- Refresh tokens cascade from the session, but deleting them explicitly
+  -- means a schema that ever loses that constraint cannot silently leave a
+  -- revoked device able to mint a new access token.
+  delete from auth.refresh_tokens where session_id = target;
+  delete from auth.sessions where id = target;
+  return true;
+end;
+$$;
+
+/** End every session except the one making the request. */
+create or replace function public.revoke_other_sessions()
+returns integer
+language plpgsql security definer set search_path = auth, public as $$
+declare
+  me uuid := auth.uid();
+  current_sid uuid;
+  n integer;
+begin
+  if me is null then
+    raise exception 'Not signed in';
+  end if;
+
+  begin
+    current_sid := nullif(current_setting('request.jwt.claims', true)::json ->> 'session_id', '')::uuid;
+  exception when others then
+    current_sid := null;
+  end;
+
+  delete from auth.refresh_tokens
+   where session_id in (
+     select s.id from auth.sessions s
+      where s.user_id = me and (current_sid is null or s.id <> current_sid)
+   );
+
+  with gone as (
+    delete from auth.sessions s
+     where s.user_id = me and (current_sid is null or s.id <> current_sid)
+    returning 1
+  )
+  select count(*) into n from gone;
+
+  return n;
+end;
+$$;
+
+revoke all on function public.my_sessions() from public;
+revoke all on function public.revoke_session(uuid) from public;
+revoke all on function public.revoke_other_sessions() from public;
+grant execute on function public.my_sessions() to authenticated;
+grant execute on function public.revoke_session(uuid) to authenticated;
+grant execute on function public.revoke_other_sessions() to authenticated;
+
+-- Records that a welcome email has gone out, so it goes out once. Somebody who
+-- signs in with Google gets no confirmation email from Supabase -- the provider
+-- has already vouched for the address -- so nothing would otherwise greet her.
+alter table public.profiles
+  add column if not exists welcomed_at timestamptz;
 
 -- ╔════════════════════════════════════════════════════════════════════════╗
 -- ║  5. Triggers                                                            ║

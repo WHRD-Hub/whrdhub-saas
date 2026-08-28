@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { ArrowRight, MapPin, Heart, ArrowUpRight, Sparkles } from "lucide-react";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
@@ -32,6 +33,15 @@ const PILLAR_TINT = ["bg-purple-050", "bg-magenta-050", "bg-cyan-050", "bg-purpl
 
 export default async function LandingPage() {
   const user = await getCurrentUser();
+
+  // A signed-in member came here to use the Hub, not to read the pitch. Sending
+  // them straight to their dashboard removes the second click that made signing
+  // in feel like it had not worked. Marketing stays reachable at /about and
+  // through the footer, and anyone signed out still lands here.
+  if (user && !user.profile?.account_deleted_at) {
+    redirect(user.profile?.is_hub_admin ? "/hub" : "/dashboard");
+  }
+
   const feed = await getFeed(20, user?.id);
 
   const supabase = await createClient();

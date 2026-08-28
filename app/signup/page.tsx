@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { Loader2, MailCheck } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { AuthShell } from "@/components/auth/auth-shell";
@@ -11,7 +10,6 @@ import { Input, Label } from "@/components/ui/field";
 import { Button } from "@/components/ui/button";
 
 export default function SignupPage() {
-  const router = useRouter();
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -46,8 +44,9 @@ export default function SignupPage() {
       setLoading(false);
       return;
     }
-    router.push("/onboarding");
-    router.refresh();
+    // Full navigation for the same reason as sign-in: the middleware must see
+    // the session cookie, and a client push can outrun it.
+    window.location.assign("/onboarding");
   };
 
   if (checkEmail) {

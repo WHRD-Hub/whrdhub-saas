@@ -52,19 +52,27 @@ export default async function MemberLayout({ children }: { children: React.React
 
   const nav: NavItem[] = reporterOnly
     ? [
-        { label: "My Reports", href: "/dashboard/reports", icon: "reports", badge: actioned || undefined },
-        { label: "Account", href: "/dashboard/account", icon: "account" },
+        { label: "My Reports", href: "/dashboard/reports", icon: "reports", badge: actioned || undefined, primary: true },
+        { label: "Community", href: "/dashboard/feed", icon: "feed", primary: true },
+        { label: "Account", href: "/dashboard/account", icon: "account", primary: true },
       ]
     : [
-        { label: "Overview", href: "/dashboard", icon: "overview" },
-        { label: "Community Feed", href: "/dashboard/feed", icon: "feed" },
-        { label: "Femtorship", href: "/mentorship", icon: "femtorship" },
-        { label: "My Reports", href: "/dashboard/reports", icon: "reports", badge: actioned || undefined },
+        // The four marked primary are what the mobile bar carries, in this order.
+        { label: "Overview", href: "/dashboard", icon: "overview", section: "Your Hub", primary: true },
+        { label: "Community Feed", href: "/dashboard/feed", icon: "feed", section: "Your Hub", primary: true },
+        { label: "My Reports", href: "/dashboard/reports", icon: "reports", badge: actioned || undefined, section: "Your Hub", primary: true },
+        { label: "Femtorship", href: "/mentorship", icon: "femtorship", section: "Your Hub", primary: true },
         ...(isOrgAdmin
-          ? ([{ label: "Your network", href: "/dashboard/network", icon: "members", badge: requestCount || undefined }] as NavItem[])
+          ? ([{
+              label: "Your network",
+              href: "/dashboard/network",
+              icon: "members",
+              badge: requestCount || undefined,
+              section: "Your network",
+            }] as NavItem[])
           : []),
-        { label: "Profile", href: "/profile", icon: "profile" },
-        { label: "Account", href: "/dashboard/account", icon: "account" },
+        { label: "Profile", href: "/profile", icon: "profile", section: "You" },
+        { label: "Account", href: "/dashboard/account", icon: "account", section: "You" },
       ];
 
   // Hub admins and reporting defenders get the console switch in the user menu.

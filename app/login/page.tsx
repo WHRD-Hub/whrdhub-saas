@@ -2,7 +2,7 @@
 
 import { useState, Suspense } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { AuthShell } from "@/components/auth/auth-shell";
@@ -10,7 +10,6 @@ import { GoogleButton } from "@/components/auth/google-button";
 import { Input, Label } from "@/components/ui/field";
 
 function LoginForm() {
-  const router = useRouter();
   const params = useSearchParams();
   const next = params.get("next") || "/dashboard";
 
@@ -30,8 +29,11 @@ function LoginForm() {
       setLoading(false);
       return;
     }
-    router.push(next);
-    router.refresh();
+    // A full navigation, not router.push: the session cookie is written by the
+    // client and the middleware reads it on the server. Pushing can arrive
+    // before the cookie does, and the request bounces back to /login -- which
+    // is exactly the "sign in twice" behaviour this replaces.
+    window.location.assign(next);
   };
 
   return (

@@ -95,13 +95,16 @@ real users.
 **2. The recovery email template must use `token_hash`.** Supabase's default
 template links to `{{ .ConfirmationURL }}`, which returns the session in a URL
 *fragment*. A fragment never reaches the server, so a server-rendered app
-cannot read it and the link does nothing useful. Under **Authentication ->
-Emails -> Reset Password**, the link must be:
+cannot read it and the link does nothing useful.
+
+Paste `supabase/email-templates/reset-password.html` into **Authentication ->
+Emails -> Reset Password**. It is written for email clients rather than
+browsers -- tables, inline styles, a system font stack, no webfonts -- so it
+holds together in Gmail, Apple Mail and Outlook, which renders with Word. The
+only part that must not change is the link:
 
 ```html
 <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery">
-  Set a new password
-</a>
 ```
 
 `/auth/confirm` exchanges the token for a session server-side and sends the

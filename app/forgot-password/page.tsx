@@ -4,26 +4,35 @@ import { useActionState } from "react";
 import Link from "next/link";
 import { Loader2, MailCheck } from "lucide-react";
 import { AuthShell } from "@/components/auth/auth-shell";
-import { GoogleButton } from "@/components/auth/google-button";
 import { Input, Label } from "@/components/ui/field";
 import { Button } from "@/components/ui/button";
-import { signUp, type AuthState } from "@/app/actions/auth";
+import { requestPasswordReset, type AuthState } from "@/app/actions/auth";
 
-export default function SignupPage() {
-  const [state, formAction, pending] = useActionState<AuthState, FormData>(signUp, {});
+export default function ForgotPasswordPage() {
+  const [state, formAction, pending] = useActionState<AuthState, FormData>(
+    requestPasswordReset,
+    {},
+  );
 
+  // The same confirmation is shown whether or not that address has an account.
+  // Anything else would let anyone test which addresses are registered here.
   if (state?.checkEmail) {
     return (
-      <AuthShell heading="Check your email" sub="One more step to get started">
+      <AuthShell heading="Check your email" sub="If we have an account, a link is on its way">
         <div className="rounded-2xl border border-line bg-surface p-6 text-center">
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-purple-050 text-purple">
             <MailCheck className="h-7 w-7" />
           </div>
           <p className="mt-4 text-sm text-muted">
-            We sent you a confirmation link. Open it to finish setting up your account.
+            If that address has an account with the Hub, we have sent it a link for setting a
+            new password. The link works once and expires after an hour.
+          </p>
+          <p className="mt-3 text-sm text-muted">
+            Nothing arrived? Check your spam folder, and make sure you used the address you
+            signed up with.
           </p>
           <Button href="/login" variant="outline" className="mt-5 w-full">
-            Go to log in
+            Back to log in
           </Button>
         </div>
       </AuthShell>
@@ -32,33 +41,18 @@ export default function SignupPage() {
 
   return (
     <AuthShell
-      heading="Join the Hub"
-      sub="One account works across the Hub and reporting platform"
+      heading="Forgotten your password?"
+      sub="We will email you a link to set a new one"
       footer={
         <>
-          Already a member?{" "}
+          Remembered it?{" "}
           <Link href="/login" className="font-bold text-purple-700">
             Log in
           </Link>
         </>
       }
     >
-      <GoogleButton next="/onboarding" label="Sign up with Google" />
-
-      <div className="my-5 flex items-center gap-3">
-        <span className="h-px flex-1 bg-line" />
-        <span className="text-xs text-muted">or with email</span>
-        <span className="h-px flex-1 bg-line" />
-      </div>
-
-      {/* Server action, for the same reasons as sign-in: the cookie and the
-          redirect leave together, and the confirmation link is built from
-          configured site URL rather than from anything the browser supplied. */}
       <form action={formAction} className="space-y-4">
-        <div>
-          <Label htmlFor="name">Full name</Label>
-          <Input id="name" name="fullName" required autoComplete="name" placeholder="Your name" />
-        </div>
         <div>
           <Label htmlFor="email">Email address</Label>
           <Input
@@ -68,18 +62,6 @@ export default function SignupPage() {
             required
             autoComplete="email"
             placeholder="name@example.com"
-          />
-        </div>
-        <div>
-          <Label htmlFor="password">Password</Label>
-          <Input
-            id="password"
-            name="password"
-            type="password"
-            required
-            minLength={8}
-            autoComplete="new-password"
-            placeholder="At least 8 characters"
           />
         </div>
 
@@ -97,9 +79,17 @@ export default function SignupPage() {
           disabled={pending}
           className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-purple text-sm font-bold text-white transition-colors hover:bg-purple-600 disabled:opacity-60"
         >
-          {pending ? <Loader2 className="h-5 w-5 animate-spin" /> : "Create account"}
+          {pending ? <Loader2 className="h-5 w-5 animate-spin" /> : "Send the link"}
         </button>
       </form>
+
+      <p className="mt-5 text-center text-xs text-muted">
+        Locked out and need to report something urgently? You can do that{" "}
+        <Link href="/report" className="font-semibold text-purple-700">
+          without an account
+        </Link>
+        .
+      </p>
     </AuthShell>
   );
 }

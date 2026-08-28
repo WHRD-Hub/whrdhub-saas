@@ -2,12 +2,14 @@
 
 import { useCallback, useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Youtube, Pin, Share2, Image as ImageIcon, Video, Smile, PenLine } from "lucide-react";
 import { Avatar } from "@/components/ui/field";
 import { PostCard } from "@/components/feed/post-card";
 import { FeedRail } from "@/components/feed/feed-rail";
 import { PendingPosts } from "@/components/feed/pending-posts";
 import type { FeedItem } from "@/lib/feed";
+import { cn } from "@/lib/utils";
 
 interface CountyChip {
   name: string;
@@ -190,6 +192,7 @@ export function FeedView({
   userName,
   avatarUrl,
   counties = [],
+  filter,
   onCompose,
 }: {
   feed: FeedItem[];
@@ -200,8 +203,19 @@ export function FeedView({
   userName?: string | null;
   avatarUrl?: string | null;
   counties?: CountyChip[];
+  filter?: { mine?: boolean; countySlug?: string };
   onCompose: () => void;
 }) {
+  // Filters stay on whichever feed you are already reading — the public one
+  // or the member dashboard's — instead of throwing you across to the other.
+  const base = usePathname();
+
+  const filterLabel = filter?.mine
+    ? "your posts only"
+    : filter?.countySlug
+      ? `the ${counties.find((c) => c.slug === filter.countySlug)?.name ?? filter.countySlug} network`
+      : null;
+
   const { share, toast } = useShare();
 
   // Interleave the Hub's videos so the stream is not a wall of text.
@@ -227,7 +241,7 @@ export function FeedView({
       {/* Left rail */}
       <aside className="hidden w-[19rem] shrink-0 lg:block">
         <div className="sticky top-20 max-h-[calc(100vh-6rem)] overflow-y-auto pr-1 feed-scroll">
-          <FeedRail userName={userName} avatarUrl={avatarUrl} signedIn={signedIn} />
+          <FeedRail userName={userName} avatarUrl={avatarUrl} signedIn={signedIn} mineActive={!!filter?.mine} />
         </div>
       </aside>
 
@@ -243,12 +257,40 @@ export function FeedView({
 
         {signedIn && <PendingPosts userName={userName} avatarUrl={avatarUrl} />}
 
+        {/* A filtered feed says so. Without this, "my posts" on a quiet account
+            looks identical to a broken feed. */}
+        {filterLabel && (
+          <div className="flex items-center gap-3 rounded-xl border border-purple/20 bg-purple-050 px-4 py-2.5">
+            <p className="min-w-0 flex-1 text-sm text-purple-700">
+              Showing <span className="font-bold">{filterLabel}</span>
+            </p>
+            <Link
+              href={base}
+              className="shrink-0 text-sm font-bold text-purple hover:underline"
+            >
+              Show everything
+            </Link>
+          </div>
+        )}
+
         {stream.length === 0 && (
           <div className="rounded-xl border border-dashed border-line bg-surface p-10 text-center">
             <p className="font-semibold text-ink">Nothing here yet</p>
             <p className="mt-1 text-sm text-muted">
-              Be the first to share something with the movement.
+              {filter?.mine
+                ? "You have not posted anything yet. Anything you share will appear here."
+                : filter?.countySlug
+                  ? "This network has not published anything yet."
+                  : "Be the first to share something with the movement."}
             </p>
+            {filterLabel && (
+              <Link
+                href={base}
+                className="mt-3 inline-flex text-sm font-bold text-purple hover:underline"
+              >
+                Show the whole feed
+              </Link>
+            )}
           </div>
         )}
 
@@ -278,21 +320,45 @@ export function FeedView({
         <div className="sticky top-20 space-y-4">
           {counties.length > 0 && (
             <section>
-              <h2 className="mb-2 px-1 text-[15px] font-bold text-muted">County networks</h2>
+              <div className="mb-2 flex items-center justify-between gap-2 px-1">
+                <h2 className="text-[15px] font-bold text-muted">County networks</h2>
+                {filter?.countySlug && (
+                  <Link href={base} className="text-xs font-bold text-purple hover:underline">
+                    Clear
+                  </Link>
+                )}
+              </div>
               <ul className="space-y-0.5">
-                {counties.map((c) => (
-                  <li key={c.slug}>
-                    <Link
-                      href={`/counties/${c.slug}`}
-                      className="flex items-center gap-3 rounded-lg px-2 py-2 text-sm font-medium text-ink transition-colors hover:bg-purple-050"
-                    >
-                      <span className="grid h-8 w-8 place-items-center rounded-full bg-purple-050 text-xs font-bold text-purple">
-                        {c.name.slice(0, 2).toUpperCase()}
-                      </span>
-                      {c.name}
-                    </Link>
-                  </li>
-                ))}
+                {counties.map((c) => {
+                  // Selecting a county narrows the feed to every network inside
+                  // it, rather than navigating away to the county's own page.
+                  // Somebody browsing the feed wants the feed, filtered.
+                  const on = filter?.countySlug === c.slug;
+                  return (
+                    <li key={c.slug}>
+                      <Link
+                        href={on ? base : `${base}?county=${c.slug}`}
+                        aria-current={on ? "true" : undefined}
+                        className={cn(
+                          "flex items-center gap-3 rounded-lg px-2 py-2 text-sm font-medium transition-colors",
+                          on
+                            ? "bg-purple-050 font-semibold text-purple-700"
+                            : "text-ink hover:bg-purple-050",
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            "grid h-8 w-8 place-items-center rounded-full text-xs font-bold",
+                            on ? "bg-purple text-white" : "bg-purple-050 text-purple",
+                          )}
+                        >
+                          {c.name.slice(0, 2).toUpperCase()}
+                        </span>
+                        {c.name}
+                      </Link>
+                    </li>
+                  );
+                })}
               </ul>
             </section>
           )}

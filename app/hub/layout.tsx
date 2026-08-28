@@ -63,40 +63,47 @@ export default async function HubLayout({ children }: { children: React.ReactNod
       .eq("status", "suspended"),
   ]);
 
+  // Grouped so each heading is contiguous, because the sidebar folds by
+  // section and a section that appears twice is two headings, not one group.
   const communityNav: NavItem[] = [
-    { label: "Overview", href: "/hub", icon: "overview", section: "Community" },
-    { label: "Posts", href: "/hub/posts", icon: "posts", badge: postsPending || undefined, section: "Community" },
-    { label: "Stories", href: "/hub/blogs", icon: "blogs", badge: blogsPending || undefined, section: "Community" },
+    { label: "Overview", href: "/hub", icon: "overview", section: "Community", primary: true },
     { label: "Resources", href: "/hub/resources", icon: "resources", section: "Community" },
     { label: "CBOs", href: "/hub/organizations", icon: "organisations", badge: orgsPending || undefined, section: "Community" },
     { label: "Members", href: "/hub/members", icon: "members", section: "Community" },
     { label: "Femtorship", href: "/hub/femtorship", icon: "femtorship", section: "Community" },
+
+    // What is waiting on a decision. This is the group an administrator opens
+    // first, so it sits directly under the overview and carries the badges.
+    { label: "Posts", href: "/hub/posts", icon: "posts", badge: postsPending || undefined, section: "Awaiting review", primary: true },
+    { label: "Stories", href: "/hub/blogs", icon: "blogs", badge: blogsPending || undefined, section: "Awaiting review" },
     {
       label: "Membership requests",
       href: "/dashboard/network",
       icon: "matching",
       badge: membersPending || undefined,
-      section: "Community",
+      section: "Awaiting review",
     },
     {
       label: "Moderation",
       href: "/hub/moderation",
       icon: "moderation",
       badge: suspendedMembers || undefined,
-      section: "Community",
+      section: "Awaiting review",
     },
-    { label: "Deleted content", href: "/hub/deleted", icon: "deleted", section: "Community" },
-    { label: "Deleted accounts", href: "/hub/accounts", icon: "accounts", section: "Community" },
+
+    { label: "Deleted content", href: "/hub/deleted", icon: "deleted", section: "Archive" },
+    { label: "Deleted accounts", href: "/hub/accounts", icon: "accounts", section: "Archive" },
   ];
 
   // The reporting console. Triage-only accounts see the case-handling pages;
   // full administrators also get the directory, listening and linkage tools.
   const reportingNav: NavItem[] = [
-    { label: "Reporting dashboard", href: "/hub/reporting", icon: "triage", section: "Reporting" },
+    { label: "Reporting dashboard", href: "/hub/reporting", icon: "triage", section: "Reporting", primary: true },
     {
       label: "Reports",
       href: "/hub/reporting/reports",
       icon: "reports",
+      primary: true,
       badge: reportsUrgent || reportsPending || undefined,
       section: "Reporting",
     },

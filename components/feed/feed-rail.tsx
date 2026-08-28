@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Home, Users, BookOpen, Heart, ShieldCheck, Building2, FileText, Megaphone,
-  Newspaper, ChevronDown, ChevronUp,
+  Newspaper, ChevronDown, ChevronUp, PenLine,
 } from "lucide-react";
 import { useState } from "react";
 import { Avatar } from "@/components/ui/field";
@@ -38,14 +38,34 @@ export function FeedRail({
   userName,
   avatarUrl,
   signedIn,
+  mineActive = false,
 }: {
   userName?: string | null;
   avatarUrl?: string | null;
   signedIn: boolean;
+  /** The feed is currently narrowed to this person's own posts. */
+  mineActive?: boolean;
 }) {
   const pathname = usePathname();
   const [expanded, setExpanded] = useState(false);
-  const shown = expanded ? LINKS : LINKS.filter((l) => l.primary);
+
+  // "My posts" filters the feed in place rather than sending anyone to another
+  // page, and it only exists for somebody who could have posted something.
+  const links: RailLink[] = signedIn
+    ? [
+        LINKS[0],
+        {
+          label: "My posts",
+          href: `${pathname}?mine=1`,
+          icon: PenLine,
+          tint: "text-magenta-700",
+          primary: true,
+        },
+        ...LINKS.slice(1),
+      ]
+    : LINKS;
+
+  const shown = expanded ? links : links.filter((l) => l.primary);
 
   return (
     <nav aria-label="Feed navigation" className="space-y-0.5">
@@ -70,7 +90,10 @@ export function FeedRail({
       )}
 
       {shown.map(({ label, href, icon: Icon, tint }) => {
-        const active = pathname === href;
+        // "My posts" is the active item when the filter is on; the plain feed
+        // link must not also light up, or two rows look selected at once.
+        const isMine = href.endsWith("?mine=1");
+        const active = isMine ? mineActive : pathname === href && !mineActive;
         return (
           <Link
             key={href}

@@ -79,6 +79,105 @@ URL that is not on the list. It silently falls back to the Site URL. A missing
 entry plus the default Site URL sends everyone who signs in on the live site to
 `localhost:3000`, with nothing in the logs to explain it.
 
+### Which sign-ups need to confirm an email
+
+Three routes in, three different answers, and they are already wired:
+
+* **Email and password** must confirm. Turn **Confirm email** on under
+  **Authentication -> Sign In / Providers -> Email**, and paste
+  `supabase/email-templates/confirm-signup.html` into **Emails -> Confirm
+  signup**. Until she follows the link there is no session, and the sign-up
+  page says so rather than dropping her somewhere she cannot use.
+* **Google** confirms nothing, because Google already has. Supabase sends no
+  email at all for OAuth, so the app sends a welcome itself on first sign-in --
+  once, recorded in `profiles.welcomed_at`. That is the one message this
+  application sends, and the only reason `MAILTRAP_SENDING_TOKEN` belongs in
+  the app's environment as well as in Supabase. Set `MAIL_FROM` alongside it if
+  the sender should differ from `tech+noreply@whrdhub.org`.
+* **Anonymous reporting accounts** never confirm anything. They are created
+  with `admin.createUser({ email_confirm: true })` against an internal
+  `@whrdhub.local` address that receives no mail and belongs to nobody.
+  Requiring confirmation there would mean a woman filing a report at the worst
+  moment of her week being asked to check an inbox that does not exist.
+
+### Signed-in devices
+
+`/profile` lists every session on the account and lets her end any of them.
+These are real sessions read from `auth.sessions`, and ending one deletes the
+row and its refresh tokens -- the device is signed out, not merely forgotten by
+a list. That distinction is the point: a tracking table that only forgets a
+device would tell a woman she had removed an intruder while the intruder kept
+reading.
+
+Both functions are `SECURITY DEFINER` and filter on `auth.uid()` first, because
+`auth.sessions` is readable by nobody otherwise. `supabase/tests/60_sessions.sql`
+asserts the isolation from both directions.
+
+### Password reset emails
+
+Two settings decide whether the "forgotten password" flow works at all, and
+both fail quietly if they are wrong.
+
+**1. Custom SMTP is not optional.** Supabase's built-in email service sends
+**2 messages per hour** and **only to members of the project's organisation**.
+Every other address fails with *Email address not authorized*. So without SMTP
+configured, password reset appears to work -- the page says a link has been
+sent -- and no defender ever receives one.
+
+These emails are sent by Supabase's auth server, not by this app. **The SMTP
+credentials therefore belong in the Supabase dashboard and nowhere else** --
+not in `.env.local`, not in Vercel. The app has no mail library and never
+opens an SMTP connection; putting the token in the project would spread a
+secret without giving anything the ability to use it.
+
+Under **Project Settings -> Authentication -> SMTP Settings**, using Mailtrap's
+sending stream:
+
+| Field | Value |
+| --- | --- |
+| Host | `live.smtp.mailtrap.io` |
+| Port | `587` |
+| Username | `api` |
+| Password | your Mailtrap **sending** token |
+| Sender email | `tech+noreply@whrdhub.org` |
+| Sender name | `WHRD Hub` |
+
+Two things to watch. `live.smtp.mailtrap.io` is the *sending* host --
+`sandbox.smtp.mailtrap.io` captures mail in a test inbox and delivers to
+nobody, which fails exactly like having no SMTP at all. And Mailtrap will not
+send from `whrdhub.org` until that domain is verified in **Sending Domains**,
+which means adding the DNS records it gives you.
+
+While in the dashboard, raise the auth email limit under **Authentication ->
+Rate Limits**. It defaults to 30 an hour across the whole project, which is
+fine until a training day puts forty women through sign-up at once.
+
+**2. The recovery email template must use `token_hash`.** Supabase's default
+template links to `{{ .ConfirmationURL }}`, which returns the session in a URL
+*fragment*. A fragment never reaches the server, so a server-rendered app
+cannot read it and the link does nothing useful.
+
+Paste `supabase/email-templates/reset-password.html` into **Authentication ->
+Emails -> Reset Password**. It is written for email clients rather than
+browsers -- tables, inline styles, a system font stack, no webfonts -- so it
+holds together in Gmail, Apple Mail and Outlook, which renders with Word. The
+only part that must not change is the link:
+
+```html
+<a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery">
+```
+
+`/auth/confirm` exchanges the token for a session server-side and sends the
+person to `/reset-password`. Add `<your-domain>/auth/confirm` to the redirect
+allow-list alongside the callback, or Supabase falls back to the Site URL --
+the same quiet failure described above.
+
+Worth knowing about the flow itself: the reset page always reports success,
+whether or not the address has an account, because a form that says "no account
+with that email" lets anyone test which women are registered here. Setting a new
+password revokes every other session, so a reset actually removes somebody
+else's access rather than merely changing a string.
+
 Under **Authentication -> Providers**, enable **Google**. Its authorised
 redirect URI belongs in the Google Cloud Console, and it is Supabase's own
 callback, not your domain:

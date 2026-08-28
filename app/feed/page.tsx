@@ -14,12 +14,18 @@ export const metadata = pageMeta({
   path: "/feed",
 });
 
-export default async function FeedPage() {
+export default async function FeedPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ mine?: string; county?: string }>;
+}) {
+  const sp = await searchParams;
+  const filter = { mine: sp.mine === "1", countySlug: sp.county };
   const user = await getCurrentUser();
   const supabase = await createClient();
 
   const [feed, { data: counties }] = await Promise.all([
-    getFeed(30, user?.id),
+    getFeed(30, user?.id, filter),
     supabase
       .from("county_networks")
       .select("name, slug")
@@ -45,6 +51,7 @@ export default async function FeedPage() {
           userName={user?.profile?.full_name ?? user?.profile?.username ?? null}
           avatarUrl={user?.profile?.avatar_url}
           counties={(counties ?? []) as { name: string; slug: string }[]}
+          filter={filter}
         />
       </Suspense>
     </div>

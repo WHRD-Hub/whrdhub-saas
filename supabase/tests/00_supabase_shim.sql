@@ -19,6 +19,28 @@ create table if not exists auth.users (
   raw_user_meta_data jsonb default '{}'::jsonb,
   created_at    timestamptz default now()
 );
+-- GoTrue's session tables, as public.my_sessions() and revoke_session() see
+-- them. Only the columns those functions touch: this is a stand-in so the
+-- behaviour can be asserted locally, not a reproduction of GoTrue.
+create table if not exists auth.sessions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now(),
+  refreshed_at timestamptz,
+  user_agent text,
+  ip inet,
+  not_after timestamptz
+);
+
+create table if not exists auth.refresh_tokens (
+  id bigserial primary key,
+  session_id uuid references auth.sessions(id) on delete cascade,
+  token text,
+  revoked boolean default false
+);
+
+
 
 -- auth.uid() reads the request JWT claims in Supabase; locally we read a GUC.
 create or replace function auth.uid() returns uuid language sql stable as $$

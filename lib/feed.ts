@@ -46,7 +46,7 @@ export interface FeedComment {
 }
 
 export interface FeedItem {
-  kind: "post" | "blog";
+  kind: "post" | "blog" | "resource";
   id: string;
   slug?: string | null;
   title?: string | null;
@@ -69,6 +69,9 @@ export interface FeedItem {
   mine: boolean;
   /** Awaiting Hub review — only ever visible to the author. */
   pending: boolean;
+  /** Resources only: the document itself, and what kind of thing it is. */
+  fileUrl?: string | null;
+  docKind?: string | null;
 }
 
 type Row = {
@@ -111,6 +114,20 @@ const HUB_AUTHOR: FeedAuthor = {
 /** The Hub's own mark, used when a post belongs to no CBO. */
 const HUB_LOGO = "/main-logo.png";
 
+/** A published document as the feed needs it. */
+type ResourceRow = {
+  id: string;
+  title: string;
+  slug: string | null;
+  description: string | null;
+  kind: string;
+  cover_image_url: string | null;
+  file_url: string;
+  featured: boolean;
+  published_on: string | null;
+  created_at: string;
+};
+
 const FALLBACK_AUTHOR: FeedAuthor = {
   id: null,
   name: "WHRD member",
@@ -126,24 +143,79 @@ const FALLBACK_AUTHOR: FeedAuthor = {
  * awaiting review or one they deleted still appears to them, labelled. RLS
  * enforces that; the flags here are what the card renders from.
  */
-export async function getFeed(limit = 40, userId?: string): Promise<FeedItem[]> {
+/**
+ * What the feed is currently showing.
+ *
+ * Filtering happens here rather than in the browser, so a filtered view is a
+ * real URL somebody can share or reload, and so the limit still means what it
+ * says — filtering after the fetch would quietly return five items because the
+ * other twenty-five belonged to somebody else.
+ */
+export interface FeedFilter {
+  /** Only what this person wrote, including their items awaiting review. */
+  mine?: boolean;
+  /** Only networks inside this county. */
+  countySlug?: string;
+}
+
+export async function getFeed(
+  limit = 40,
+  userId?: string,
+  filter: FeedFilter = {},
+): Promise<FeedItem[]> {
   const supabase = await createClient();
 
-  const [{ data: posts }, { data: blogs }] = await Promise.all([
+  // A county filter needs the network's id; an unknown slug filters to nothing
+  // rather than silently showing everything.
+  let countyId: string | null = null;
+  if (filter.countySlug) {
+    const { data } = await supabase
+      .from("county_networks")
+      .select("id")
+      .eq("slug", filter.countySlug)
+      .maybeSingle();
+    countyId = (data?.id as string) ?? null;
+    if (!countyId) return [];
+  }
+
+  const mineOnly = !!filter.mine && !!userId;
+  const filtered = mineOnly || !!countyId;
+
+  let postQuery = supabase
+    .from("posts")
+    .select(
+      "id, author_id, body, image_urls, media, is_hub, pinned, status, deleted_at, deleted_reason, published_at, created_at, guest_name, guest_title, organizations(name, logo_url), county_networks(name)",
+    )
+    .order("created_at", { ascending: false })
+    .limit(limit * 2);
+
+  let blogQuery = supabase
+    .from("blogs")
+    .select(
+      "id, author_id, title, slug, excerpt, cover_image_url, is_hub, pinned, status, deleted_at, deleted_reason, published_at, created_at, organizations(name, logo_url), county_networks(name)",
+    )
+    .order("created_at", { ascending: false })
+    .limit(limit * 2);
+
+  if (mineOnly) {
+    postQuery = postQuery.eq("author_id", userId!);
+    blogQuery = blogQuery.eq("author_id", userId!);
+  }
+  if (countyId) {
+    postQuery = postQuery.eq("county_network_id", countyId);
+    blogQuery = blogQuery.eq("county_network_id", countyId);
+  }
+
+  const [{ data: posts }, { data: blogs }, { data: resources }] = await Promise.all([
+    postQuery,
+    blogQuery,
     supabase
-      .from("posts")
-      .select(
-        "id, author_id, body, image_urls, media, is_hub, pinned, status, deleted_at, deleted_reason, published_at, created_at, guest_name, guest_title, organizations(name, logo_url), county_networks(name)",
-      )
+      .from("resources")
+      .select("id, title, slug, description, kind, cover_image_url, file_url, featured, published_on, created_at")
+      .eq("published", true)
+      .is("deleted_at", null)
       .order("created_at", { ascending: false })
-      .limit(limit * 2),
-    supabase
-      .from("blogs")
-      .select(
-        "id, author_id, title, slug, excerpt, cover_image_url, is_hub, pinned, status, deleted_at, deleted_reason, published_at, created_at, organizations(name, logo_url), county_networks(name)",
-      )
-      .order("created_at", { ascending: false })
-      .limit(limit * 2),
+      .limit(limit),
   ]);
 
   const all: (Row & { kind: "post" | "blog" })[] = [
@@ -308,6 +380,52 @@ export async function getFeed(limit = 40, userId?: string): Promise<FeedItem[]> 
       pending: r.status === "pending",
     };
   });
+
+  // Publications belong in the feed too.
+  //
+  // A report the Hub spent months on used to appear only in the library, where
+  // somebody had to go looking for it. Adding it here is how the people the
+  // work is for find out it exists.
+  //
+  // Note this is the publications library — resources.kind defaults to
+  // 'Report'. Incident reports filed by survivors are private and are never
+  // surfaced in any feed.
+  //
+  // A publication belongs to the Hub and to no county, so it has no place in
+  // "my posts" or in one county's view. Filtering it out is more honest than
+  // showing the same six documents whatever you asked for.
+  const resourceItems: FeedItem[] = (filtered ? [] : ((resources as ResourceRow[]) ?? [])).map((r) => ({
+    kind: "resource" as const,
+    id: r.id,
+    slug: r.slug ?? null,
+    title: r.title,
+    body: r.description ?? "",
+    image: r.cover_image_url ?? null,
+    media: [],
+    author: HUB_AUTHOR,
+    byline: {
+      name: "WHRD Hub",
+      logo_url: HUB_LOGO,
+      county: null,
+      isHub: true,
+      person: null,
+    },
+    org: null,
+    county: null,
+    is_hub: true,
+    pinned: r.featured,
+    published_at: r.published_on ?? r.created_at,
+    reactions: 0,
+    reactedByMe: false,
+    comments: [],
+    commentCount: 0,
+    mine: false,
+    pending: false,
+    fileUrl: r.file_url,
+    docKind: r.kind,
+  }));
+
+  items.push(...resourceItems);
 
   items.sort((a, b) => {
     if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;

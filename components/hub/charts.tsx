@@ -65,7 +65,7 @@ export function ValueBars({ data, color = BRAND.cyan, suffix, height = 260, hori
         ) : (
           <>
             <XAxis dataKey="label" tick={{ fontSize: 11, fill: "var(--muted)" }} tickLine={false} axisLine={false} interval={0} angle={-20} textAnchor="end" height={54} />
-            <YAxis tick={{ fontSize: 11, fill: "var(--muted)" }} tickLine={false} axisLine={false} allowDecimals={false} width={34} />
+            <YAxis width={44} tick={{ fontSize: 11, fill: "var(--muted)" }} tickLine={false} axisLine={false} allowDecimals={false} />
           </>
         )}
         <Tooltip content={<TooltipCard suffix={suffix} />} cursor={{ fill: color, fillOpacity: 0.06 }} />

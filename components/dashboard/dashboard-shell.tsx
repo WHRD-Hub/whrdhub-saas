@@ -1,45 +1,56 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  LayoutGrid, FileText, MessageCircle, BookOpen, Calendar, Briefcase, Heart, User,
-  ShieldCheck, Building2, Users, GitBranch, ChevronLeft, ChevronRight, Search, Bell,
-  Megaphone, ClipboardCheck, Sparkles, LogOut, ChevronDown,
-  BarChart2, RadioTower, Map as MapIcon, LifeBuoy, Trash2, UserX, UserCog, Gavel,
-  Workflow,
+  ChevronLeft, ChevronRight, ChevronDown, Search, Bell, LogOut, User, LayoutGrid, Megaphone,
 } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
-import { useRouter } from "next/navigation";
+import { signOut as signOutAction } from "@/app/actions/auth";
 import { links } from "@/lib/site-nav";
 import { cn } from "@/lib/utils";
 import { RoleSwitcher } from "@/components/dashboard/role-switcher";
+import { ICONS, type NavItem } from "@/components/dashboard/icons";
+import { BottomNav } from "@/components/dashboard/bottom-nav";
+
+export type { NavItem };
 
 const LOGO = "/main-logo.png";
 
-const ICONS = {
-  overview: LayoutGrid, feed: Sparkles, posts: FileText, messages: MessageCircle,
-  resources: BookOpen, calendar: Calendar, services: Briefcase, femtorship: Heart,
-  profile: User, verifications: ShieldCheck, organisations: Building2, members: Users,
-  matching: GitBranch, reports: FileText, queue: ClipboardCheck, blogs: BookOpen,
-  // Reporting console
-  triage: ShieldCheck, analytics: BarChart2, listening: RadioTower, map: MapIcon,
-  support: LifeBuoy, linkages: GitBranch, matchflow: Workflow,
-  deleted: Trash2, accounts: UserX, account: UserCog, moderation: Gavel,
-} as const;
+/**
+ * Folded sidebar sections, kept in localStorage.
+ *
+ * A Hub administrator sees eighteen destinations across two consoles. Folding
+ * the groups they are not working in today is the difference between a sidebar
+ * you scan and one you scroll -- and being made to re-fold the same four groups
+ * every morning is its own small tax, so the choice is remembered.
+ *
+ * Exposed as an external store so the value is read during render instead of
+ * being copied in by an effect, which would paint the wrong state first.
+ */
+const FOLD_KEY = "whrd-nav-folded";
+const foldListeners = new Set<() => void>();
 
-export interface NavItem {
-  label: string;
-  href: string;
-  icon: keyof typeof ICONS;
-  badge?: number;
-  /**
-   * Optional group heading. Consecutive items sharing a section are rendered
-   * under one label — this is how the reporting console appears as its own
-   * block in the Hub sidebar rather than a flat list of extra links.
-   */
-  section?: string;
+function subscribeFolded(listener: () => void) {
+  foldListeners.add(listener);
+  return () => foldListeners.delete(listener);
+}
+
+function readFolded(): string {
+  try {
+    return localStorage.getItem(FOLD_KEY) ?? "";
+  } catch {
+    return ""; // private mode: every section simply stays open
+  }
+}
+
+function writeFolded(value: string) {
+  try {
+    localStorage.setItem(FOLD_KEY, value);
+  } catch {
+    /* ignore */
+  }
+  foldListeners.forEach((l) => l());
 }
 
 export function DashboardShell({
@@ -64,10 +75,30 @@ export function DashboardShell({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userMenu, setUserMenu] = useState(false);
+
+  // Which section headings are folded away, read straight from localStorage
+  // rather than copied into state by an effect -- that pattern renders once
+  // with the wrong value and again with the right one, and on a sidebar the
+  // flicker is visible.
+  const raw = useSyncExternalStore(subscribeFolded, readFolded, () => "");
+  const folded = useMemo<Set<string>>(() => {
+    if (!raw) return new Set();
+    try {
+      return new Set(JSON.parse(raw) as string[]);
+    } catch {
+      return new Set();
+    }
+  }, [raw]);
+
+  const toggleSection = (section: string) => {
+    const next = new Set(folded);
+    if (next.has(section)) next.delete(section);
+    else next.add(section);
+    writeFolded(JSON.stringify([...next]));
+  };
 
   // Title in the top bar follows the active nav item.
   const isActive = (href: string) =>
@@ -80,13 +111,13 @@ export function DashboardShell({
     [...nav].sort((a, b) => b.href.length - a.href.length).find((n) => isActive(n.href))?.label ??
     title;
 
-  const signOut = async () => {
-    await createClient().auth.signOut();
-    router.push("/");
-    router.refresh();
-  };
-
   const initials = userName.split(/\s+/).slice(0, 2).map((s) => s[0]?.toUpperCase()).join("") || "W";
+
+  // The bottom bar carries four destinations. Anything marked primary wins;
+  // otherwise the first four in the sidebar are a reasonable stand-in, since
+  // that order is already the order of importance.
+  const flagged = nav.filter((n) => n.primary);
+  const bottomItems = (flagged.length ? flagged : nav).slice(0, 4);
 
   const SideContent = () => (
     <div className="flex flex-col h-full">
@@ -130,45 +161,81 @@ export function DashboardShell({
                 <RoleSwitcher variant="menu" />
               </div>
             )}
-            <button onClick={signOut} className="w-full flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-semibold text-rose-600 hover:bg-rose-50">
-              <LogOut className="w-4 h-4" /> Sign out
-            </button>
+            {/* Server action: the cookie is cleared before the response,
+                rather than in the browser and hoped for afterwards. */}
+            <form action={signOutAction}>
+              <button
+                type="submit"
+                className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-semibold text-rose-600 hover:bg-rose-50"
+              >
+                <LogOut className="h-4 w-4" /> Sign out
+              </button>
+            </form>
           </div>
         )}
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-1">
+      <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-0.5">
         {nav.map((item, i) => {
           const Icon = ICONS[item.icon];
           const active = isActive(item.href);
-          const startsSection = !!item.section && item.section !== nav[i - 1]?.section;
+          const section = item.section;
+          const startsSection = !!section && section !== nav[i - 1]?.section;
+          // A folded section keeps any item you are actually on visible --
+          // hiding the page somebody is looking at is disorienting, not tidy.
+          const hidden = !!section && folded.has(section) && !active && !collapsed;
+
           return (
             <div key={`${item.href}-wrap`}>
-            {startsSection && (
-              <p className={cn(
-                "px-3 pb-1 pt-4 text-[10px] font-bold uppercase tracking-[0.14em] text-muted",
-                collapsed && "sr-only",
-              )}>
-                {item.section}
-              </p>
-            )}
-            <Link
-              key={item.href}
-              href={item.href}
-              onClick={() => setMobileOpen(false)}
-              className={cn(
-                "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors relative",
-                active ? "bg-purple-050 text-purple-700" : "text-ink/70 hover:bg-purple-050 hover:text-ink",
+              {startsSection && !collapsed && (
+                <button
+                  type="button"
+                  onClick={() => toggleSection(section!)}
+                  aria-expanded={!folded.has(section!)}
+                  className="mt-4 flex w-full items-center gap-1 rounded-lg px-3 pb-1 pt-1 text-[10px] font-bold uppercase tracking-[0.14em] text-muted transition-colors hover:text-ink"
+                >
+                  <ChevronDown
+                    className={cn(
+                      "h-3 w-3 transition-transform",
+                      folded.has(section!) && "-rotate-90",
+                    )}
+                  />
+                  {section}
+                </button>
               )}
-              title={collapsed ? item.label : undefined}
-            >
-              <Icon className="w-5 h-5 shrink-0" />
-              {!collapsed && <span className="truncate">{item.label}</span>}
-              {!collapsed && item.badge ? (
-                <span className="ml-auto text-xs font-bold bg-magenta text-white rounded-full px-2 py-0.5">{item.badge}</span>
-              ) : null}
-            </Link>
+              {startsSection && collapsed && <div className="my-2 border-t border-line" />}
+
+              {!hidden && (
+                <Link
+                  href={item.href}
+                  onClick={() => setMobileOpen(false)}
+                  aria-current={active ? "page" : undefined}
+                  className={cn(
+                    "group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors",
+                    active
+                      ? "bg-purple-050 text-purple-700"
+                      : "text-ink/70 hover:bg-purple-050 hover:text-ink",
+                    collapsed && "justify-center",
+                  )}
+                  title={collapsed ? item.label : undefined}
+                >
+                  {/* The active marker reads at a glance when collapsed to icons. */}
+                  {active && (
+                    <span className="absolute inset-y-1.5 left-0 w-1 rounded-r-full bg-purple" aria-hidden />
+                  )}
+                  <Icon className="h-5 w-5 shrink-0" />
+                  {!collapsed && <span className="truncate">{item.label}</span>}
+                  {!collapsed && item.badge ? (
+                    <span className="ml-auto rounded-full bg-magenta px-2 py-0.5 text-xs font-bold text-white">
+                      {item.badge}
+                    </span>
+                  ) : null}
+                  {collapsed && item.badge ? (
+                    <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-magenta" aria-hidden />
+                  ) : null}
+                </Link>
+              )}
             </div>
           );
         })}
@@ -194,8 +261,15 @@ export function DashboardShell({
 
       {/* Sidebar — mobile drawer */}
       {mobileOpen && (
-        <div className="lg:hidden fixed inset-0 z-50 bg-black/40" onClick={() => setMobileOpen(false)}>
-          <div className="absolute inset-y-0 left-0 w-72 bg-surface" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="fixed inset-0 z-50 bg-black/40 lg:hidden"
+          onClick={() => setMobileOpen(false)}
+          role="presentation"
+        >
+          <div
+            className="rise absolute inset-y-0 left-0 w-[17rem] max-w-[85vw] overflow-hidden bg-surface shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
             <SideContent />
           </div>
         </div>
@@ -225,8 +299,11 @@ export function DashboardShell({
           </Link>
         </header>
 
-        <main className="px-4 sm:px-6 lg:px-8 py-6 max-w-6xl mx-auto">{children}</main>
+        {/* pb-24 on small screens keeps the last row clear of the bottom bar. */}
+        <main className="mx-auto max-w-6xl px-4 pb-24 pt-6 sm:px-6 lg:px-8 lg:pb-6">{children}</main>
       </div>
+
+      <BottomNav items={bottomItems} notifCount={notifCount} />
     </div>
   );
 }

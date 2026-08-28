@@ -4,16 +4,18 @@ import { useCallback, useRef, useState } from "react";
 import Link from "next/link";
 import {
   BadgeCheck, Globe2, MoreHorizontal, X, ThumbsUp, MessageCircle,
-  Share2, Pin, BookOpen, Trash2, Clock, Loader2,
+  Share2, Pin, BookOpen, Trash2, Clock, Loader2, FileText, Pencil,
 } from "lucide-react";
 import { useReaction } from "@/lib/use-reaction";
 import { promptSignIn } from "@/lib/guest-reactions";
+import { hubFile } from "@/lib/file-url";
 import { timeAgo, cn } from "@/lib/utils";
 import { Avatar } from "@/components/ui/field";
 import { NetworkAvatar } from "@/components/feed/network-avatar";
 import { MediaBlock } from "@/components/feed/media-block";
 import { CommentThread } from "@/components/feed/comment-thread";
 import { deleteOwnContent, adminSoftDelete } from "@/app/actions/lifecycle";
+import { togglePin } from "@/app/actions/content";
 import { toast } from "@/components/ui/toast";
 import type { FeedItem } from "@/lib/feed";
 
@@ -69,6 +71,7 @@ export function PostCard({
   onShare: (title: string, url: string) => void;
 }) {
   const isBlog = item.kind === "blog";
+  const isResource = item.kind === "resource";
   const { count, reacted, react } = useReaction({
     postId: item.id,
     signedIn,
@@ -95,8 +98,12 @@ export function PostCard({
     lastTap.current = now;
   };
 
-  const kind = isBlog ? "blog" : "post";
-  const shareUrl = isBlog ? `/blog/${item.slug}` : `/feed#${item.id}`;
+  const kind = isBlog ? "blog" : isResource ? "resource" : "post";
+  const shareUrl = isBlog
+    ? `/blog/${item.slug}`
+    : isResource
+      ? "/resources"
+      : `/feed#${item.id}`;
 
   const run = async (fn: () => Promise<{ error?: string; ok?: boolean }>, done: string) => {
     setBusy(true);
@@ -173,10 +180,38 @@ export function PostCard({
           </p>
         </div>
 
-        {item.pinned && (
-          <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-purple/20 bg-purple-050 px-2 py-0.5 text-xs font-semibold text-purple-700">
-            <Pin className="h-3 w-3" /> Pinned
-          </span>
+        {/* Pinning is a one-click act for the Hub, not a trip into a menu.
+            The badge a reader sees and the control an administrator uses are
+            the same object in the same place, so nothing moves when the role
+            changes. Everyone else still just sees the badge. */}
+        {isHubAdmin ? (
+          <button
+            type="button"
+            onClick={() =>
+              run(
+                () => togglePin(kind, item.id, !item.pinned),
+                item.pinned ? "Unpinned." : "Pinned to the top of the feed.",
+              )
+            }
+            disabled={busy}
+            aria-pressed={item.pinned}
+            title={item.pinned ? "Unpin from the top of the feed" : "Pin to the top of the feed"}
+            className={cn(
+              "inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-semibold transition-colors disabled:opacity-50",
+              item.pinned
+                ? "border-purple/20 bg-purple-050 text-purple-700 hover:bg-purple-100"
+                : "border-line text-muted hover:border-purple/30 hover:bg-purple-050 hover:text-purple-700",
+            )}
+          >
+            <Pin className={cn("h-3 w-3", item.pinned && "fill-current")} />
+            {item.pinned ? "Pinned" : "Pin"}
+          </button>
+        ) : (
+          item.pinned && (
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-purple/20 bg-purple-050 px-2 py-0.5 text-xs font-semibold text-purple-700">
+              <Pin className="h-3 w-3" /> Pinned
+            </span>
+          )
         )}
 
         <div className="relative shrink-0">
@@ -192,17 +227,34 @@ export function PostCard({
             <>
               <div className="fixed inset-0 z-10" onClick={() => setMenu(false)} aria-hidden />
               <div className="absolute right-0 top-full z-20 mt-1 w-60 rounded-xl border border-line bg-surface p-1.5 shadow-lg">
-                {item.mine && (
+                {/* Editing anybody's content. Pinning is the button in the
+                    card header, which is one click rather than two. */}
+                {isHubAdmin && (
+                  <Link
+                    href={
+                      isResource
+                        ? `/hub/resources/${item.id}`
+                        : isBlog
+                          ? `/hub/blogs/${item.id}`
+                          : `/hub/posts/${item.id}`
+                    }
+                    onClick={() => setMenu(false)}
+                    className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-semibold text-ink/80 hover:bg-purple-050 hover:text-purple-700"
+                  >
+                    <Pencil className="h-4 w-4" /> Edit {kind}
+                  </Link>
+                )}
+                {item.mine && !isResource && (
                   <button
-                    onClick={() => run(() => deleteOwnContent(kind, item.id), `Your ${kind} was deleted.`)}
+                    onClick={() => run(() => deleteOwnContent(kind as "post" | "blog", item.id), `Your ${kind} was deleted.`)}
                     className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-semibold text-rose-600 hover:bg-rose-50"
                   >
                     <Trash2 className="h-4 w-4" /> Delete {kind}
                   </button>
                 )}
-                {isHubAdmin && !item.mine && (
+                {isHubAdmin && !item.mine && !isResource && (
                   <button
-                    onClick={() => run(() => adminSoftDelete(kind, item.id), "Removed from the feed.")}
+                    onClick={() => run(() => adminSoftDelete(kind as "post" | "blog", item.id), "Removed from the feed.")}
                     className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-semibold text-rose-600 hover:bg-rose-50"
                   >
                     <Trash2 className="h-4 w-4" /> Remove as Hub admin
@@ -264,6 +316,26 @@ export function PostCard({
         </Link>
       )}
 
+      {/* A publication is a document, so the card offers the document. */}
+      {isResource && item.fileUrl && (
+        <div className="flex flex-wrap items-center gap-2 px-4 pb-3">
+          <a
+            href={hubFile(item.fileUrl)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-purple px-3.5 text-sm font-bold text-white transition-[filter] hover:brightness-95"
+          >
+            <FileText className="h-4 w-4" /> Read {(item.docKind ?? "document").toLowerCase()}
+          </a>
+          <Link
+            href="/resources"
+            className="text-sm font-semibold text-purple hover:text-purple-700"
+          >
+            All publications →
+          </Link>
+        </div>
+      )}
+
       {/* Counts */}
       {(count > 0 || commentCount > 0) && (
         <div className="flex items-center gap-3 border-b border-line px-4 py-2 text-xs text-muted">
@@ -286,24 +358,32 @@ export function PostCard({
         </div>
       )}
 
-      {/* Actions */}
+      {/* Actions.
+          A publication is a library entry surfaced here, not a post: supports
+          and comments are keyed to a post row it does not have, so offering
+          them would fail on the first click. It keeps Share, which is the
+          thing people actually want to do with a report. */}
       <div className="flex items-center gap-1 p-1">
-        <button
-          onClick={() => doReact()}
-          aria-pressed={reacted}
-          className={cn(
-            "flex flex-1 items-center justify-center gap-2 rounded-lg py-2 text-sm font-semibold transition-colors",
-            reacted ? "text-purple" : "text-ink/70 hover:bg-purple-050",
-          )}
-        >
-          <ThumbsUp className={cn("h-5 w-5", reacted && "fill-current")} /> Support
-        </button>
-        <button
-          onClick={() => (signedIn ? setShowComments((s) => !s) : promptSignIn("comment"))}
-          className="flex flex-1 items-center justify-center gap-2 rounded-lg py-2 text-sm font-semibold text-ink/70 transition-colors hover:bg-purple-050"
-        >
-          <MessageCircle className="h-5 w-5" /> Comment
-        </button>
+        {!isResource && (
+          <>
+            <button
+              onClick={() => doReact()}
+              aria-pressed={reacted}
+              className={cn(
+                "flex flex-1 items-center justify-center gap-2 rounded-lg py-2 text-sm font-semibold transition-colors",
+                reacted ? "text-purple" : "text-ink/70 hover:bg-purple-050",
+              )}
+            >
+              <ThumbsUp className={cn("h-5 w-5", reacted && "fill-current")} /> Support
+            </button>
+            <button
+              onClick={() => (signedIn ? setShowComments((s) => !s) : promptSignIn("comment"))}
+              className="flex flex-1 items-center justify-center gap-2 rounded-lg py-2 text-sm font-semibold text-ink/70 transition-colors hover:bg-purple-050"
+            >
+              <MessageCircle className="h-5 w-5" /> Comment
+            </button>
+          </>
+        )}
         <button
           onClick={() => onShare(item.title || item.body.slice(0, 80), shareUrl)}
           className="flex flex-1 items-center justify-center gap-2 rounded-lg py-2 text-sm font-semibold text-ink/70 transition-colors hover:bg-purple-050"
@@ -312,7 +392,7 @@ export function PostCard({
         </button>
       </div>
 
-      {showComments && !isBlog && (
+      {showComments && !isBlog && !isResource && (
         <CommentThread
           postId={item.id}
           initial={item.comments}

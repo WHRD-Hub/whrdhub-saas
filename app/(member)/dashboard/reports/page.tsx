@@ -6,6 +6,7 @@ import { Pill } from "@/components/ui/pill";
 import { timeAgo } from "@/lib/utils";
 import { getServerLanguage } from "@/lib/i18n/server";
 import { translations } from "@/lib/i18n/translations";
+import { Building2, ArrowRight } from "lucide-react";
 
 const STATUS_TONE: Record<string, "amber" | "green" | "red" | "slate" | "cyan"> = {
   submitted: "amber",
@@ -78,6 +79,8 @@ export default async function MemberReportsPage() {
         </Link>
       </div>
 
+      <JoinChapterOffer />
+
       {withUpdates > 0 && (
         <div className="mb-6 flex items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4">
           <AlertTriangle className="h-5 w-5 shrink-0 text-amber-600" />
@@ -136,5 +139,41 @@ export default async function MemberReportsPage() {
         </div>
       )}
     </>
+  );
+}
+
+
+/**
+ * An invitation, shown once somebody has an account but no chapter.
+ *
+ * Reporting deliberately requires nothing: no membership, not even a name. But
+ * a reporter who stays is someone the network can support and who can support
+ * others, and nothing in the product previously told her that joining was even
+ * possible. It is an offer and stays one — dismissing it costs nothing and her
+ * reports are unaffected either way.
+ */
+async function JoinChapterOffer() {
+  const user = await getCurrentUser();
+  if (!user) return null;
+  // Already in a chapter, or asked and waiting: nothing to offer.
+  if (user.membership) return null;
+
+  return (
+    <Link
+      href="/dashboard/network/join"
+      className="group mb-6 flex items-start gap-3 rounded-2xl border border-purple/20 bg-purple-050 p-4 transition-shadow hover:shadow-sm"
+    >
+      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-surface text-purple">
+        <Building2 className="h-5 w-5" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-bold text-ink">Join a chapter in your county</p>
+        <p className="mt-0.5 text-sm text-ink/70">
+          WHRD Hub is a network of county chapters. Joining one lets you post to the
+          community and publish stories. Your reports stay private either way.
+        </p>
+      </div>
+      <ArrowRight className="mt-0.5 h-4 w-4 shrink-0 text-purple transition-transform group-hover:translate-x-0.5" />
+    </Link>
   );
 }

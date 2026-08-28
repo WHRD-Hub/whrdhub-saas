@@ -58,7 +58,7 @@ export function ReportsCharts({ data }: { data: ChartData }) {
           <BarChart data={data.countyBreakdown.slice(0, 8)}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="name" tick={{ fontSize: 10 }} />
-            <YAxis tick={{ fontSize: 11 }} />
+            <YAxis width={44} tick={{ fontSize: 11 }} />
             <Tooltip />
             <Bar dataKey="count" fill={GOLD} radius={[4, 4, 0, 0]} />
           </BarChart>
@@ -72,7 +72,7 @@ export function ReportsCharts({ data }: { data: ChartData }) {
           <LineChart data={data.monthlyTrend}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="month" tick={{ fontSize: 10 }} />
-            <YAxis tick={{ fontSize: 11 }} />
+            <YAxis width={44} tick={{ fontSize: 11 }} />
             <Tooltip />
             <Legend />
             <Line type="monotone" dataKey="anonymous" stroke={PURPLE} strokeWidth={2} dot={false} />
@@ -88,7 +88,7 @@ export function ReportsCharts({ data }: { data: ChartData }) {
           <BarChart data={data.urgencyBreakdown}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-            <YAxis tick={{ fontSize: 11 }} />
+            <YAxis width={44} tick={{ fontSize: 11 }} />
             <Tooltip />
             <Bar dataKey="count" radius={[4, 4, 0, 0]}>
               {data.urgencyBreakdown.map((entry, i) => (

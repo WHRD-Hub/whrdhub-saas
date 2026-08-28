@@ -46,6 +46,13 @@ export default function SignupPage() {
     }
     // Full navigation for the same reason as sign-in: the middleware must see
     // the session cookie, and a client push can outrun it.
+    // The rule below recommends router.push, which is what this replaced: the
+    // session cookie is written by the client and read by the middleware on the
+    // server, and a client-side push can arrive before the cookie does,
+    // bouncing the request straight back to /login. A full navigation
+    // guarantees the cookie is sent. The correct alternative is a server action
+    // that sets the cookie and redirects; until auth moves there, this stays.
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination
     window.location.assign("/onboarding");
   };
 

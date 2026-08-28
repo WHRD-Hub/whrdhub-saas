@@ -33,6 +33,12 @@ function LoginForm() {
     // client and the middleware reads it on the server. Pushing can arrive
     // before the cookie does, and the request bounces back to /login -- which
     // is exactly the "sign in twice" behaviour this replaces.
+    // A full navigation, not router.push: the session cookie is written by the
+    // client and read by the middleware on the server, and a client-side push
+    // can arrive before the cookie does -- which bounced the request straight
+    // back to /login and is the "sign in twice" behaviour this replaced. The
+    // correct alternative is a server action that sets the cookie and
+    // redirects; until auth moves there, this stays.
     window.location.assign(next);
   };
 

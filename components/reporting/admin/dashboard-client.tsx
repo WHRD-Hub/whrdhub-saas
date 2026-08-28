@@ -231,7 +231,7 @@ export function AdminDashboardClient({ reports }: { reports: Report[] }) {
             <BarChart data={countyBreakdown.slice(0, 8)}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="name" tick={{ fontSize: 10 }} />
-              <YAxis tick={{ fontSize: 11 }} />
+              <YAxis width={44} tick={{ fontSize: 11 }} />
               <Tooltip />
               <Bar dataKey="count" fill={GOLD} radius={[4, 4, 0, 0]} />
             </BarChart>
@@ -243,7 +243,7 @@ export function AdminDashboardClient({ reports }: { reports: Report[] }) {
             <LineChart data={monthlyTrend}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="month" tick={{ fontSize: 10 }} />
-              <YAxis tick={{ fontSize: 11 }} />
+              <YAxis width={44} tick={{ fontSize: 11 }} />
               <Tooltip />
               <Line type="monotone" dataKey="total" stroke={PURPLE} strokeWidth={2} dot={false} />
             </LineChart>
@@ -255,7 +255,7 @@ export function AdminDashboardClient({ reports }: { reports: Report[] }) {
             <BarChart data={urgencyBreakdown}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-              <YAxis tick={{ fontSize: 11 }} />
+              <YAxis width={44} tick={{ fontSize: 11 }} />
               <Tooltip />
               <Bar dataKey="count" radius={[4, 4, 0, 0]}>
                 {urgencyBreakdown.map((entry, i) => (

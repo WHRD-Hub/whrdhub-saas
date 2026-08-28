@@ -59,6 +59,8 @@ function readableError(code: string | undefined, message: string): string {
       return "Too many attempts just now. Please wait a minute and try again.";
     case "user_banned":
       return "This account is not available. Contact the Hub if you think that is a mistake.";
+    case "same_password":
+      return "That is your current password. Choose a different one.";
     case "weak_password":
       return "Please choose a longer password — at least eight characters.";
     case "user_already_exists":
@@ -148,4 +150,98 @@ export async function signOut(): Promise<void> {
   await supabase.auth.signOut();
   revalidatePath("/", "layout");
   redirect("/");
+}
+
+
+/* ── Forgotten passwords ───────────────────────────────────────────────── */
+
+/**
+ * Ask for a reset link.
+ *
+ * The reply is identical whether or not the address has an account, and it is
+ * returned even when Supabase reports an error. That is deliberate: a form
+ * that says "no account with that email" is an account-existence oracle, and
+ * anyone can query it. On this platform the bare fact that a woman has an
+ * account here can put her at risk, so the page must not confirm it — not by
+ * wording, and not by succeeding for one address and failing for another.
+ *
+ * The one exception is rate limiting, which is said plainly. It reveals
+ * nothing about any particular address and, withheld, leaves somebody
+ * refreshing a page that has quietly stopped sending anything.
+ */
+export async function requestPasswordReset(
+  _prev: AuthState,
+  formData: FormData,
+): Promise<AuthState> {
+  const email = String(formData.get("email") ?? "").trim();
+  if (!email) return { error: "Enter the email address for your account." };
+
+  const supabase = await createClient();
+  const origin = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "");
+
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    // Absolute and from configuration: this goes into an email, so it cannot
+    // be relative, and it must not be built from anything the caller sent.
+    redirectTo: origin ? `${origin}/auth/confirm?type=recovery` : undefined,
+  });
+
+  if (error?.code === "over_email_send_rate_limit" || error?.code === "over_request_rate_limit") {
+    return { error: "Too many requests just now. Please wait a few minutes and try again." };
+  }
+  if (error) {
+    // Logged for us, invisible to the person: an SMTP failure is our problem
+    // to fix, not a signal to hand back about which addresses exist.
+    console.error("[auth] password reset request failed", error.message);
+  }
+
+  return { checkEmail: true };
+}
+
+/**
+ * Set a new password, using the session a recovery link established.
+ *
+ * Two things happen afterwards that matter more than the password change
+ * itself. Every other session is revoked, because somebody resetting a
+ * password may be doing it precisely because another person has access to the
+ * account — leaving those sessions alive would make the reset cosmetic. And
+ * she is sent to sign in again with the new password rather than being carried
+ * straight in, so the change is confirmed by use.
+ */
+export async function updatePassword(
+  _prev: AuthState,
+  formData: FormData,
+): Promise<AuthState> {
+  const password = String(formData.get("password") ?? "");
+  const confirm = String(formData.get("confirm") ?? "");
+
+  if (password.length < 8) {
+    return { error: "Please choose a password of at least eight characters." };
+  }
+  if (password !== confirm) {
+    return { error: "The two passwords do not match." };
+  }
+
+  const supabase = await createClient();
+
+  // The recovery link is what put a session here. Without one there is nothing
+  // to update, and saying so plainly is more use than a generic failure.
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return {
+      error:
+        "This reset link has expired or has already been used. Request a new one and try again.",
+    };
+  }
+
+  const { error } = await supabase.auth.updateUser({ password });
+  if (error) return { error: readableError(error.code, error.message) };
+
+  // Revoke everywhere else, then here.
+  await supabase.auth.signOut({ scope: "others" });
+  await supabase.auth.signOut();
+
+  revalidatePath("/", "layout");
+  redirect("/login?reset=1");
 }

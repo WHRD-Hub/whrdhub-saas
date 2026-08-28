@@ -16,6 +16,8 @@ function LoginForm() {
   // actually matters; this stops a hostile `next` from reaching the markup.
   const next = safeNext(params.get("next"));
 
+  const justReset = params.get("reset") === "1";
+
   const [state, formAction, pending] = useActionState<AuthState, FormData>(signIn, {
     error: params.get("error") ? "Sign in failed. Please try again." : undefined,
   });
@@ -33,6 +35,12 @@ function LoginForm() {
         </>
       }
     >
+      {justReset && (
+        <p className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm text-emerald-800">
+          Your password has been changed. Sign in with the new one.
+        </p>
+      )}
+
       <GoogleButton next={next} />
 
       <div className="my-5 flex items-center gap-3">
@@ -61,7 +69,15 @@ function LoginForm() {
           />
         </div>
         <div>
-          <Label htmlFor="password">Password</Label>
+          <div className="flex items-center justify-between gap-2">
+            <Label htmlFor="password">Password</Label>
+            <Link
+              href="/forgot-password"
+              className="mb-1.5 text-xs font-semibold text-purple hover:underline"
+            >
+              Forgotten it?
+            </Link>
+          </div>
           <Input
             id="password"
             name="password"

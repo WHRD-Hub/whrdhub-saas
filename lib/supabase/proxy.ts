@@ -43,6 +43,10 @@ export async function updateSession(request: NextRequest) {
     "/blog", "/about", "/our-work", "/organizations", "/counties", "/contact",
     "/partners", "/activity-images", "/press", "/resources", "/newsletter", "/opportunities",
     "/privacy-policy", "/terms-of-use", "/data",
+    // Recovering an account is something you do precisely because you cannot
+    // sign in. Gating either page behind a session would make the whole flow
+    // unreachable for the only people who need it.
+    "/forgot-password", "/reset-password",
     // Reporting: filing a report must work without an account. The form creates
     // an anonymous credentialed account on submit, so gating this behind login
     // would defeat the purpose of the platform.

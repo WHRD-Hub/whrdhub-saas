@@ -33,6 +33,14 @@ export async function GET(request: NextRequest) {
   const isLocal = process.env.NODE_ENV === "development";
   const base = isLocal ? origin : forwardedHost ? `https://${forwardedHost}` : origin;
 
+  // A recovery link has one job: get her to the page where she sets a new
+  // password. Diverting it into onboarding -- which is what happened to any
+  // recovery for an account that had not finished onboarding -- leaves her
+  // signed in with the old password still in force and no way to change it.
+  if (type === "recovery") {
+    return NextResponse.redirect(`${base}/reset-password`);
+  }
+
   // Send people who have not finished Hub onboarding through it first.
   const {
     data: { user },

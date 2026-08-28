@@ -79,6 +79,42 @@ URL that is not on the list. It silently falls back to the Site URL. A missing
 entry plus the default Site URL sends everyone who signs in on the live site to
 `localhost:3000`, with nothing in the logs to explain it.
 
+### Password reset emails
+
+Two settings decide whether the "forgotten password" flow works at all, and
+both fail quietly if they are wrong.
+
+**1. Custom SMTP is not optional.** Supabase's built-in email service sends
+**2 messages per hour** and **only to members of the project's organisation**.
+Every other address fails with *Email address not authorized*. So without SMTP
+configured, password reset appears to work -- the page says a link has been
+sent -- and no defender ever receives one. Configure a provider under
+**Project Settings -> Authentication -> SMTP Settings** before this goes near
+real users.
+
+**2. The recovery email template must use `token_hash`.** Supabase's default
+template links to `{{ .ConfirmationURL }}`, which returns the session in a URL
+*fragment*. A fragment never reaches the server, so a server-rendered app
+cannot read it and the link does nothing useful. Under **Authentication ->
+Emails -> Reset Password**, the link must be:
+
+```html
+<a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery">
+  Set a new password
+</a>
+```
+
+`/auth/confirm` exchanges the token for a session server-side and sends the
+person to `/reset-password`. Add `<your-domain>/auth/confirm` to the redirect
+allow-list alongside the callback, or Supabase falls back to the Site URL --
+the same quiet failure described above.
+
+Worth knowing about the flow itself: the reset page always reports success,
+whether or not the address has an account, because a form that says "no account
+with that email" lets anyone test which women are registered here. Setting a new
+password revokes every other session, so a reset actually removes somebody
+else's access rather than merely changing a string.
+
 Under **Authentication -> Providers**, enable **Google**. Its authorised
 redirect URI belongs in the Google Cloud Console, and it is Supabase's own
 callback, not your domain:

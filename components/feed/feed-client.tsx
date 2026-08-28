@@ -21,6 +21,7 @@ export function FeedClient({
   userName,
   avatarUrl,
   counties = [],
+  filter,
 }: {
   feed: FeedItem[];
   videos: string[];
@@ -30,6 +31,7 @@ export function FeedClient({
   userName?: string | null;
   avatarUrl?: string | null;
   counties?: { name: string; slug: string }[];
+  filter?: { mine?: boolean; countySlug?: string };
 }) {
   const router = useRouter();
   const params = useSearchParams();
@@ -74,6 +76,7 @@ export function FeedClient({
         userName={userName}
         avatarUrl={avatarUrl}
         counties={counties}
+        filter={filter}
         canPost={canPost}
         onCompose={onCompose}
       />

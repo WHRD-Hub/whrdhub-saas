@@ -7,12 +7,18 @@ import { FeedClient } from "@/components/feed/feed-client";
 
 export const metadata = { title: "Community Feed — WHRD Hub" };
 
-export default async function MemberFeedPage() {
+export default async function MemberFeedPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ mine?: string; county?: string }>;
+}) {
+  const sp = await searchParams;
+  const filter = { mine: sp.mine === "1", countySlug: sp.county };
   const user = await getCurrentUser();
   const supabase = await createClient();
 
   const [feed, { data: counties }] = await Promise.all([
-    getFeed(30, user?.id),
+    getFeed(30, user?.id, filter),
     supabase.from("county_networks").select("name, slug").eq("is_active", true).order("name"),
   ]);
 
@@ -33,6 +39,7 @@ export default async function MemberFeedPage() {
           userName={user?.profile?.full_name ?? user?.profile?.username ?? null}
           avatarUrl={user?.profile?.avatar_url}
           counties={(counties ?? []) as { name: string; slug: string }[]}
+          filter={filter}
         />
       </Suspense>
     </div>

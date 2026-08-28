@@ -9,6 +9,7 @@ import { NetworkAvatar } from "@/components/feed/network-avatar";
 import { BlogGallery } from "@/components/blog/blog-gallery";
 import { createClient } from "@/lib/supabase/server";
 import { pageMeta, SITE_DESCRIPTION } from "@/lib/seo";
+import { hubFile, hubFileHtml } from "@/lib/file-url";
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
@@ -113,14 +114,14 @@ export default async function BlogReader({
         {blog.cover_image_url && (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={blog.cover_image_url}
+            src={hubFile(blog.cover_image_url)}
             alt=""
             className="mt-6 w-full rounded-2xl border border-line object-cover max-h-[420px]"
           />
         )}
 
         {/(<\/?[a-z][\s\S]*>)/i.test(blog.body as string) ? (
-          <div className="blog-content mt-8" dangerouslySetInnerHTML={{ __html: blog.body as string }} />
+          <div className="blog-content mt-8" dangerouslySetInnerHTML={{ __html: hubFileHtml(blog.body as string) }} />
         ) : (
           <div className="blog-content mt-8">
             {(blog.body as string).split(/\n{2,}/).map((para, i) => (

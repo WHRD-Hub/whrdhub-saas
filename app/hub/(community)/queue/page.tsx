@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { ReviewControls } from "@/components/hub/review-controls";
 import { Avatar } from "@/components/ui/field";
 import { timeAgo } from "@/lib/utils";
+import { hubFile } from "@/lib/file-url";
 
 export const metadata = { title: "Review queue — WHRD Hub" };
 
@@ -65,7 +66,7 @@ export default async function ReviewQueue() {
               {b.excerpt && <p className="text-sm text-muted mt-1">{b.excerpt}</p>}
               {b.cover_image_url && (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={b.cover_image_url} alt="" className="mt-3 rounded-xl border border-line max-h-56 object-cover w-full" />
+                <img src={hubFile(b.cover_image_url)} alt="" className="mt-3 rounded-xl border border-line max-h-56 object-cover w-full" />
               )}
               <ReviewControls kind="blog" id={b.id} pinned={b.pinned} title={b.title as string} excerpt={(b.excerpt as string) ?? ""} body="" />
             </article>

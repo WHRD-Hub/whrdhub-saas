@@ -9,6 +9,7 @@ import { RichText, readingStats } from "@/components/editor/rich-text";
 import { MediaUploader, type MediaItem } from "@/components/composer/media-uploader";
 import { cn } from "@/lib/utils";
 import { updateOwnBlog } from "@/app/actions/content";
+import { hubFile, hubFileHtml } from "@/lib/file-url";
 
 const STATE = {
   draft: { label: "Draft", icon: FileEdit, cls: "border-slate-200 bg-slate-50 text-slate-700", note: "Only you can see this. Save as you go, then submit when it's ready." },
@@ -67,7 +68,7 @@ export function StoryEditor({
         <div className="rounded-xl border border-line bg-surface p-6">
           <h1 className="text-2xl font-black text-ink">{title || "Untitled story"}</h1>
           {excerpt && <p className="text-muted mt-1">{excerpt}</p>}
-          <div className="blog-content mt-4" dangerouslySetInnerHTML={{ __html: body }} />
+          <div className="blog-content mt-4" dangerouslySetInnerHTML={{ __html: hubFileHtml(body) }} />
         </div>
       ) : (
         <>
@@ -94,11 +95,11 @@ export function StoryEditor({
             <article className="rounded-xl border border-line bg-surface p-6">
               {cover[0]?.url && (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={cover[0].url} alt="" className="w-full max-h-72 object-cover rounded-xl border border-line mb-4" />
+                <img src={hubFile(cover[0].url)} alt="" className="w-full max-h-72 object-cover rounded-xl border border-line mb-4" />
               )}
               <h1 className="text-2xl font-black text-ink">{title || "Untitled story"}</h1>
               {excerpt && <p className="text-muted mt-1">{excerpt}</p>}
-              <div className="blog-content mt-4" dangerouslySetInnerHTML={{ __html: body || "<p>Nothing to preview yet.</p>" }} />
+              <div className="blog-content mt-4" dangerouslySetInnerHTML={{ __html: hubFileHtml(body) || "<p>Nothing to preview yet.</p>" }} />
             </article>
           )}
 

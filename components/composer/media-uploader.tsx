@@ -3,6 +3,9 @@
 import { useState, useRef } from "react";
 import { ImagePlus, FileText, Video, X, Loader2, UploadCloud, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { hubFile } from "@/lib/file-url";
+import { MAX_UPLOAD_MB, tooLargeMessage, formatMb } from "@/lib/upload-limits";
+import { compressPdfToFit } from "@/lib/pdf/compress-client";
 
 export interface MediaItem {
   type: "image" | "video" | "document";
@@ -86,7 +89,7 @@ export function MediaUploader({
   bucket = "media",
   folder,
   accept = "image/*,video/*,.pdf,.doc,.docx,.ppt,.pptx",
-  maxMb = 50,
+  maxMb = MAX_UPLOAD_MB,
 }: {
   value: MediaItem[];
   onChange: (v: MediaItem[]) => void;
@@ -124,14 +127,63 @@ export function MediaUploader({
       const user = auth?.user;
       if (!user) throw new Error("You are signed out. Refresh the page and sign in again.");
 
-      for (const file of list) {
+      const limitBytes = maxMb * 1024 * 1024;
+
+      for (const original of list) {
+        let file = original;
         try {
-          if (file.size > maxMb * 1024 * 1024) {
-            mark(file.name, "failed", `Larger than ${maxMb} MB.`);
+          // An oversized PDF is compressed here rather than refused. Almost
+          // every one is heavy because its photographs are embedded at print
+          // resolution, and shrinking those leaves the text -- and therefore
+          // the searchability and the citations -- completely intact.
+          if (file.size > limitBytes && file.type === "application/pdf") {
+            mark(file.name, "uploading", "Too large — compressing before upload…");
+            try {
+              const result = await compressPdfToFit(file, limitBytes, (p) => {
+                const pct = p.imagesTotal ? Math.round((p.imagesDone / p.imagesTotal) * 100) : 0;
+                mark(
+                  original.name,
+                  "uploading",
+                  `Compressing at ${p.pass.label} — ${pct}% of ${p.imagesTotal} images`,
+                );
+              });
+
+              if (!result.fits) {
+                mark(
+                  original.name,
+                  "failed",
+                  result.imagesRewritten === 0
+                    ? `That file is ${formatMb(original.size)} MB and its weight is not coming ` +
+                      `from photographs, so compressing it does not help. A scanned document is ` +
+                      `usually best split into volumes.`
+                    : `Compressed from ${formatMb(result.bytesBefore)} MB to ` +
+                      `${formatMb(result.bytesAfter)} MB, which is still over the ${maxMb} MB ` +
+                      `limit. Try splitting it into parts.`,
+                );
+                continue;
+              }
+
+              file = result.file;
+              mark(
+                original.name,
+                "uploading",
+                `Compressed ${formatMb(result.bytesBefore)} MB → ${formatMb(result.bytesAfter)} MB. Uploading…`,
+              );
+            } catch (e) {
+              // Compression is an attempt to rescue the upload, not a promise.
+              // If it fails, say the file is too big -- the original message.
+              console.error("[MediaUploader] compression failed", e);
+              mark(original.name, "failed", tooLargeMessage(original.size));
+              continue;
+            }
+          }
+
+          if (file.size > limitBytes) {
+            mark(original.name, "failed", tooLargeMessage(file.size));
             continue;
           }
 
-          const safe = file.name.replace(/[^a-zA-Z0-9.\-_]/g, "_");
+          const safe = original.name.replace(/[^a-zA-Z0-9.\-_]/g, "_");
           const path = `${folder ?? user.id}/${Date.now()}-${safe}`;
 
           const { error: upErr } = await supabase.storage
@@ -140,22 +192,22 @@ export function MediaUploader({
 
           if (upErr) {
             console.error(`[MediaUploader] upload failed → bucket "${bucket}", path "${path}"`, upErr);
-            mark(file.name, "failed", explain(upErr.message, bucket));
+            mark(original.name, "failed", explain(upErr.message, bucket));
             continue;
           }
 
           const { data: pub } = supabase.storage.from(bucket).getPublicUrl(path);
           if (!pub?.publicUrl) {
-            mark(file.name, "failed", "Uploaded, but no public URL came back.");
+            mark(original.name, "failed", "Uploaded, but no public URL came back.");
             continue;
           }
 
-          added.push({ type: kindOf(file), url: pub.publicUrl, name: file.name });
-          mark(file.name, "done");
+          added.push({ type: kindOf(file), url: pub.publicUrl, name: original.name });
+          mark(original.name, "done");
         } catch (e) {
           const detail = e instanceof Error ? e.message : "Unexpected error.";
-          console.error(`[MediaUploader] unexpected error uploading ${file.name}`, e);
-          mark(file.name, "failed", explain(detail, bucket));
+          console.error(`[MediaUploader] unexpected error uploading ${original.name}`, e);
+          mark(original.name, "failed", explain(detail, bucket));
         }
       }
 
@@ -239,7 +291,7 @@ export function MediaUploader({
             <div key={i} className="relative rounded-lg border border-line overflow-hidden bg-paper group">
               {m.type === "image" ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={m.url} alt={m.name} className="w-full h-24 object-cover" />
+                <img src={hubFile(m.url)} alt={m.name} className="w-full h-24 object-cover" />
               ) : m.type === "video" ? (
                 <div className="w-full h-24 flex items-center justify-center bg-black text-white"><Video className="w-6 h-6" /></div>
               ) : (

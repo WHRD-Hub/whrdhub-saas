@@ -10,6 +10,8 @@ import { RESOURCE_KINDS, type ResourceItem } from "@/lib/resource-types";
 import { StorageCheck } from "@/components/hub/storage-check";
 import { createResource, updateResource, deleteResource } from "@/app/actions/resources";
 import { cn } from "@/lib/utils";
+import { hubFile } from "@/lib/file-url";
+import { MAX_UPLOAD_MB } from "@/lib/upload-limits";
 
 const blank = {
   title: "",
@@ -268,7 +270,6 @@ export function ResourceForm({ item }: { item?: ResourceItem }) {
             bucket="publications"
             folder="covers"
             accept="image/*"
-            maxMb={100}
           />
           <Input
             className="mt-2"
@@ -280,14 +281,18 @@ export function ResourceForm({ item }: { item?: ResourceItem }) {
 
         <div>
           <Label>The document</Label>
-          <p className="text-xs text-muted mb-2">Upload the PDF, or paste a link to one already online.</p>
+          <p className="text-xs text-muted mb-2">
+            Upload the PDF, or paste a link to one already online. A report over{" "}
+            {MAX_UPLOAD_MB} MB is compressed in your browser before it uploads — the
+            photographs are made smaller, the text stays searchable, and the original
+            on your computer is untouched.
+          </p>
           <MediaUploader
             value={fileValue}
             onChange={(v) => set("file_url", v.slice(-1)[0]?.url ?? "")}
             bucket="publications"
             folder="documents"
             accept=".pdf,.doc,.docx,.ppt,.pptx,application/pdf"
-            maxMb={100}
           />
           <Input
             className="mt-2"
@@ -336,7 +341,7 @@ export function ResourceForm({ item }: { item?: ResourceItem }) {
             <div className="aspect-[3/4] bg-paper overflow-hidden grid place-items-center">
               {d.cover_image_url ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={d.cover_image_url} alt="" className="w-full h-full object-cover" />
+                <img src={hubFile(d.cover_image_url)} alt="" className="w-full h-full object-cover" />
               ) : (
                 <FileText className="w-8 h-8 text-muted" />
               )}

@@ -9,6 +9,7 @@ import { MediaUploader, type MediaItem } from "@/components/composer/media-uploa
 import { MediaBlock } from "@/components/feed/media-block";
 import { cn } from "@/lib/utils";
 import { editContent, reviewContent, togglePin } from "@/app/actions/content";
+import { hubFile, hubFileHtml } from "@/lib/file-url";
 
 interface Props {
   kind: "post" | "blog";
@@ -139,11 +140,11 @@ export function ContentEditor({ kind, id, status, pinned, initial, media = [] }:
             <>
               {cover[0]?.url && (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={cover[0].url} alt="" className="w-full max-h-72 object-cover rounded-xl border border-line mb-4" />
+                <img src={hubFile(cover[0].url)} alt="" className="w-full max-h-72 object-cover rounded-xl border border-line mb-4" />
               )}
               <h1 className="text-2xl font-black text-ink">{title || "Untitled story"}</h1>
               {excerpt && <p className="text-muted mt-1">{excerpt}</p>}
-              <div className="blog-content mt-4" dangerouslySetInnerHTML={{ __html: body || "<p class='text-muted'>Nothing to preview yet.</p>" }} />
+              <div className="blog-content mt-4" dangerouslySetInnerHTML={{ __html: hubFileHtml(body) || "<p class='text-muted'>Nothing to preview yet.</p>" }} />
             </>
           ) : (
             <>

@@ -10,6 +10,7 @@ import { getCurrentUser } from "@/lib/current-user";
 import { createClient } from "@/lib/supabase/server";
 import { SITE, PILLARS, LAWLOR_QUOTE } from "@/lib/data";
 import { latestVideoId, HUB_VIDEOS } from "@/lib/videos";
+import { hubFile } from "@/lib/file-url";
 
 const IMG = {
   // Same photo used as the hero on the About page, per request.
@@ -180,7 +181,7 @@ export default async function LandingPage() {
                 <Link key={s.slug} href={`/blog/${s.slug}`} className="group rounded-2xl border border-line bg-surface overflow-hidden hover:shadow-md transition-shadow">
                   {s.cover_image_url ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={s.cover_image_url} alt="" className="h-44 w-full object-cover" />
+                    <img src={hubFile(s.cover_image_url)} alt="" className="h-44 w-full object-cover" />
                   ) : <div className="h-44 brand-wash" />}
                   <div className="p-5">
                     <h3 className="font-bold text-ink leading-snug group-hover:text-purple transition-colors">{s.title}</h3>

@@ -1,5 +1,6 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
+import { hubFile } from "@/lib/file-url";
 
 export function Input({ className, ...props }: React.InputHTMLAttributes<HTMLInputElement>) {
   return (
@@ -59,7 +60,7 @@ export function Avatar({
     // eslint-disable-next-line @next/next/no-img-element
     return (
       <img
-        src={src}
+        src={hubFile(src)}
         alt={label}
         width={size}
         height={size}

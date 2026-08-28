@@ -7,6 +7,7 @@ import { isStoredHere } from "@/lib/storage";
 import { StorageBackfill } from "@/components/hub/storage-backfill";
 import { resourceDate, type ResourceItem } from "@/lib/resource-types";
 import { cn } from "@/lib/utils";
+import { hubFile } from "@/lib/file-url";
 
 export const metadata = { title: "Resources — WHRD Hub" };
 
@@ -55,7 +56,7 @@ export default async function HubResources({
         <div className="flex items-center gap-3 min-w-0">
           {r.cover_image_url ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={r.cover_image_url} alt="" className="w-9 h-12 rounded object-cover border border-line shrink-0" />
+            <img src={hubFile(r.cover_image_url)} alt="" className="w-9 h-12 rounded object-cover border border-line shrink-0" />
           ) : (
             <span className="w-9 h-12 rounded border border-line bg-paper grid place-items-center shrink-0">
               <FileText className="w-4 h-4 text-muted" />

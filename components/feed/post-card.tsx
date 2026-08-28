@@ -180,10 +180,38 @@ export function PostCard({
           </p>
         </div>
 
-        {item.pinned && (
-          <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-purple/20 bg-purple-050 px-2 py-0.5 text-xs font-semibold text-purple-700">
-            <Pin className="h-3 w-3" /> Pinned
-          </span>
+        {/* Pinning is a one-click act for the Hub, not a trip into a menu.
+            The badge a reader sees and the control an administrator uses are
+            the same object in the same place, so nothing moves when the role
+            changes. Everyone else still just sees the badge. */}
+        {isHubAdmin ? (
+          <button
+            type="button"
+            onClick={() =>
+              run(
+                () => togglePin(kind, item.id, !item.pinned),
+                item.pinned ? "Unpinned." : "Pinned to the top of the feed.",
+              )
+            }
+            disabled={busy}
+            aria-pressed={item.pinned}
+            title={item.pinned ? "Unpin from the top of the feed" : "Pin to the top of the feed"}
+            className={cn(
+              "inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-semibold transition-colors disabled:opacity-50",
+              item.pinned
+                ? "border-purple/20 bg-purple-050 text-purple-700 hover:bg-purple-100"
+                : "border-line text-muted hover:border-purple/30 hover:bg-purple-050 hover:text-purple-700",
+            )}
+          >
+            <Pin className={cn("h-3 w-3", item.pinned && "fill-current")} />
+            {item.pinned ? "Pinned" : "Pin"}
+          </button>
+        ) : (
+          item.pinned && (
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-purple/20 bg-purple-050 px-2 py-0.5 text-xs font-semibold text-purple-700">
+              <Pin className="h-3 w-3" /> Pinned
+            </span>
+          )
         )}
 
         <div className="relative shrink-0">
@@ -199,22 +227,8 @@ export function PostCard({
             <>
               <div className="fixed inset-0 z-10" onClick={() => setMenu(false)} aria-hidden />
               <div className="absolute right-0 top-full z-20 mt-1 w-60 rounded-xl border border-line bg-surface p-1.5 shadow-lg">
-                {/* Pin, and edit, over anybody's content. The Hub is
-                    answerable for what the platform publishes, so it can lift
-                    something to the top or correct it without owning it. */}
-                {isHubAdmin && (
-                  <button
-                    onClick={() =>
-                      run(
-                        () => togglePin(kind, item.id, !item.pinned),
-                        item.pinned ? "Unpinned." : "Pinned to the top of the feed.",
-                      )
-                    }
-                    className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-semibold text-ink/80 hover:bg-purple-050 hover:text-purple-700"
-                  >
-                    <Pin className="h-4 w-4" /> {item.pinned ? "Unpin" : "Pin to top"}
-                  </button>
-                )}
+                {/* Editing anybody's content. Pinning is the button in the
+                    card header, which is one click rather than two. */}
                 {isHubAdmin && (
                   <Link
                     href={

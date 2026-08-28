@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { safeNext } from "@/lib/safe-next";
 
 /**
  * OAuth / email-confirmation callback. Supabase redirects here with a `code`
@@ -9,7 +10,10 @@ import { createClient } from "@/lib/supabase/server";
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
-  const next = searchParams.get("next") ?? "/dashboard";
+  // Validated, not trusted. Built into `${origin}${next}` below, a value of
+  // "//evil.com" would have produced a protocol-relative URL and sent somebody
+  // who had just signed in to another site entirely.
+  const next = safeNext(searchParams.get("next"));
 
   if (code) {
     const supabase = await createClient();

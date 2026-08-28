@@ -2,11 +2,11 @@
 
 import { useMemo, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import {
   ChevronLeft, ChevronRight, ChevronDown, Search, Bell, LogOut, User, LayoutGrid, Megaphone,
 } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
+import { signOut as signOutAction } from "@/app/actions/auth";
 import { links } from "@/lib/site-nav";
 import { cn } from "@/lib/utils";
 import { RoleSwitcher } from "@/components/dashboard/role-switcher";
@@ -75,7 +75,6 @@ export function DashboardShell({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userMenu, setUserMenu] = useState(false);
@@ -111,12 +110,6 @@ export function DashboardShell({
   const activeTitle =
     [...nav].sort((a, b) => b.href.length - a.href.length).find((n) => isActive(n.href))?.label ??
     title;
-
-  const signOut = async () => {
-    await createClient().auth.signOut();
-    router.push("/");
-    router.refresh();
-  };
 
   const initials = userName.split(/\s+/).slice(0, 2).map((s) => s[0]?.toUpperCase()).join("") || "W";
 
@@ -168,9 +161,16 @@ export function DashboardShell({
                 <RoleSwitcher variant="menu" />
               </div>
             )}
-            <button onClick={signOut} className="w-full flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-semibold text-rose-600 hover:bg-rose-50">
-              <LogOut className="w-4 h-4" /> Sign out
-            </button>
+            {/* Server action: the cookie is cleared before the response,
+                rather than in the browser and hoped for afterwards. */}
+            <form action={signOutAction}>
+              <button
+                type="submit"
+                className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-semibold text-rose-600 hover:bg-rose-50"
+              >
+                <LogOut className="h-4 w-4" /> Sign out
+              </button>
+            </form>
           </div>
         )}
       </div>

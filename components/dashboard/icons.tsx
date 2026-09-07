@@ -37,4 +37,10 @@ export interface NavItem {
   section?: string;
   /** Show in the mobile bottom bar. At most four are used, in order. */
   primary?: boolean;
+  /**
+   * A shorter label for the bottom bar, where a slot is about seventy pixels
+   * wide. "Reporting dashboard" spills into its neighbour there; "Reporting"
+   * does not. The sidebar always uses the full label.
+   */
+  shortLabel?: string;
 }

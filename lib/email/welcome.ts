@@ -63,7 +63,7 @@ export function welcomeHtml(name: string | null, site: string): string {
         <tr>
           <td style="background-color:#ffffff;border:1px solid ${BRAND.line};border-radius:16px;padding:38px 30px;font-family:${FONT};">
 
-            <img src="${site}/main-logo.png" alt="Women Human Rights Defenders Hub" width="150" height="49"
+            <img src="https://www.whrdhub.org/main-logo.png" alt="Women Human Rights Defenders Hub" width="150" height="49"
                  style="display:block;border:0;outline:none;text-decoration:none;width:150px;height:auto;max-width:150px;margin:0 0 24px 0;" />
 
             <h1 style="margin:0 0 12px 0;font-size:22px;line-height:1.3;font-weight:700;color:${BRAND.ink};">

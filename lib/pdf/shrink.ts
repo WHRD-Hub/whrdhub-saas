@@ -1,5 +1,6 @@
 import { PDFDocument, PDFName, PDFRawStream, PDFDict, PDFArray, type PDFRef } from "pdf-lib";
 import { jpegPayload } from "./filters";
+import { decodeRawImage } from "./raw-image";
 
 /**
  * Shrink a PDF by re-encoding the pictures inside it, and nothing else.
@@ -27,9 +28,17 @@ import { jpegPayload } from "./filters";
  * graph surgery below is the part worth testing, and this keeps it testable.
  */
 
+/**
+ * An image as the PDF stored it: either a JPEG we can hand to a decoder, or
+ * plain samples we have to paint ourselves.
+ */
+export type ResampleInput =
+  | { kind: "jpeg"; bytes: Uint8Array }
+  | { kind: "raw"; samples: Uint8Array; width: number; height: number; channels: 1 | 3 };
+
 /** Re-encode one image. Returns null to leave the original in place. */
 export type Resample = (
-  bytes: Uint8Array,
+  input: ResampleInput,
   opts: { maxEdge: number; quality: number },
 ) => Promise<{ bytes: Uint8Array; width: number; height: number } | null>;
 
@@ -49,6 +58,22 @@ export interface ShrinkResult {
   imagesRewritten: number;
   bytesBefore: number;
   bytesAfter: number;
+  /**
+   * Why the images we did not rewrite were left alone.
+   *
+   * Without this, a document that refuses to shrink looks identical to one
+   * that is already small, and the only advice we can offer is "split it" —
+   * which was wrong the first time it mattered. A count of unreadable images
+   * turns a dead end into a sentence somebody can act on.
+   */
+  skipped: {
+    /** Under the size floor: re-encoding these tends to add bytes. */
+    tooSmall: number;
+    /** A format we decline to guess at: JPEG 2000, CCITT, CMYK, indexed. */
+    unsupported: number;
+    /** Readable, but the re-encode came out no smaller. */
+    noSaving: number;
+  };
 }
 
 const JPEG = "DCTDecode";
@@ -106,6 +131,7 @@ export async function shrinkPdf(
   const refs = imageRefs(doc);
   let rewritten = 0;
   let done = 0;
+  const skipped = { tooSmall: 0, unsupported: 0, noSaving: 0 };
 
   for (const ref of refs) {
     opts.onProgress?.(done++, refs.length);
@@ -113,40 +139,75 @@ export async function shrinkPdf(
     const stream = doc.context.lookup(ref);
     if (!(stream instanceof PDFRawStream)) continue;
 
-    // A soft mask carries transparency that JPEG cannot express.
-    if (stream.dict.has(PDFName.of("SMask"))) continue;
-
     const original = stream.getContents();
-    if (original.length < minBytes) continue;
+    if (original.length < minBytes) {
+      skipped.tooSmall++;
+      continue;
+    }
 
-    // Peel the transport encodings and get at the JPEG. Anything that is not
-    // ultimately a JPEG is left alone: a Flate-compressed raw bitmap needs its
-    // colour space and bit depth interpreted, and getting that subtly wrong
-    // corrupts the picture rather than shrinking it. Same for JPEG2000 and
-    // CCITT fax. Skipping costs a few bytes; guessing costs the document.
-    const jpeg = await jpegPayload(original, filtersOf(stream.dict));
-    if (!jpeg) continue;
+    const filters = filtersOf(stream.dict);
+
+    // Two shapes are readable. A JPEG, once any transport encoding in front of
+    // it is peeled off. And a Flate-compressed bitmap of 8-bit grey or RGB,
+    // which is how a document laid out in InDesign or Canva stores its
+    // photographs -- skipping those was why a 171 MB photo book compressed to
+    // 58 MB and no further.
+    //
+    // Everything else is still left exactly as it was. Indexed palettes, CMYK,
+    // 1-bit scans and JPEG 2000 all require assumptions we cannot check, and a
+    // wrong assumption corrupts the picture rather than shrinking it.
+    let input: ResampleInput | null = null;
+    const jpeg = await jpegPayload(original, filters);
+    if (jpeg) {
+      input = { kind: "jpeg", bytes: jpeg };
+    } else {
+      const raw = await decodeRawImage(stream, filters, doc.context);
+      if (raw) input = { kind: "raw", ...raw };
+    }
+    if (!input) {
+      skipped.unsupported++;
+      continue;
+    }
 
     let replacement: Awaited<ReturnType<Resample>> = null;
     try {
-      replacement = await resample(jpeg, { maxEdge: opts.maxEdge, quality: opts.quality });
+      replacement = await resample(input, { maxEdge: opts.maxEdge, quality: opts.quality });
     } catch {
       replacement = null; // a picture we cannot read is a picture we leave alone
     }
-    if (!replacement) continue;
+    if (!replacement) {
+      skipped.unsupported++;
+      continue;
+    }
 
     // Never accept a "compression" that made the file bigger.
-    if (replacement.bytes.length >= original.length) continue;
+    if (replacement.bytes.length >= original.length) {
+      skipped.noSaving++;
+      continue;
+    }
 
     const next = PDFRawStream.of(stream.dict, replacement.bytes);
     next.dict.set(PDFName.of("Width"), doc.context.obj(replacement.width));
     next.dict.set(PDFName.of("Height"), doc.context.obj(replacement.height));
     next.dict.set(PDFName.of("Filter"), PDFName.of(JPEG));
     next.dict.set(PDFName.of("Length"), doc.context.obj(replacement.bytes.length));
+
+    // The canvas always hands back three-channel 8-bit JPEG, whatever went in.
+    // The dictionary has to say so: a greyscale source left describing itself
+    // as DeviceGray would be read one byte per pixel and come out as noise.
+    next.dict.set(PDFName.of("ColorSpace"), PDFName.of("DeviceRGB"));
+    next.dict.set(PDFName.of("BitsPerComponent"), doc.context.obj(8));
+
     // /Decode and /DecodeParms describe the original sample layout. Our
-    // re-encode is plain 8-bit, so a stale /Decode would invert the picture.
+    // re-encode is plain 8-bit, so a stale /Decode would invert the picture,
+    // and a stale predictor would have it unpacked as though still filtered.
     next.dict.delete(PDFName.of("Decode"));
     next.dict.delete(PDFName.of("DecodeParms"));
+    next.dict.delete(PDFName.of("DP"));
+
+    // /SMask is deliberately left in place. Transparency lives in that separate
+    // stream, not in these samples, and the specification scales a soft mask to
+    // its image — so re-encoding the picture smaller keeps the mask correct.
 
     doc.context.assign(ref, next);
     rewritten++;
@@ -162,5 +223,6 @@ export async function shrinkPdf(
     imagesRewritten: rewritten,
     bytesBefore: input.length,
     bytesAfter: bytes.length,
+    skipped,
   };
 }

@@ -84,6 +84,7 @@ export function ListeningView({ connected, keywords, results }: { connected: boo
               : <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />}
             <div className="min-w-0 flex-1">
               <p className={`text-sm font-bold ${diag.canPull ? "text-emerald-800" : "text-amber-900"}`}>{diag.summary}</p>
+              <p className="text-xs text-muted mt-1">Checked against Meta just now.</p>
               <ul className="mt-3 space-y-1.5">
                 {diag.checks.map((c) => (
                   <li key={c.name} className="flex items-start gap-2 text-sm">
@@ -101,7 +102,7 @@ export function ListeningView({ connected, keywords, results }: { connected: boo
       )}
 
       {/* Connection status */}
-      {connected ? (
+      {connected && !(diag && !diag.canPull) ? (
         <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 flex items-start gap-3">
           <Check className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
           <p className="text-sm text-emerald-800"><span className="font-bold">Connected to Meta.</span> New comments on your Page are matched in real time via the webhook; use Sync now to backfill recent posts.</p>
@@ -122,7 +123,7 @@ export function ListeningView({ connected, keywords, results }: { connected: boo
           </div>
         </div>
       )}
-      {msg && <p className="text-sm font-semibold text-purple">{msg}</p>}
+      {msg && !diag && <p className="text-sm font-semibold text-purple">{msg}</p>}
 
       {/* Keyword manager */}
       <section className="rounded-xl border border-line bg-surface p-5">

@@ -44,6 +44,9 @@ export interface CompressOutcome {
   imagesRewritten: number;
   /** False when even the most aggressive pass could not reach the target. */
   fits: boolean;
+  /** How many images could not be read, so the failure can say why. */
+  unreadableImages: number;
+  imagesFound: number;
 }
 
 /**
@@ -77,7 +80,13 @@ export async function compressPdfToFit(
   onProgress?: (p: CompressProgress) => void,
 ): Promise<CompressOutcome> {
   const buffer = await file.arrayBuffer();
-  let best: { bytes: Uint8Array; pass: Pass; rewritten: number } | null = null;
+  let best: {
+    bytes: Uint8Array;
+    pass: Pass;
+    rewritten: number;
+    unreadable: number;
+    found: number;
+  } | null = null;
 
   for (let i = 0; i < PASSES.length; i++) {
     const pass = PASSES[i];
@@ -91,7 +100,13 @@ export async function compressPdfToFit(
       }),
     );
 
-    best = { bytes: result.bytes, pass, rewritten: result.imagesRewritten };
+    best = {
+      bytes: result.bytes,
+      pass,
+      rewritten: result.imagesRewritten,
+      unreadable: result.skipped.unsupported,
+      found: result.imagesFound,
+    };
     if (result.bytesAfter <= targetBytes) break;
 
     // No images were rewritten, so a harsher pass would change nothing either:
@@ -114,5 +129,7 @@ export async function compressPdfToFit(
     pass: best.pass,
     imagesRewritten: best.rewritten,
     fits: out.size <= targetBytes,
+    unreadableImages: best.unreadable,
+    imagesFound: best.found,
   };
 }

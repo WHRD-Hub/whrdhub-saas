@@ -66,7 +66,7 @@ export default async function HubLayout({ children }: { children: React.ReactNod
   // Grouped so each heading is contiguous, because the sidebar folds by
   // section and a section that appears twice is two headings, not one group.
   const communityNav: NavItem[] = [
-    { label: "Overview", href: "/hub", icon: "overview", section: "Community", primary: true },
+    { label: "Overview", shortLabel: "Hub", href: "/hub", icon: "overview", section: "Community", primary: true },
     { label: "Resources", href: "/hub/resources", icon: "resources", section: "Community" },
     { label: "CBOs", href: "/hub/organizations", icon: "organisations", badge: orgsPending || undefined, section: "Community" },
     { label: "Members", href: "/hub/members", icon: "members", section: "Community" },
@@ -98,7 +98,7 @@ export default async function HubLayout({ children }: { children: React.ReactNod
   // The reporting console. Triage-only accounts see the case-handling pages;
   // full administrators also get the directory, listening and linkage tools.
   const reportingNav: NavItem[] = [
-    { label: "Reporting dashboard", href: "/hub/reporting", icon: "triage", section: "Reporting", primary: true },
+    { label: "Reporting dashboard", shortLabel: "Reporting", href: "/hub/reporting", icon: "triage", section: "Reporting", primary: true },
     {
       label: "Reports",
       href: "/hub/reporting/reports",

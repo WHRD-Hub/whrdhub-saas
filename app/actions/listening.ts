@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireReportingAdmin } from "@/lib/reporting-access";
-import { fetchRecentContent, metaConfigured } from "@/lib/meta";
+import { fetchRecentContent, metaConfigured, metaDiagnose, type MetaDiagnosis } from "@/lib/meta";
 import { ingestItems } from "@/lib/listening";
 
 async function requireAdmin() {
@@ -23,6 +23,21 @@ export async function pollMeta() {
     return { ok: true, stored, scanned: items.length };
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Sync failed." };
+  }
+}
+
+/**
+ * Run the real Graph requests and report what Meta said.
+ *
+ * Admin-gated, because the result names the Page id and quotes Meta's own error
+ * messages back — useful to whoever is configuring this, not for anyone else.
+ */
+export async function diagnoseMeta(): Promise<{ error: string } | { ok: true; diagnosis: MetaDiagnosis }> {
+  if (!(await requireAdmin())) return { error: "Admins only." };
+  try {
+    return { ok: true, diagnosis: await metaDiagnose() };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Could not reach Meta." };
   }
 }
 

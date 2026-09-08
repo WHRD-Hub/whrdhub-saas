@@ -159,16 +159,23 @@ export function MediaUploader({
               });
 
               if (!result.fits) {
+                // Say which of the three things went wrong, because the advice
+                // differs completely and a generic "try splitting it" was wrong
+                // the first time somebody hit this.
+                const shrank = `Compressed from ${formatMb(result.bytesBefore)} MB to ${formatMb(result.bytesAfter)} MB, still over the ${maxMb} MB limit.`;
                 mark(
                   original.name,
                   "failed",
-                  result.imagesRewritten === 0
-                    ? `That file is ${formatMb(original.size)} MB and its weight is not coming ` +
-                      `from photographs, so compressing it does not help. A scanned document is ` +
-                      `usually best split into volumes.`
-                    : `Compressed from ${formatMb(result.bytesBefore)} MB to ` +
-                      `${formatMb(result.bytesAfter)} MB, which is still over the ${maxMb} MB ` +
-                      `limit. Try splitting it into parts.`,
+                  result.imagesFound === 0
+                    ? `That file is ${formatMb(original.size)} MB and contains no images to ` +
+                      `compress, so its weight is elsewhere. Splitting it into parts is the way through.`
+                    : result.unreadableImages > 0
+                      ? `${shrank} ${result.unreadableImages} of its ${result.imagesFound} images ` +
+                        `are in a format this can't re-encode safely — usually a scan, a CMYK ` +
+                        `print export, or JPEG 2000. Re-exporting the PDF as RGB from the design ` +
+                        `file usually fixes it; otherwise split it into parts.`
+                      : `${shrank} Its images are already as small as they can go without visible ` +
+                        `damage. Splitting it into parts is the way through.`,
                 );
                 continue;
               }

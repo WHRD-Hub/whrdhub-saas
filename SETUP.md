@@ -209,6 +209,39 @@ META_PAGE_ACCESS_TOKEN=
 META_VERIFY_TOKEN=
 ```
 
+### Getting the Meta credentials right
+
+Online listening reads **one Facebook Page that you administer**. There is no
+API — from Meta or anyone else — that watches all of Facebook or Instagram for
+keywords; that capability does not exist outside Meta's Content Library, which
+requires an approved academic researcher application. So the scope of this
+feature is: your Page's posts, and the comments people leave on them.
+
+An **App ID and App Secret are not sufficient**. They produce an app access
+token, and an app token cannot read a Page feed. What you need:
+
+1. **`META_PAGE_ID`** — open your Page, About → Page transparency, copy the
+   numeric Page ID.
+2. **`META_PAGE_ACCESS_TOKEN`** — in Graph API Explorer, select your app,
+   choose *User token*, add the `pages_read_engagement`,
+   `pages_show_list` and `pages_manage_metadata` permissions, generate it, then
+   call `GET /me/accounts` and copy the `access_token` belonging to your Page.
+   Exchange it for a long-lived one at `/oauth/access_token` with
+   `grant_type=fb_exchange_token`, otherwise it expires in about an hour.
+3. **`META_APP_SECRET`** — App dashboard → Settings → Basic. Used only to verify
+   that incoming webhook calls really came from Meta.
+4. **`META_VERIFY_TOKEN`** — any random string you invent; you type the same one
+   into the webhook setup form.
+
+Then, in the App dashboard, add the Page webhook pointing at
+`https://<domain>/api/meta/webhook` and subscribe to `feed`.
+
+Finally, open `/hub/reporting/listening` and press **Test connection**. It runs
+the real Graph requests and tells you, check by check, whether Meta accepts the
+token and whether the Page feed can actually be read — including Meta's own
+error message when it cannot.
+
+
 ## 5. External callbacks
 
 Point these at the deployed domain. The paths have not changed from the

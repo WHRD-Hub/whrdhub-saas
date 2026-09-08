@@ -20,7 +20,7 @@ export default function ReportingOverviewPage() {
     <Suspense fallback={
       <div className="space-y-4">
         <div className="h-8 w-48 bg-paper rounded animate-pulse" />
-        <div className="h-24 grid grid-cols-3 gap-4">
+        <div className="grid h-24 grid-cols-1 gap-4 sm:grid-cols-3">
           {[...Array(3)].map((_, i) => <div key={i} className="bg-paper rounded-xl animate-pulse" />)}
         </div>
         <div className="h-64 bg-paper rounded-xl animate-pulse" />

@@ -59,8 +59,8 @@ export default async function MemberLayout({ children }: { children: React.React
     : [
         // The four marked primary are what the mobile bar carries, in this order.
         { label: "Overview", href: "/dashboard", icon: "overview", section: "Your Hub", primary: true },
-        { label: "Community Feed", href: "/dashboard/feed", icon: "feed", section: "Your Hub", primary: true },
-        { label: "My Reports", href: "/dashboard/reports", icon: "reports", badge: actioned || undefined, section: "Your Hub", primary: true },
+        { label: "Community Feed", shortLabel: "Feed", href: "/dashboard/feed", icon: "feed", section: "Your Hub", primary: true },
+        { label: "My Reports", shortLabel: "Reports", href: "/dashboard/reports", icon: "reports", badge: actioned || undefined, section: "Your Hub", primary: true },
         { label: "Femtorship", href: "/mentorship", icon: "femtorship", section: "Your Hub", primary: true },
         ...(isOrgAdmin
           ? ([{

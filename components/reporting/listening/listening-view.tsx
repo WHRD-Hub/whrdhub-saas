@@ -3,9 +3,10 @@
 import { useState } from "react";
 import {
   RadioTower, RefreshCw, Loader2, Plus, X, Circle, Plug, ExternalLink,
-  Check, EyeOff, Search,
+  Check, EyeOff, Search, Stethoscope, AlertTriangle,
 } from "lucide-react";
-import { pollMeta, addKeyword, removeKeyword, toggleKeyword, setResultStatus } from "@/app/actions/listening";
+import { pollMeta, addKeyword, removeKeyword, toggleKeyword, setResultStatus, diagnoseMeta } from "@/app/actions/listening";
+import type { MetaDiagnosis } from "@/lib/meta";
 import { useRouter } from "next/navigation";
 
 export interface Keyword { id: string; word: string; severity: string; active: boolean }
@@ -28,6 +29,17 @@ export function ListeningView({ connected, keywords, results }: { connected: boo
   const [msg, setMsg] = useState<string | null>(null);
   const [newWord, setNewWord] = useState("");
   const [newSev, setNewSev] = useState("high");
+  const [diag, setDiag] = useState<MetaDiagnosis | null>(null);
+
+  // Deliberately separate from `run`: a diagnosis is not a mutation, it should
+  // not refresh the page, and its result is a panel rather than a one-line message.
+  const testConnection = async () => {
+    setBusy("diagnose"); setMsg(null); setDiag(null);
+    const res = await diagnoseMeta();
+    setBusy(null);
+    if ("error" in res) { setMsg(res.error); return; }
+    setDiag(res.diagnosis);
+  };
 
   const run = async (tag: string, fn: () => Promise<{ error?: string; ok?: boolean; stored?: number; scanned?: number } | undefined>) => {
     setBusy(tag); setMsg(null);
@@ -49,12 +61,44 @@ export function ListeningView({ connected, keywords, results }: { connected: boo
           <h1 className="text-2xl font-black text-ink flex items-center gap-2"><RadioTower className="w-6 h-6 text-purple" /> Online Listening</h1>
           <p className="text-sm text-muted mt-1">Watches your connected Meta assets for abuse keywords and flags them for review.</p>
         </div>
+        <div className="flex flex-wrap items-center gap-2">
+        <button onClick={testConnection} disabled={busy !== null}
+          title="Ask Meta directly whether this Page can be read"
+          className="inline-flex items-center gap-2 rounded-lg border border-line bg-white text-ink px-4 h-10 text-sm font-bold hover:bg-paper disabled:opacity-50">
+          {busy === "diagnose" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Stethoscope className="w-4 h-4" />} Test connection
+        </button>
         <button onClick={() => run("poll", pollMeta)} disabled={busy !== null || !connected}
           title={connected ? "Scan recent posts now" : "Connect Meta to enable syncing"}
           className="inline-flex items-center gap-2 rounded-lg bg-purple text-white px-4 h-10 text-sm font-bold hover:bg-purple/90 disabled:opacity-50 disabled:cursor-not-allowed">
           {busy === "poll" ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />} Sync now
         </button>
+        </div>
       </div>
+
+      {/* Diagnosis: what Meta actually said, check by check. */}
+      {diag && (
+        <div className={`rounded-xl border p-4 ${diag.canPull ? "border-emerald-200 bg-emerald-50" : "border-amber-200 bg-amber-50"}`}>
+          <div className="flex items-start gap-3">
+            {diag.canPull
+              ? <Check className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+              : <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />}
+            <div className="min-w-0 flex-1">
+              <p className={`text-sm font-bold ${diag.canPull ? "text-emerald-800" : "text-amber-900"}`}>{diag.summary}</p>
+              <ul className="mt-3 space-y-1.5">
+                {diag.checks.map((c) => (
+                  <li key={c.name} className="flex items-start gap-2 text-sm">
+                    {c.ok
+                      ? <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                      : <X className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />}
+                    <span className="min-w-0 break-words"><span className="font-semibold text-ink">{c.name}</span> <span className="text-muted">— {c.detail}</span></span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <button onClick={() => setDiag(null)} className="text-muted hover:text-ink shrink-0" aria-label="Dismiss"><X className="w-4 h-4" /></button>
+          </div>
+        </div>
+      )}
 
       {/* Connection status */}
       {connected ? (
@@ -70,9 +114,9 @@ export function ListeningView({ connected, keywords, results }: { connected: boo
               <h3 className="font-bold text-ink">Connect Meta to activate listening</h3>
               <p className="text-sm text-muted mt-0.5">Everything is wired up and waiting on your Meta credentials. You can add and fine-tune the watch keywords below right now; captured signals will appear here the moment it is connected.</p>
               <ol className="mt-3 space-y-1.5 text-sm text-muted list-decimal pl-5">
-                <li>Add <code>META_PAGE_ID</code>, <code>META_ACCESS_TOKEN</code>, <code>META_APP_SECRET</code> and <code>META_VERIFY_TOKEN</code> to the environment.</li>
+                <li>Add <code>META_PAGE_ID</code>, <code>META_PAGE_ACCESS_TOKEN</code>, <code>META_APP_SECRET</code> and <code>META_VERIFY_TOKEN</code> to the environment. An App ID and App Secret alone are not enough — the token must be a <span className="font-semibold">Page</span> access token.</li>
                 <li>In the Meta App dashboard, point the Page webhook at <code>/api/meta/webhook</code> and subscribe to &quot;feed&quot;.</li>
-                <li>Come back here and use <span className="font-semibold">Sync now</span> to pull in recent posts.</li>
+                <li>Come back here, press <span className="font-semibold">Test connection</span> to confirm Meta accepts it, then <span className="font-semibold">Sync now</span> to pull in recent posts.</li>
               </ol>
             </div>
           </div>

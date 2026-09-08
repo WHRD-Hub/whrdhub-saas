@@ -119,7 +119,7 @@ export default async function LandingPage() {
 
       {/* ── STATS BAND ───────────────────────────────────────────── */}
       <section className="bg-purple text-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-10 grid grid-cols-3 gap-8 text-center">
+        <div className="mx-auto grid max-w-7xl grid-cols-1 gap-8 px-4 py-10 text-center sm:grid-cols-3 sm:px-6">
           {[
             { k: "9", v: "County networks" },
             { k: "6", v: "Pillars of protection" },

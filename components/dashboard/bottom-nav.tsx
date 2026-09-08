@@ -34,7 +34,10 @@ export function BottomNav({ items, notifCount = 0 }: { items: NavItem[]; notifCo
       <Link
         href={item.href}
         aria-current={active ? "page" : undefined}
-        className="flex flex-1 flex-col items-center gap-0.5 py-2 min-w-0"
+        // basis-0 and min-w-0 together let every slot shrink below its content,
+        // so the four share the bar evenly. Without them the longest label sets
+        // the width and pushes its neighbours off the edge.
+        className="flex min-w-0 flex-1 basis-0 flex-col items-center gap-0.5 py-2"
       >
         <span className="relative">
           <Icon className={cn("h-5 w-5 transition-colors", active ? "text-purple" : "text-muted")} />
@@ -44,8 +47,13 @@ export function BottomNav({ items, notifCount = 0 }: { items: NavItem[]; notifCo
             </span>
           )}
         </span>
-        <span className={cn("truncate text-[10px] font-semibold", active ? "text-purple" : "text-muted")}>
-          {item.label}
+        <span
+          className={cn(
+            "w-full truncate px-0.5 text-center text-[10px] font-semibold leading-tight",
+            active ? "text-purple" : "text-muted",
+          )}
+        >
+          {item.shortLabel ?? item.label}
         </span>
       </Link>
     );

@@ -35,6 +35,7 @@ const PAGE_ID = process.env.META_PAGE_ID || "";
 const TOKEN = process.env.META_PAGE_ACCESS_TOKEN || process.env.META_ACCESS_TOKEN || "";
 export const META_VERIFY_TOKEN = process.env.META_VERIFY_TOKEN || "";
 const APP_SECRET = process.env.META_APP_SECRET || "";
+const APP_ID = process.env.META_APP_ID || "";
 
 export function metaConfigured(): boolean {
   return !!(PAGE_ID && TOKEN);
@@ -96,10 +97,15 @@ export interface MetaDiagnosis {
  *
  * This exists because every failure mode here is silent. A missing env var, an
  * app token where a Page token is needed, an expired token, a Page the token
- * does not administer, a missing pages_read_engagement permission — all of them
- * end with an empty listening screen and no explanation. Running the real
- * request and reading the real error is the only honest way to answer "is this
- * connected?", so that is what this does.
+ * does not administer, a missing pages_read_engagement scope. All of them end
+ * in the same blank screen.
+ *
+ * The single most common mistake, by a distance, is copying the token out of
+ * the Graph API Explorer's Access Token box. That is a User token. The Page
+ * token is nested inside the me/accounts response, and the two look identical.
+ * Meta's own reply to that mistake is a #10 permissions error that sends you
+ * off reading about App Review, which is the wrong trail entirely. So when the
+ * token turns out not to be a Page token, we say that first and say it plainly.
  */
 export async function metaDiagnose(): Promise<MetaDiagnosis> {
   const checks: MetaDiagnosis["checks"] = [];
@@ -114,14 +120,12 @@ export async function metaDiagnose(): Promise<MetaDiagnosis> {
   checks.push({
     name: "META_PAGE_ACCESS_TOKEN",
     ok: haveToken,
-    detail: haveToken
-      ? "Set."
-      : "Not set. This must be a Page access token — an App ID and App Secret cannot read a Page feed.",
+    detail: haveToken ? "Set." : "Not set. This must be a Page access token, not an App ID and secret.",
   });
   checks.push({
     name: "META_APP_SECRET",
     ok: !!APP_SECRET,
-    detail: APP_SECRET ? "Set — webhook signatures will be verified." : "Not set. Live webhook events will be rejected; only manual Sync will work.",
+    detail: APP_SECRET ? "Set, so webhook signatures will be verified." : "Not set. Live webhook events will be rejected; only manual Sync will work.",
   });
   checks.push({
     name: "META_VERIFY_TOKEN",
@@ -132,29 +136,34 @@ export async function metaDiagnose(): Promise<MetaDiagnosis> {
   if (!havePage || !haveToken) {
     return {
       canPull: false,
-      summary:
-        "Not connected. The Page id and a Page access token are both required, and at least one is missing — so nothing can be pulled yet.",
+      summary: "Not connected. The Page id and a Page access token are both required, and at least one is missing.",
       checks,
     };
   }
 
-  // What kind of token is this, and does it still work?
-  let tokenKind = "unknown";
+  const wrongTokenAdvice =
+    `Open the Graph API Explorer, run me/accounts, and copy the access_token from inside the result for Page ${PAGE_ID}. ` +
+    `Do not copy the token from the Access Token box at the top: that is a User token, and it is the usual cause of this.`;
+
+  // What kind of token is this?
+  let isPageToken = false;
   try {
     const me = await graph("me", { fields: "id,name" });
-    tokenKind = me.id === PAGE_ID ? "page" : "user-or-other";
+    isPageToken = String(me.id) === String(PAGE_ID);
     checks.push({
-      name: "Token is valid",
-      ok: true,
-      detail:
-        tokenKind === "page"
-          ? `Yes — it is a Page token for "${me.name}".`
-          : `Yes, but it identifies "${me.name}" (${me.id}), not the Page in META_PAGE_ID. A Page token is what this needs.`,
+      name: "Token is a Page token",
+      ok: isPageToken,
+      detail: isPageToken
+        ? `Yes, a Page token for "${me.name}".`
+        : `No. It identifies "${me.name}" (${me.id}), which is not the Page in META_PAGE_ID. ${wrongTokenAdvice}`,
     });
   } catch (err) {
-    checks.push({ name: "Token is valid", ok: false, detail: msg(err) });
-    return { canPull: false, summary: "The access token was rejected by Meta. " + msg(err), checks };
+    checks.push({ name: "Token is valid", ok: false, detail: clean(err) });
+    return { canPull: false, summary: "Meta rejected the access token. " + clean(err), checks };
   }
+
+  // Scopes and expiry, when the app id is available to mint an app token.
+  await describeToken(checks);
 
   // The question that actually matters.
   try {
@@ -163,8 +172,9 @@ export async function metaDiagnose(): Promise<MetaDiagnosis> {
     checks.push({
       name: "Read the Page feed",
       ok: true,
-      detail: n ? `Yes — ${n} recent post(s) returned.` : "Yes, the request succeeded, but the Page has no posts to read yet.",
+      detail: n ? `Yes, ${n} recent post(s) returned.` : "Yes, the request succeeded, but the Page has no posts yet.",
     });
+    await describeWebhook(checks);
     return {
       canPull: true,
       summary: n
@@ -173,19 +183,90 @@ export async function metaDiagnose(): Promise<MetaDiagnosis> {
       checks,
     };
   } catch (err) {
-    checks.push({ name: "Read the Page feed", ok: false, detail: msg(err) });
+    checks.push({ name: "Read the Page feed", ok: false, detail: clean(err) });
     return {
       canPull: false,
-      summary:
-        "The token works, but it cannot read this Page's feed — usually a missing pages_read_engagement permission, or a Page the token does not administer. " +
-        msg(err),
+      // When the token is not a Page token, that is the cause, and Meta's own
+      // #10 error points at App Review instead, which wastes hours.
+      summary: isPageToken
+        ? "The token administers this Page but still cannot read its feed, which points at a missing pages_read_engagement scope. " + clean(err)
+        : "This is a User token, not a Page token. " + wrongTokenAdvice,
       checks,
     };
   }
 }
 
-function msg(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
+/** Report the token's type, scopes and expiry, if we can mint an app token. */
+async function describeToken(checks: MetaDiagnosis["checks"]) {
+  if (!APP_ID || !APP_SECRET) {
+    checks.push({
+      name: "Token scopes",
+      ok: true,
+      detail: "Not checked. Set META_APP_ID alongside META_APP_SECRET and this will list the token's scopes and expiry.",
+    });
+    return;
+  }
+  try {
+    const res = await graph("debug_token", { input_token: TOKEN }, `${APP_ID}|${APP_SECRET}`);
+    const d = res.data ?? {};
+    const scopes: string[] = d.scopes ?? [];
+    const canRead = scopes.includes("pages_read_engagement");
+    checks.push({
+      name: "pages_read_engagement",
+      ok: canRead,
+      detail: canRead
+        ? "Granted."
+        : `Missing. The token carries: ${scopes.join(", ") || "no scopes"}. Re-generate it with pages_read_engagement ticked.`,
+    });
+
+    // Expiry is worth surfacing loudly: a token minted from a short-lived user
+    // token works today and mysteriously stops tomorrow.
+    const exp = Number(d.expires_at ?? 0);
+    if (!exp) {
+      checks.push({ name: "Token expiry", ok: true, detail: "Never expires." });
+    } else {
+      const mins = Math.round((exp * 1000 - Date.now()) / 60000);
+      checks.push({
+        name: "Token expiry",
+        ok: mins > 60 * 24,
+        detail:
+          mins <= 0
+            ? "Already expired. Generate a new one."
+            : `Expires in about ${mins < 120 ? `${mins} minutes` : `${Math.round(mins / 60)} hours`}. ` +
+              "Exchange the user token for a long-lived one, then take the Page token from me/accounts again, or this will stop working on its own.",
+      });
+    }
+  } catch {
+    // Not being able to inspect the token is not itself a failure.
+  }
+}
+
+/** Is the Page subscribed to this app, so webhook events actually arrive? */
+async function describeWebhook(checks: MetaDiagnosis["checks"]) {
+  try {
+    const res = await graph(`${PAGE_ID}/subscribed_apps`, {});
+    const apps = res.data ?? [];
+    const subscribed = APP_ID ? apps.some((a: { id?: string }) => String(a.id) === String(APP_ID)) : apps.length > 0;
+    checks.push({
+      name: "Webhook subscription",
+      ok: subscribed,
+      detail: subscribed
+        ? "This Page is subscribed to the app, so live comment events will arrive."
+        : "This Page is not subscribed to the app. Manual Sync works, but live events will not arrive until it is.",
+    });
+  } catch {
+    // Requires pages_manage_metadata; its absence is not worth failing over.
+  }
+}
+
+/**
+ * Meta appends a paragraph of documentation URLs to its errors. Useful in a
+ * terminal, useless in a status panel, and it buries the one sentence that
+ * matters under two hundred characters of links.
+ */
+function clean(err: unknown): string {
+  const text = err instanceof Error ? err.message : String(err);
+  return text.replace(/\s*Refer to https?:\/\/\S+.*$/i, "").trim();
 }
 
 /**

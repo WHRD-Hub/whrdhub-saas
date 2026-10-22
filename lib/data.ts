@@ -50,16 +50,17 @@ export const PILLARS: { title: string; body: string }[] = [
 export const FEMTORSHIP_QUESTIONS = {
   in_leadership_role: "Are you currently in any leadership role?",
   leadership_detail: "If yes, tell us a little about that role.",
-  has_guide: "Do you have someone who guides you in that role?",
+  has_guide: "Do you have someone who guides you in your work?",
   relationship_nature: "How would you describe that relationship?",
   barriers:
     "What are the main barriers to having a femtor, and would you be interested in having one?",
   desired_qualities: "What qualities would you look for in a femtor?",
   guidance_areas:
     "Are there specific areas where you need guidance to strengthen your human rights work or advocacy?",
+  guidance_areas_hint: "Pick a maximum of 3",
   can_provide: "Are you in a capacity to provide femtorship to others?",
   support_offered: "What kinds of support can you provide?",
-  support_detail: "Anything else you would like a match to know?",
+  support_detail: "Anything else you would like a match to know? (any special needs)",
 };
 
 /**
@@ -88,7 +89,8 @@ export const FEMTOR_QUALITIES = [
   "Patient and encouraging",
   "Strategic thinker",
   "Available and reliable",
-  "Shares my values",
+  "Respect",
+  "Time management",
 ];
 
 /** The eight county networks the Hub currently operates in (matches the site). */

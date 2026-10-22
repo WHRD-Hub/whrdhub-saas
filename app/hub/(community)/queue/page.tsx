@@ -1,4 +1,5 @@
-import { BookOpen, FileText, Inbox } from "lucide-react";
+import { BookOpen, FileText, Inbox, ShieldAlert } from "lucide-react";
+import { reviewFlags, REVIEW_FLAG_LABEL } from "@/lib/jev-uses";
 import { createClient } from "@/lib/supabase/server";
 import { ReviewControls } from "@/components/hub/review-controls";
 import { Avatar } from "@/components/ui/field";
@@ -34,6 +35,21 @@ export default async function ReviewQueue() {
 
   const empty = !posts?.length && !blogs?.length;
 
+  // Jev reads what is waiting and points at anything that needs a second look. It only flags; a person decides.
+  const flags = await reviewFlags([
+    ...(posts ?? []).map((p) => ({ id: p.id as string, text: (p.body as string) ?? "" })),
+    ...(blogs ?? []).map((b) => ({ id: b.id as string, text: `${b.title ?? ""}. ${b.excerpt ?? ""}` })),
+  ]);
+  const Flag = ({ id }: { id: string }) => {
+    const f = flags.get(id);
+    if (!f) return null;
+    return (
+      <p className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-900">
+        <ShieldAlert className="h-3.5 w-3.5" /> Check before approving: {REVIEW_FLAG_LABEL[f.flag].toLowerCase()}
+      </p>
+    );
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -64,6 +80,7 @@ export default async function ReviewQueue() {
               </div>
               <h3 className="mt-3 font-bold text-ink">{b.title}</h3>
               {b.excerpt && <p className="text-sm text-muted mt-1">{b.excerpt}</p>}
+              <Flag id={b.id as string} />
               {b.cover_image_url && (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={hubFile(b.cover_image_url)} alt="" className="mt-3 rounded-xl border border-line max-h-56 object-cover w-full" />
@@ -83,6 +100,7 @@ export default async function ReviewQueue() {
                 <span className="inline-flex items-center gap-1 text-xs font-semibold text-cyan-700 bg-cyan-050 px-2 py-0.5 rounded-full"><FileText className="w-3 h-3" /> Post</span>
               </div>
               <p className="mt-3 text-sm text-ink whitespace-pre-wrap">{p.body}</p>
+              <Flag id={p.id as string} />
               {p.image_urls?.[0] && (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={p.image_urls[0]} alt="" className="mt-3 rounded-xl border border-line max-h-56 object-cover w-full" />

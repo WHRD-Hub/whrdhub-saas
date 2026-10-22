@@ -24,13 +24,13 @@ async function ReportFormWithAuth() {
 
 export default function ReportPage() {
   return (
-    <main className="min-h-screen bg-paper">
+    <main className="min-h-screen calm-wash">
 
       <LanguageOnboardingModal />
       <QuickExit />
 
       {/* Header */}
-      <header className="bg-purple text-white">
+      <header className="bg-gradient-to-r from-purple-700 via-purple to-purple-600 text-white">
         <div className="max-w-3xl mx-auto px-4 sm:px-5 py-3 sm:py-4 flex items-center justify-between gap-3">
           <Link href="/" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm text-white/70 hover:text-white transition-colors">
             <ArrowLeft className="w-4 h-4" />
@@ -59,12 +59,12 @@ export default function ReportPage() {
       {/* Content */}
       <div className="max-w-3xl mx-auto px-4 sm:px-5 py-6 sm:py-10">
         <div className="mb-6 sm:mb-8 text-center">
-          <div className="inline-flex items-center gap-2 bg-purple/10 text-purple rounded-full px-3 sm:px-4 py-1.5 text-xs font-semibold mb-3 sm:mb-4">
+          <div className="inline-flex items-center gap-2 bg-surface border border-line shadow-sm text-purple-700 rounded-full px-3.5 sm:px-4 py-1.5 text-xs font-semibold mb-4 sm:mb-5">
             <Shield className="w-3 sm:w-3.5 h-3 sm:h-3.5" />
             Your report is encrypted
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black text-purple mb-2">Report safely</h1>
-          <p className="text-muted text-sm max-w-xl mx-auto leading-relaxed">
+          <h1 className="font-display text-3xl sm:text-4xl font-bold tracking-tight text-ink mb-3">Report safely</h1>
+          <p className="text-muted text-sm sm:text-[15px] max-w-xl mx-auto leading-relaxed">
             You are not alone. Share only what feels comfortable. Your IP address is not recorded.
           </p>
         </div>

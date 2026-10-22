@@ -46,7 +46,7 @@ export default async function NetworkPage() {
   const adminOrgIds = (mine ?? []).map((m) => m.organization_id as string);
   if (!isHubAdmin && adminOrgIds.length === 0) {
     // Not an administrator of anything: the account page is the useful place.
-    redirect("/dashboard/account");
+    redirect("/profile");
   }
 
   let query = supabase

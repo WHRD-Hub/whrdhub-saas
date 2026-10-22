@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/current-user";
 import { OnboardingWizard } from "./onboarding-client";
+import { loadCountyNetworks } from "@/lib/county-networks";
 
 export const metadata = { title: "Complete your profile — WHRD Hub" };
 
@@ -11,8 +12,8 @@ export default async function OnboardingPage() {
   if (user.profile?.hub_onboarded) redirect("/dashboard");
 
   const supabase = await createClient();
-  const [{ data: counties }, { data: orgs }] = await Promise.all([
-    supabase.from("county_networks").select("id, name, is_active").order("is_active", { ascending: false }).order("name"),
+  const [counties, { data: orgs }] = await Promise.all([
+    loadCountyNetworks(),
     supabase
       .from("organizations")
       .select("id, name, county_network_id, verification_status")
@@ -22,7 +23,7 @@ export default async function OnboardingPage() {
   return (
     <OnboardingWizard
       defaultName={user.profile?.full_name ?? user.email?.split("@")[0] ?? ""}
-      counties={counties ?? []}
+      counties={counties}
       organizations={orgs ?? []}
     />
   );

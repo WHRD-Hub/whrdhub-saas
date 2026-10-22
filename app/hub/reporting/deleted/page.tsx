@@ -7,6 +7,7 @@ import { timeAgo } from "@/lib/utils";
 import { DeletedActions } from "@/components/hub/deleted-actions";
 import { getReportingAccess } from "@/lib/reporting-access";
 import { redirect } from "next/navigation";
+import { urgencyMeta } from "@/lib/urgency";
 
 export const metadata = { title: "Deleted reports — WHRD Hub" };
 
@@ -97,7 +98,7 @@ export default async function DeletedReportsPage() {
                     </p>
                   )}
                 </div>
-                {r.urgency === "immediate" && <Pill tone="red">Was urgent</Pill>}
+                {r.urgency && <Pill tone={urgencyMeta(r.urgency).tone}>{urgencyMeta(r.urgency).label}</Pill>}
                 <Pill tone="slate">{(r.status as string)?.replace(/_/g, " ")}</Pill>
                 <DeletedActions target={{ type: "report", id: r.id as string, label }} />
               </li>

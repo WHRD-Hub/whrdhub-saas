@@ -44,6 +44,8 @@ export interface OutboxItem {
   attempts: number;
   lastError?: string;
   payload: ReportData | QueuedPost;
+  /** A recorded voice note that goes with a signed-in reporter's offline report. */
+  voice?: Blob;
 }
 
 /** Kept for the report-specific call sites that predate the outbox. */
@@ -120,9 +122,10 @@ async function migrateLegacyReports(): Promise<void> {
 export async function enqueue(
   kind: OutboxKind,
   payload: ReportData | QueuedPost,
+  extras: { voice?: Blob } = {},
 ): Promise<OutboxItem> {
   if (!hasIDB()) throw new Error("Offline storage is not available on this device.");
-  const record: OutboxItem = { localId: uuid(), kind, createdAt: Date.now(), attempts: 0, payload };
+  const record: OutboxItem = { localId: uuid(), kind, createdAt: Date.now(), attempts: 0, payload, ...(extras.voice ? { voice: extras.voice } : {}) };
   await tx(OUTBOX_STORE, "readwrite", (s) => s.put(record));
   announce();
   return record;

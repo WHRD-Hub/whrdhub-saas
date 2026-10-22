@@ -9,6 +9,11 @@ import { matchMeta } from "@/lib/match-state";
 import { ReferralResponse } from "@/components/reporting/referral-response";
 import { translations } from "@/lib/i18n/translations";
 import { getServerLanguage } from "@/lib/i18n/server";
+import { ReportUpdateButton } from "@/components/reporting/report-update-button";
+import { ReportRisksButton } from "@/components/reporting/report-risks-button";
+import { SafetyPlan } from "@/components/reporting/safety-plan";
+import { incidentLabel, riskLabel, supportLabel } from "@/lib/reporting-options";
+import { urgencyMeta } from "@/lib/urgency";
 
 export const metadata = { title: "Report details — WHRD Hub" };
 
@@ -36,8 +41,8 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-line bg-surface p-5 sm:p-6">
-      <h2 className="mb-4 flex items-center gap-2 text-base font-black text-ink">
+    <section className="card-premium p-5 sm:p-7">
+      <h2 className="mb-4 flex items-center gap-2 font-display text-lg font-bold tracking-tight text-ink">
         {Icon && <Icon className="h-4.5 w-4.5 text-purple" />}
         {title}
       </h2>
@@ -142,6 +147,26 @@ export default async function ReportDetailPage({
         <div className="flex flex-wrap items-center gap-2">
           <Pill tone={sm.tone}>{sm.label}</Pill>
           <Pill tone={vm.tone}>{vm.label}</Pill>
+          <ReportRisksButton
+            reportId={report.id as string}
+            label={((report.incident_types as string[]) ?? []).map(incidentLabel).join(", ") || "Report"}
+            initialRisks={(report.risks as string[]) ?? []}
+            initialSupport={(report.support_needed as string[]) ?? []}
+            initialOther={(report.support_other as string) ?? ""}
+          />
+          <ReportUpdateButton
+            reportId={report.id as string}
+            initial={{
+              description: (report.description as string) ?? "",
+              county: (report.county as string) ?? "",
+              location_description: (report.location_description as string) ?? "",
+              occurred_at: (report.occurred_at as string) ?? "",
+              occurred_time: (report.occurred_time as string) ?? "",
+              perpetrator_detail: (report.perpetrator_detail as string) ?? "",
+              contact_method: (report.contact_method as string) ?? "",
+              contact_value: (report.contact_value as string) ?? "",
+            }}
+          />
         </div>
       </div>
 
@@ -153,10 +178,8 @@ export default async function ReportDetailPage({
             </span>
           </Row>
           <Row label={t.violenceType}>
-            <span className="capitalize">
-              {((report.incident_types as string[]) ?? [])
-                .map((it) => it.replace(/_/g, " "))
-                .join(", ") || "—"}
+            <span>
+              {((report.incident_types as string[]) ?? []).map(incidentLabel).join(", ") || "—"}
             </span>
           </Row>
         </dl>
@@ -183,7 +206,8 @@ export default async function ReportDetailPage({
               <span className="inline-flex items-center gap-1.5">
                 <Calendar className="h-3.5 w-3.5 text-muted" />
                 {report.occurred_at
-                  ? new Date(report.occurred_at as string).toLocaleDateString()
+                  ? new Date(report.occurred_at as string).toLocaleDateString() +
+                    (report.occurred_time ? ` · ${report.occurred_time as string}` : "")
                   : t.notSpecified}
               </span>
             </Row>
@@ -268,14 +292,33 @@ export default async function ReportDetailPage({
       {((report.support_needed as string[]) ?? []).length > 0 && (
         <Section title={t.supportRequested}>
           <div className="flex flex-wrap gap-2">
-            {(report.support_needed as string[]).map((s) => (
-              <Pill key={s} tone="purple">
-                <span className="capitalize">{s.replace(/_/g, " ")}</span>
-              </Pill>
+            {(report.support_needed as string[]).map((sv) => (
+              <Pill key={sv} tone="purple">{supportLabel(sv)}</Pill>
+            ))}
+          </div>
+          {report.support_other ? (
+            <p className="mt-3 whitespace-pre-line rounded-xl bg-paper p-3.5 text-sm text-ink">
+              {report.support_other as string}
+            </p>
+          ) : null}
+        </Section>
+      )}
+
+      {((report.risks as string[]) ?? []).length > 0 && (
+        <Section title="Risks you told us about">
+          <div className="flex flex-wrap gap-2">
+            {(report.risks as string[]).map((rk) => (
+              <Pill key={rk} tone="magenta">{riskLabel(rk)}</Pill>
             ))}
           </div>
         </Section>
       )}
+
+      <SafetyPlan
+        planKey={report.id as string}
+        incidentTypes={(report.incident_types as string[]) ?? []}
+        risks={(report.risks as string[]) ?? []}
+      />
 
       <Section title={t.assignedServices}>
         {services.length === 0 ? (
@@ -344,9 +387,9 @@ export default async function ReportDetailPage({
       <Section title={t.contactUrgency}>
         <dl className="grid gap-4 sm:grid-cols-2">
           <Row label={t.urgency}>
-            <span className="capitalize">
-              {(report.urgency as string)?.replace(/_/g, " ") ?? "—"}
-            </span>
+            <Pill tone={urgencyMeta(report.urgency as string).tone}>
+              {urgencyMeta(report.urgency as string).label}
+            </Pill>
           </Row>
           {report.contact_method ? (
             <>

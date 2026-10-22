@@ -1,20 +1,30 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { Suspense } from "react";
+import { Suspense, useMemo, useSyncExternalStore } from "react";
 import { Check, ArrowRight, Phone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useT } from "@/lib/i18n/context";
+import { SafetyPlan } from "@/components/reporting/safety-plan";
+
+const noop = () => () => {};
+const readTypes = () => {
+  try { return sessionStorage.getItem("whrd:last-incident-types"); } catch { return null; }
+};
 
 function SuccessContent() {
   const params   = useSearchParams();
   const reportId = params.get("rid") || "";
   const t = useT();
   const s = t.success;
+  const rawTypes = useSyncExternalStore(noop, readTypes, () => null);
+  const incidentTypes = useMemo<string[]>(() => {
+    try { const v = JSON.parse(rawTypes ?? "[]"); return Array.isArray(v) ? v.filter((x) => typeof x === "string") : []; } catch { return []; }
+  }, [rawTypes]);
 
   return (
-    <main className="min-h-screen bg-paper flex items-center justify-center px-5 py-16">
-      <div className="max-w-md w-full space-y-5">
+    <main className="min-h-screen calm-wash flex justify-center px-5 py-12 sm:py-16">
+      <div className="max-w-2xl w-full space-y-5">
 
         <div className="text-center">
           <div className="w-16 h-16 rounded-2xl bg-green-100 flex items-center justify-center mx-auto mb-5">
@@ -37,6 +47,8 @@ function SuccessContent() {
             ))}
           </ol>
         </div>
+
+        <SafetyPlan planKey={reportId || "latest"} incidentTypes={incidentTypes} />
 
         <div className="bg-purple/5 border border-purple/20 rounded-2xl p-4 text-sm">
           <p className="font-semibold text-purple mb-1">{s.alreadySignedIn}</p>

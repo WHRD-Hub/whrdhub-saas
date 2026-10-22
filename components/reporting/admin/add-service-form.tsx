@@ -5,30 +5,36 @@ import { Plus, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { createService } from "@/app/actions/reporting-admin";
 import { toast } from "@/components/ui/toast";
+import { SERVICE_CATEGORIES, SERVICE_COUNTRIES, KENYA, KENYA_COUNTIES } from "@/lib/reporting-options";
 
-const CATEGORIES = ["legal","medical","psychosocial","shelter","digital_security","financial","referral","other"];
-const COUNTIES = ["Nairobi","Mombasa","Kisumu","Nakuru","Kilifi","Kakamega","All Counties"];
+const CATEGORIES = SERVICE_CATEGORIES;
 
 export function AddServiceForm() {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
     name: "", description: "", category: "legal", organization: "",
-    contact_phone: "", contact_email: "", contact_url: "", county: "",
+    contact_phone: "", contact_email: "", contact_url: "", county: "", country: "",
   });
 
+  // A service is offered in one county, across a whole country, or everywhere.
+  const [scope, setScope] = useState<"county" | "country" | "everywhere">("country");
   const set = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name || !form.category) return;
     setLoading(true);
-    const result = await createService(form);
+    const result = await createService({
+      ...form,
+      country: scope === "everywhere" ? "" : form.country || KENYA,
+      county: scope === "county" ? form.county : "",
+    });
     if (result.error) {
       toast.error(result.error);
     } else {
       toast.success("Service added successfully");
-      setForm({ name: "", description: "", category: "legal", organization: "", contact_phone: "", contact_email: "", contact_url: "", county: "" });
+      setForm({ name: "", description: "", category: "legal", organization: "", contact_phone: "", contact_email: "", contact_url: "", county: "", country: "" });
       setOpen(false);
     }
     setLoading(false);
@@ -66,14 +72,37 @@ export function AddServiceForm() {
               <input value={form.organization} onChange={e => set("organization", e.target.value)}
                 placeholder="Organization name" className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple" />
             </div>
-            <div>
-              <label className="block text-xs font-semibold mb-1">County</label>
-              <select value={form.county} onChange={e => set("county", e.target.value)}
-                className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple">
-                <option value="">Select county</option>
-                {COUNTIES.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
+            <div className="sm:col-span-2">
+              <label className="block text-xs font-semibold mb-1.5">Where is it offered?</label>
+              <div className="flex flex-wrap gap-2">
+                {([["county", "A county"], ["country", "A whole country"], ["everywhere", "Everywhere"]] as const).map(([v, l]) => (
+                  <button key={v} type="button" onClick={() => setScope(v)} aria-pressed={scope === v}
+                    className={`rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-colors ${scope === v ? "bg-purple text-white border-purple" : "bg-surface border-line text-ink hover:bg-purple-050"}`}>
+                    {l}
+                  </button>
+                ))}
+              </div>
             </div>
+            {scope !== "everywhere" && (
+              <div>
+                <label className="block text-xs font-semibold mb-1">Country</label>
+                <select value={form.country || KENYA} onChange={e => { set("country", e.target.value); if (e.target.value !== KENYA) set("county", ""); }}
+                  className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple">
+                  {SERVICE_COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+            )}
+            {scope === "county" && (
+              <div>
+                <label className="block text-xs font-semibold mb-1">County</label>
+                <select required value={form.county} onChange={e => set("county", e.target.value)}
+                  className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple">
+                  <option value="">Select county</option>
+                  {KENYA_COUNTIES.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+                {(form.country || KENYA) !== KENYA && <p className="text-[11px] text-muted mt-1">Counties are listed for Kenya only. Choose Kenya, or offer it across the whole country.</p>}
+              </div>
+            )}
             <div>
               <label className="block text-xs font-semibold mb-1">Phone</label>
               <input value={form.contact_phone} onChange={e => set("contact_phone", e.target.value)}

@@ -7,6 +7,9 @@ import { timeAgo } from "@/lib/utils";
 import { getServerLanguage } from "@/lib/i18n/server";
 import { translations } from "@/lib/i18n/translations";
 import { Building2, ArrowRight } from "lucide-react";
+import { ReportRisksButton } from "@/components/reporting/report-risks-button";
+import { incidentLabel } from "@/lib/reporting-options";
+import { urgencyMeta } from "@/lib/urgency";
 
 const STATUS_TONE: Record<string, "amber" | "green" | "red" | "slate" | "cyan"> = {
   submitted: "amber",
@@ -25,7 +28,7 @@ export default async function MemberReportsPage() {
   const [{ data: reports }, { data: profile }] = await Promise.all([
     supabase
       .from("reports")
-      .select("id, incident_types, county, status, verification_status, urgency, created_at")
+      .select("id, incident_types, county, status, verification_status, urgency, created_at, risks, support_needed, support_other")
       .eq("user_id", user!.id)
       .is("deleted_at", null)
       .order("created_at", { ascending: false }),
@@ -63,8 +66,9 @@ export default async function MemberReportsPage() {
     <>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="flex items-center gap-2 text-2xl font-black text-ink">
-            <ShieldCheck className="h-6 w-6 text-purple" /> My reports
+          <p className="eyebrow mb-1.5">Your private space</p>
+          <h1 className="flex items-center gap-2.5 font-display text-3xl font-bold tracking-tight text-ink">
+            <ShieldCheck className="h-7 w-7 text-purple" /> My reports
           </h1>
           <p className="mt-1 text-sm text-muted">
             Everything you have filed, and what has happened since. Only you and the
@@ -106,34 +110,49 @@ export default async function MemberReportsPage() {
           </Link>
         </div>
       ) : (
-        <div className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-surface">
+        <div className="card-premium divide-y divide-line overflow-hidden">
           {list.map((r) => {
             const hasAction =
               actioned.has(r.id as string) || (r.status && r.status !== "submitted");
             const status = (r.status as string) ?? "submitted";
+            const types = (r.incident_types as string[]) ?? [];
+            const title = types.map(incidentLabel).join(", ") || "Report";
+            const urgency = urgencyMeta(r.urgency as string);
             return (
-              <Link
-                key={r.id as string}
-                href={`/dashboard/reports/${r.id}`}
-                className="flex items-center gap-4 p-4 transition-colors hover:bg-paper"
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-ink">
-                    {(r.incident_types as string[])?.map((t) => t.replace(/_/g, " ")).join(", ") ||
-                      "Report"}
-                    {r.county ? ` · ${r.county}` : ""}
-                  </p>
-                  <p className="mt-0.5 text-xs text-muted">
-                    Filed {timeAgo(r.created_at as string)}
-                    {r.urgency === "immediate" ? " · Marked urgent" : ""}
-                  </p>
-                </div>
-                {hasAction && <Pill tone="green">Action taken</Pill>}
-                <Pill tone={STATUS_TONE[status] ?? "slate"}>
-                  {STATUS_LABEL[status] ?? status.replace(/_/g, " ")}
-                </Pill>
-                <ChevronRight className="h-4 w-4 shrink-0 text-muted" />
-              </Link>
+              <div key={r.id as string} className="flex items-center gap-2 pr-3 transition-colors hover:bg-paper/70 sm:gap-3 sm:pr-4">
+                <Link
+                  href={`/dashboard/reports/${r.id}`}
+                  className="flex min-w-0 flex-1 items-center gap-3 p-4 sm:gap-4 sm:p-5"
+                >
+                  <span
+                    className="h-10 w-1 shrink-0 rounded-full"
+                    style={{ background: urgency.hex }}
+                    title={`Urgency: ${urgency.label}`}
+                    aria-hidden="true"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-ink">
+                      {title}
+                      {r.county ? ` · ${r.county}` : ""}
+                    </p>
+                    <p className="mt-0.5 text-xs text-muted">
+                      Filed {timeAgo(r.created_at as string)} · {urgency.label}
+                    </p>
+                  </div>
+                  {hasAction && <Pill tone="green" className="hidden sm:inline-flex">Action taken</Pill>}
+                  <Pill tone={STATUS_TONE[status] ?? "slate"}>
+                    {STATUS_LABEL[status] ?? status.replace(/_/g, " ")}
+                  </Pill>
+                  <ChevronRight className="hidden h-4 w-4 shrink-0 text-muted sm:block" />
+                </Link>
+                <ReportRisksButton
+                  reportId={r.id as string}
+                  label={title}
+                  initialRisks={(r.risks as string[]) ?? []}
+                  initialSupport={(r.support_needed as string[]) ?? []}
+                  initialOther={(r.support_other as string) ?? ""}
+                />
+              </div>
             );
           })}
         </div>

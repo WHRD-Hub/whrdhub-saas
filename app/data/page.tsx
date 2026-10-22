@@ -193,10 +193,10 @@ export default function DataPage() {
             .
           </li>
           <li>
-            Open <strong className="text-ink">Account</strong> from the menu on the left, or go
-            directly to{" "}
-            <Link href="/dashboard/account" className="font-semibold text-purple-700 hover:underline">
-              whrdhub.org/dashboard/account
+            Open <strong className="text-ink">Profile &amp; account</strong> from the menu, then
+            choose <strong className="text-ink">Privacy &amp; data</strong>, or go directly to{" "}
+            <Link href="/profile?section=privacy" className="font-semibold text-purple-700 hover:underline">
+              whrdhub.org/profile?section=privacy
             </Link>
             .
           </li>

@@ -3,7 +3,10 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { safeNext } from "@/lib/safe-next";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { generateUsername } from "@/lib/anonymous-username";
+import { safeNext, DEFAULT_NEXT } from "@/lib/safe-next";
+import { isStaffProfile, STAFF_HOME } from "@/lib/staff-landing";
 
 /**
  * Signing in and signing up, on the server.
@@ -33,6 +36,8 @@ export interface AuthState {
   error?: string;
   /** Sign-up only: the account exists but the address needs confirming. */
   checkEmail?: boolean;
+  /** Anonymous sign-up only: the generated username, shown once so it can be written down. */
+  username?: string;
 }
 
 /**
@@ -82,26 +87,46 @@ export async function signIn(_prev: AuthState, formData: FormData): Promise<Auth
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
   if (error) {
     return { error: readableError(error.code, error.message) };
+  }
+
+  // Staff land in the console, not on the member dashboard. Sending an admin to
+  // /dashboard meant the member onboarding wall (or a second trip through the
+  // login page) stood between them and the console, so signing in seemed to
+  // need doing twice. The profile is read with this same client: a fresh client
+  // would still see the request's old, signed-out cookies.
+  let destination = next;
+  if (next === DEFAULT_NEXT && data.user) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("user_type, is_hub_admin")
+      .eq("id", data.user.id)
+      .maybeSingle();
+    if (isStaffProfile(profile)) destination = STAFF_HOME;
   }
 
   // Every layout reads the session, so the whole tree is stale now.
   revalidatePath("/", "layout");
   // redirect() signals by throwing, so it must be the last thing and must not
   // sit inside a try/catch that would swallow it.
-  redirect(next);
+  redirect(destination);
 }
 
 export async function signUp(_prev: AuthState, formData: FormData): Promise<AuthState> {
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
   const fullName = String(formData.get("fullName") ?? "").trim();
+  // Two email routes: just report, or join a chapter. Anything else is a chapter member, as before.
+  const kind = formData.get("accountKind") === "reporter" ? "reporter" : "member";
 
   if (!email || !password) {
     return { error: "Enter your email and a password." };
+  }
+  if (kind === "member" && !fullName) {
+    return { error: "Tell us your name so your chapter knows who you are." };
   }
   if (password.length < 8) {
     return { error: "Please choose a password of at least eight characters." };
@@ -114,13 +139,14 @@ export async function signUp(_prev: AuthState, formData: FormData): Promise<Auth
     email,
     password,
     options: {
-      // Carried into the profile by the handle_new_user trigger.
-      data: { full_name: fullName, user_type: "defender" },
+      // Carried into the profile by the handle_new_user trigger. Roles are never taken from here:
+      // the trigger decides user_type itself and only reads the kind of account being joined.
+      data: { full_name: fullName, account_kind: kind },
       // Absolute, and from configuration rather than from the request: a
       // confirmation link is emailed, so it cannot be relative, and it must not
       // be built from anything a caller controls.
       emailRedirectTo: origin
-        ? `${origin}/auth/callback?next=/onboarding`
+        ? `${origin}/auth/callback?next=${kind === "reporter" ? "/dashboard/reports" : "/onboarding"}`
         : undefined,
     },
   });
@@ -136,7 +162,43 @@ export async function signUp(_prev: AuthState, formData: FormData): Promise<Auth
   }
 
   revalidatePath("/", "layout");
-  redirect("/onboarding");
+  redirect(kind === "reporter" ? "/dashboard/reports" : "/onboarding");
+}
+
+/**
+ * Join with no email and no name: a generated username and a password of the
+ * person's choosing. Nothing identifies them, and there is no reset, so the
+ * page that follows tells them to write the details down. The session is
+ * created here, so they are already signed in when they continue.
+ */
+export async function signUpAnonymous(_prev: AuthState, formData: FormData): Promise<AuthState> {
+  const password = String(formData.get("password") ?? "");
+  if (password.length < 8) {
+    return { error: "Please choose a password of at least eight characters." };
+  }
+
+  const username = generateUsername();
+  const email = `${username}@whrdhub.local`;
+
+  // Admin client so the account is created pre-confirmed: no mail is sent to an address that cannot receive it.
+  const { error: createError } = await createAdminClient().auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+    user_metadata: { username, is_anonymous: true, account_kind: "anonymous" },
+  });
+  if (createError) {
+    return { error: "Could not create your account just now. Please try again." };
+  }
+
+  const supabase = await createClient();
+  const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+  if (signInError) {
+    return { error: "Your account was created, but signing in failed. Log in with your username and password." };
+  }
+
+  revalidatePath("/", "layout");
+  return { username };
 }
 
 /**

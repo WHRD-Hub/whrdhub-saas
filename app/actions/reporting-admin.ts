@@ -121,7 +121,7 @@ export async function removeService(reportId: string, serviceId: string) {
 
 export async function createService(data: {
   name: string; description: string; category: string; organization?: string;
-  contact_phone?: string; contact_email?: string; contact_url?: string; county?: string;
+  contact_phone?: string; contact_email?: string; contact_url?: string; county?: string; country?: string;
 }) {
   const adminId = await requireReportingAdmin();
   if (!adminId) return { error: "You do not have permission to do that." };
@@ -130,6 +130,9 @@ export async function createService(data: {
 
   const { error } = await supabase.from("services").insert({
     ...data,
+    // Empty means "not scoped to this level", which the matcher reads as NULL.
+    county: data.county?.trim() || null,
+    country: data.country?.trim() || null,
     category: data.category as "legal" | "medical" | "psychosocial" | "shelter" | "digital_security" | "financial" | "referral" | "other",
     created_by: user.id,
     is_active: true,

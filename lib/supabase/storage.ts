@@ -96,3 +96,18 @@ export async function uploadReportScreenshots(
 
   return { urls, errors };
 }
+
+/**
+ * Upload a recorded voice note to the same private bucket as report evidence.
+ * Returns the storage path, or null if it could not be saved. Needs a signed-in
+ * session, because the bucket only accepts files into the uploader's own folder.
+ */
+export async function uploadReportVoiceNote(blob: Blob): Promise<string | null> {
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+  const ext = blob.type.includes("mp4") ? "m4a" : blob.type.includes("ogg") ? "ogg" : "webm";
+  const path = `${user.id}/voice_${Date.now()}.${ext}`;
+  const { error } = await supabase.storage.from("report-screenshots").upload(path, blob, { contentType: blob.type || "audio/webm" });
+  return error ? null : path;
+}

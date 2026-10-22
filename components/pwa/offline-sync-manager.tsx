@@ -4,6 +4,8 @@ import { useEffect } from "react";
 import { toast } from "@/components/ui/toast";
 import { submitReport, type ReportData } from "@/app/actions/report-submit";
 import { createPost } from "@/app/actions/content";
+import { attachVoiceNote } from "@/app/actions/report-update";
+import { uploadReportVoiceNote } from "@/lib/supabase/storage";
 import {
   getOutbox,
   removeFromOutbox,
@@ -42,6 +44,11 @@ export async function flushOutbox(): Promise<void> {
         if (item.kind === "report") {
           const result = await submitReport(item.payload as ReportData);
           if (result.success) {
+            // A signed-in reporter may have recorded a voice note while offline: send it now there is a connection.
+            if (item.voice && result.reportId && (item.payload as ReportData).is_authenticated) {
+              const path = await uploadReportVoiceNote(item.voice).catch(() => null);
+              if (path) await attachVoiceNote(result.reportId, [path]).catch(() => undefined);
+            }
             await removeFromOutbox(item.localId);
             reportsSent += 1;
             continue;

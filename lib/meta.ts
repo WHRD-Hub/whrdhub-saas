@@ -42,7 +42,7 @@ export function metaConfigured(): boolean {
 }
 
 export interface Keyword { word: string; severity: string }
-export interface RawItem { source: "facebook" | "instagram"; source_id: string; permalink: string | null; author: string | null; content: string }
+export interface RawItem { source: "facebook" | "instagram" | "x"; source_id: string; permalink: string | null; author: string | null; content: string }
 
 const SEV_RANK: Record<string, number> = { low: 1, medium: 2, high: 3 };
 

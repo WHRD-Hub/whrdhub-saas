@@ -1,212 +1,112 @@
 "use client";
 
 import { useState } from "react";
-import {
-  RadioTower, RefreshCw, Loader2, Plus, X, Circle, Plug, ExternalLink,
-  Check, EyeOff, Search, Stethoscope, AlertTriangle,
-} from "lucide-react";
-import { pollMeta, addKeyword, removeKeyword, toggleKeyword, setResultStatus, diagnoseMeta } from "@/app/actions/listening";
-import type { MetaDiagnosis } from "@/lib/meta";
 import { useRouter } from "next/navigation";
+import { Loader2, RadioTower, RefreshCw } from "lucide-react";
+import { scanAllNow } from "@/app/actions/listening";
+import { toast } from "@/components/ui/toast";
+import { cn } from "@/lib/utils";
+import type { Source } from "@/lib/listening-sources";
+import type { PackState } from "@/lib/listening-packs";
+import { Inbox } from "./inbox";
+import { WatchingPanel } from "./watching-panel";
+import { KeywordsPanel } from "./keywords-panel";
+import { CheckPanel } from "./check-panel";
+import type { ActionResult, InboxData, Keyword, Result, Run } from "./types";
 
-export interface Keyword { id: string; word: string; severity: string; active: boolean }
-export interface Result {
-  id: string; source: string; permalink: string | null; author: string | null;
-  content: string; matched_keywords: string[]; severity: string; status: string; captured_at: string;
-}
+export type { Keyword, Result };
 
-const SEV: Record<string, string> = {
-  high: "bg-red-100 text-red-700 border-red-200",
-  medium: "bg-amber-100 text-amber-700 border-amber-200",
-  low: "bg-slate-100 text-slate-600 border-slate-200",
-};
-const STATUS_TABS = ["new", "reviewing", "actioned", "dismissed"] as const;
+type Tab = "inbox" | "watching" | "keywords" | "check";
 
-export function ListeningView({ connected, keywords, results }: { connected: boolean; keywords: Keyword[]; results: Result[] }) {
+/**
+ * Online listening. The inbox is the point of the page, so it comes first and
+ * the setup screens sit one click away behind quiet tabs. Outcomes appear as
+ * toasts rather than banners, so nothing shoves the content around.
+ */
+export function ListeningView({ sources, keywords, inbox, packs }: { sources: Source[]; keywords: Keyword[]; inbox: InboxData; packs: PackState[] }) {
   const router = useRouter();
-  const [tab, setTab] = useState<(typeof STATUS_TABS)[number]>("new");
+  const [tab, setTab] = useState<Tab>("inbox");
   const [busy, setBusy] = useState<string | null>(null);
-  const [msg, setMsg] = useState<string | null>(null);
-  const [newWord, setNewWord] = useState("");
-  const [newSev, setNewSev] = useState("high");
-  const [diag, setDiag] = useState<MetaDiagnosis | null>(null);
 
-  // Deliberately separate from `run`: a diagnosis is not a mutation, it should
-  // not refresh the page, and its result is a panel rather than a one-line message.
-  const testConnection = async () => {
-    setBusy("diagnose"); setMsg(null); setDiag(null);
-    const res = await diagnoseMeta();
+  const run: Run = async (tag, fn) => {
+    setBusy(tag);
+    let res: ActionResult;
+    try {
+      res = await fn();
+    } catch {
+      res = { error: "Something went wrong. Please try again." };
+    }
     setBusy(null);
-    if ("error" in res) { setMsg(res.error); return; }
-    setDiag(res.diagnosis);
-  };
-
-  const run = async (tag: string, fn: () => Promise<{ error?: string; ok?: boolean; stored?: number; scanned?: number } | undefined>) => {
-    setBusy(tag); setMsg(null);
-    const res = await fn();
-    setBusy(null);
-    if (res?.error) { setMsg(res.error); return; }
-    if (typeof res?.stored === "number") setMsg(`Scanned ${res.scanned}, captured ${res.stored} new signal(s).`);
+    if (res?.error) {
+      toast.error(res.error);
+    } else {
+      if (typeof res?.added === "number") toast.success(res.added ? `Added ${res.added} word${res.added === 1 ? "" : "s"}.` : "Those words are already on your list.");
+      else if (typeof res?.stored === "number") toast.success(res.scanned ? `Looked at ${res.scanned} post${res.scanned === 1 ? "" : "s"}: ${res.stored} new in your inbox${res.existing ? `, ${res.existing} already there` : ""}.` : "Scan finished. Nothing new to look at.");
+      if (res?.problems?.length) toast.error(res.problems.slice(0, 2).join(" · "));
+    }
     router.refresh();
+    return res;
   };
 
-  const counts = STATUS_TABS.reduce((a, s) => ({ ...a, [s]: results.filter((r) => r.status === s).length }), {} as Record<string, number>);
-  const shown = results.filter((r) => r.status === tab);
+  const freshCount = inbox.counts.new ?? 0;
+  const freshReal = inbox.likelyNew;
+  const watching = sources.filter((s) => s.active).length;
+  const lastScan = sources.map((s) => s.last_scanned_at).filter(Boolean).sort().pop() ?? null;
+
+  const tabs: { id: Tab; label: string; count?: number }[] = [
+    { id: "inbox", label: "Inbox", count: freshCount },
+    { id: "watching", label: "Listening to", count: watching },
+    { id: "keywords", label: "Words" },
+    { id: "check", label: "Check a post" },
+  ];
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6">
-      {/* Header */}
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-black text-ink flex items-center gap-2"><RadioTower className="w-6 h-6 text-purple" /> Online Listening</h1>
-          <p className="text-sm text-muted mt-1">Watches your connected Meta assets for abuse keywords and flags them for review.</p>
+    <div className="space-y-6">
+      <header className="flex flex-wrap items-end justify-between gap-4">
+        <div className="min-w-0">
+          <p className="eyebrow mb-1.5">Early warning</p>
+          <h1 className="flex items-center gap-2.5 font-display text-3xl font-bold tracking-tight text-ink">
+            <RadioTower className="h-7 w-7 text-purple" /> Online listening
+          </h1>
+          <p className="mt-1.5 text-sm text-muted">
+            {freshReal > 0
+              ? <><span className="font-semibold text-rose-600">{freshReal} likely real case{freshReal === 1 ? "" : "s"}</span> waiting for the team. </>
+              : freshCount > 0 ? `${freshCount.toLocaleString()} new capture${freshCount === 1 ? "" : "s"} to look at. ` : "Nothing waiting. "}
+            Shared by every admin and scanned every day
+            {lastScan && <>, last at {new Date(lastScan).toLocaleString("en-KE", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</>}.
+          </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-        <button onClick={testConnection} disabled={busy !== null}
-          title="Ask Meta directly whether this Page can be read"
-          className="inline-flex items-center gap-2 rounded-lg border border-line bg-white text-ink px-4 h-10 text-sm font-bold hover:bg-paper disabled:opacity-50">
-          {busy === "diagnose" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Stethoscope className="w-4 h-4" />} Test connection
+        <button
+          onClick={() => run("all", scanAllNow)}
+          disabled={busy !== null}
+          className="inline-flex h-10 items-center gap-2 rounded-xl bg-purple px-5 text-sm font-semibold text-white transition-colors hover:bg-purple-600 disabled:opacity-50"
+        >
+          {busy === "all" ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />} Scan now
         </button>
-        <button onClick={() => run("poll", pollMeta)} disabled={busy !== null || !connected}
-          title={connected ? "Scan recent posts now" : "Connect Meta to enable syncing"}
-          className="inline-flex items-center gap-2 rounded-lg bg-purple text-white px-4 h-10 text-sm font-bold hover:bg-purple/90 disabled:opacity-50 disabled:cursor-not-allowed">
-          {busy === "poll" ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />} Sync now
-        </button>
-        </div>
+      </header>
+
+      <div role="tablist" aria-label="Online listening" className="flex gap-6 overflow-x-auto border-b border-line">
+        {tabs.map((t) => (
+          <button
+            key={t.id}
+            role="tab"
+            aria-selected={tab === t.id}
+            onClick={() => setTab(t.id)}
+            className={cn(
+              "-mb-px shrink-0 border-b-2 pb-3 text-sm font-semibold transition-colors",
+              tab === t.id ? "border-purple text-ink" : "border-transparent text-muted hover:text-ink",
+            )}
+          >
+            {t.label}
+            {t.count ? <span className={cn("ml-1.5 rounded-full px-1.5 text-[11px] font-bold", tab === t.id ? "bg-purple-050 text-purple-700" : "bg-paper text-muted")}>{t.count}</span> : null}
+          </button>
+        ))}
       </div>
 
-      {/* Diagnosis: what Meta actually said, check by check. */}
-      {diag && (
-        <div className={`rounded-xl border p-4 ${diag.canPull ? "border-emerald-200 bg-emerald-50" : "border-amber-200 bg-amber-50"}`}>
-          <div className="flex items-start gap-3">
-            {diag.canPull
-              ? <Check className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
-              : <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />}
-            <div className="min-w-0 flex-1">
-              <p className={`text-sm font-bold ${diag.canPull ? "text-emerald-800" : "text-amber-900"}`}>{diag.summary}</p>
-              <p className="text-xs text-muted mt-1">Checked against Meta just now.</p>
-              <ul className="mt-3 space-y-1.5">
-                {diag.checks.map((c) => (
-                  <li key={c.name} className="flex items-start gap-2 text-sm">
-                    {c.ok
-                      ? <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                      : <X className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />}
-                    <span className="min-w-0 break-words"><span className="font-semibold text-ink">{c.name}</span> <span className="text-muted">— {c.detail}</span></span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <button onClick={() => setDiag(null)} className="text-muted hover:text-ink shrink-0" aria-label="Dismiss"><X className="w-4 h-4" /></button>
-          </div>
-        </div>
-      )}
-
-      {/* Connection status */}
-      {connected && !(diag && !diag.canPull) ? (
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 flex items-start gap-3">
-          <Check className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
-          <p className="text-sm text-emerald-800"><span className="font-bold">Connected to Meta.</span> New comments on your Page are matched in real time via the webhook; use Sync now to backfill recent posts.</p>
-        </div>
-      ) : (
-        <div className="rounded-xl border border-line bg-paper p-5">
-          <div className="flex items-start gap-3">
-            <span className="w-10 h-10 rounded-xl bg-purple/10 text-purple grid place-items-center shrink-0"><Plug className="w-5 h-5" /></span>
-            <div className="min-w-0">
-              <h3 className="font-bold text-ink">Connect Meta to activate listening</h3>
-              <p className="text-sm text-muted mt-0.5">Everything is wired up and waiting on your Meta credentials. You can add and fine-tune the watch keywords below right now; captured signals will appear here the moment it is connected.</p>
-              <ol className="mt-3 space-y-1.5 text-sm text-muted list-decimal pl-5">
-                <li>Add <code>META_PAGE_ID</code>, <code>META_PAGE_ACCESS_TOKEN</code>, <code>META_APP_SECRET</code> and <code>META_VERIFY_TOKEN</code> to the environment. An App ID and App Secret alone are not enough — the token must be a <span className="font-semibold">Page</span> access token.</li>
-                <li>In the Meta App dashboard, point the Page webhook at <code>/api/meta/webhook</code> and subscribe to &quot;feed&quot;.</li>
-                <li>Come back here, press <span className="font-semibold">Test connection</span> to confirm Meta accepts it, then <span className="font-semibold">Sync now</span> to pull in recent posts.</li>
-              </ol>
-            </div>
-          </div>
-        </div>
-      )}
-      {msg && !diag && <p className="text-sm font-semibold text-purple">{msg}</p>}
-
-      {/* Keyword manager */}
-      <section className="rounded-xl border border-line bg-surface p-5">
-        <h2 className="font-bold text-ink flex items-center gap-2"><Search className="w-4 h-4 text-purple" /> Watch keywords</h2>
-        <p className="text-xs text-muted mt-1">Comments and posts containing these words are captured. High-severity words are surfaced first.</p>
-        <div className="mt-4 flex flex-wrap gap-2">
-          {keywords.map((k) => (
-            <span key={k.id} className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold ${k.active ? SEV[k.severity] ?? SEV.low : "bg-paper text-muted border-line line-through opacity-60"}`}>
-              <button onClick={() => run(`t-${k.id}`, () => toggleKeyword(k.id, !k.active))} title={k.active ? "Mute" : "Activate"} className="hover:opacity-70">
-                {k.active ? <Circle className="w-2.5 h-2.5 fill-current" /> : <EyeOff className="w-3 h-3" />}
-              </button>
-              {k.word}
-              <button onClick={() => run(`d-${k.id}`, () => removeKeyword(k.id))} title="Remove" className="hover:opacity-70">
-                {busy === `d-${k.id}` ? <Loader2 className="w-3 h-3 animate-spin" /> : <X className="w-3 h-3" />}
-              </button>
-            </span>
-          ))}
-          {keywords.length === 0 && <p className="text-sm text-muted">No keywords yet. Add some below.</p>}
-        </div>
-        <div className="mt-4 flex flex-wrap items-center gap-2">
-          <input value={newWord} onChange={(e) => setNewWord(e.target.value)} placeholder="Add a keyword"
-            onKeyDown={(e) => { if (e.key === "Enter" && newWord.trim()) run("add", async () => { const r = await addKeyword(newWord, newSev); if (!r?.error) setNewWord(""); return r; }); }}
-            className="rounded-lg border border-line bg-surface px-3 h-9 text-sm focus:outline-none focus:ring-2 focus:ring-purple/30" />
-          <select value={newSev} onChange={(e) => setNewSev(e.target.value)} className="rounded-lg border border-line bg-surface px-2 h-9 text-sm">
-            <option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option>
-          </select>
-          <button onClick={() => run("add", async () => { const r = await addKeyword(newWord, newSev); if (!r?.error) setNewWord(""); return r; })} disabled={busy !== null || !newWord.trim()}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 h-9 text-sm font-semibold hover:bg-paper disabled:opacity-50">
-            {busy === "add" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />} Add
-          </button>
-        </div>
-      </section>
-
-      {/* Results */}
-      <section>
-        <div className="flex gap-1 rounded-lg border border-line bg-paper p-1 w-fit mb-4">
-          {STATUS_TABS.map((s) => (
-            <button key={s} onClick={() => setTab(s)}
-              className={`rounded-md px-3 py-1.5 text-sm font-bold capitalize transition-colors ${tab === s ? "bg-surface text-purple shadow-sm" : "text-muted hover:text-ink"}`}>
-              {s} {counts[s] ? <span className="ml-1 text-xs opacity-70">{counts[s]}</span> : null}
-            </button>
-          ))}
-        </div>
-
-        {shown.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-line p-10 text-center text-sm text-muted">
-            <RadioTower className="w-8 h-8 mx-auto text-purple/60" />
-            <p className="mt-3">No {tab} signals. {connected ? "Try Sync now to scan recent posts." : "Connect Meta to start capturing."}</p>
-          </div>
-        ) : (
-          <div className="grid sm:grid-cols-2 gap-3">
-            {shown.map((r) => (
-              <article key={r.id} className="rounded-xl border border-line bg-surface p-4">
-                <div className="flex items-center justify-between gap-2">
-                  <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-bold uppercase ${SEV[r.severity] ?? SEV.low}`}>{r.severity}</span>
-                  <span className="text-xs text-muted capitalize">{r.source} · {new Date(r.captured_at).toLocaleDateString()}</span>
-                </div>
-                <p className="mt-2 text-sm text-ink line-clamp-4">{r.content}</p>
-                <div className="mt-2 flex flex-wrap gap-1">
-                  {r.matched_keywords.map((w) => <span key={w} className="text-[11px] rounded bg-purple/10 text-purple px-1.5 py-0.5 font-semibold">{w}</span>)}
-                </div>
-                <div className="mt-3 flex items-center justify-between gap-2 border-t border-line pt-3">
-                  <div className="flex items-center gap-1.5">
-                    {r.status !== "reviewing" && <StatusBtn label="Review" onClick={() => run(`s-${r.id}`, () => setResultStatus(r.id, "reviewing"))} busy={busy === `s-${r.id}`} />}
-                    {r.status !== "actioned" && <StatusBtn label="Actioned" onClick={() => run(`s-${r.id}`, () => setResultStatus(r.id, "actioned"))} busy={busy === `s-${r.id}`} />}
-                    {r.status !== "dismissed" && <StatusBtn label="Dismiss" onClick={() => run(`s-${r.id}`, () => setResultStatus(r.id, "dismissed"))} busy={busy === `s-${r.id}`} />}
-                  </div>
-                  {r.author && <span className="text-xs text-muted truncate max-w-[8rem]">{r.author}</span>}
-                  {r.permalink && <a href={r.permalink} target="_blank" rel="noopener noreferrer" className="text-purple shrink-0" title="Open on Meta"><ExternalLink className="w-4 h-4" /></a>}
-                </div>
-              </article>
-            ))}
-          </div>
-        )}
-      </section>
+      {tab === "inbox" && <Inbox data={inbox} run={run} busy={busy} />}
+      {tab === "watching" && <WatchingPanel sources={sources} packs={packs} run={run} busy={busy} />}
+      {tab === "keywords" && <KeywordsPanel keywords={keywords} run={run} busy={busy} />}
+      {tab === "check" && <CheckPanel run={run} busy={busy} />}
     </div>
-  );
-}
-
-function StatusBtn({ label, onClick, busy }: { label: string; onClick: () => void; busy: boolean }) {
-  return (
-    <button onClick={onClick} disabled={busy} className="rounded-md border border-line px-2 py-1 text-[11px] font-semibold text-ink hover:bg-paper disabled:opacity-50">
-      {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : label}
-    </button>
   );
 }

@@ -35,6 +35,10 @@ export interface NavItem {
    * becoming an eighteen-item wall.
    */
   section?: string;
+  /** Which console this belongs to. The sidebar shows one area at a time, with a switch between them. */
+  area?: string;
+  /** Rarely used pages: listed under "More" so they do not crowd the everyday ones. */
+  secondary?: boolean;
   /** Show in the mobile bottom bar. At most four are used, in order. */
   primary?: boolean;
   /**

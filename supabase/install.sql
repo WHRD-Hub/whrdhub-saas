@@ -1030,7 +1030,9 @@ alter table public.listening_results
 
 create index if not exists listening_results_captured_idx on public.listening_results (captured_at DESC);
 
-create unique index if not exists listening_results_source_uidx on public.listening_results (source, source_id) WHERE (source_id IS NOT NULL);
+-- A plain unique index (not a partial one) so it can be the target of an upsert; NULL source ids are never equal, so nothing changes for them.
+drop index if exists listening_results_source_uidx;
+create unique index if not exists listening_results_source_uidx on public.listening_results (source, source_id);
 
 create index if not exists listening_results_status_idx on public.listening_results (status);
 
@@ -1065,6 +1067,33 @@ create index if not exists profiles_banned_idx
 -- ╔════════════════════════════════════════════════════════════════════════╗
 -- ║  4. Functions                                                           ║
 -- ╚════════════════════════════════════════════════════════════════════════╝
+
+-- ── Clear out older versions of the functions below ───────────────────────
+--
+-- `create or replace function` cannot change a function's return type, so a
+-- project that still has an older version of one of these stops at the first
+-- mismatch with "cannot change return type of existing function". Each
+-- function this script defines is therefore dropped first. One that a policy,
+-- trigger or other object still depends on cannot be dropped without breaking
+-- that object, so it is left alone and replaced in place, which works whenever
+-- its signature is unchanged (and it is, for all of those).
+do $$
+declare r record;
+begin
+  for r in
+    select p.oid::regprocedure as sig
+      from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public'
+       and p.prokind = 'f'
+       and p.proname = any (array['ban_account', 'blogs_before_write', 'can_administer_reports', 'can_post_to_feed', 'can_triage_reports', 'delete_account', 'delete_own_content', 'fill_report_notification_copy', 'get_my_user_type', 'get_report_stats', 'get_user_report_count', 'guard_profile_privileges', 'handle_new_user', 'handle_report_matching', 'handle_report_verified', 'handle_service_assigned_notify', 'handle_updated_at', 'hub_member_growth', 'hub_overview', 'hub_submissions_timeseries', 'is_banned', 'is_hub_admin', 'is_org_admin', 'match_report_services', 'matching_overview', 'membership_before_write', 'my_admin_org_ids', 'my_org_ids', 'my_sessions', 'notify_match_progress', 'posts_before_write', 'resources_before_write', 'respond_to_match', 'restore_account', 'restore_content', 'revoke_other_sessions', 'revoke_session', 'slugify', 'stamp_soft_delete', 'suspend_member', 'sync_notification_read_flags', 'unban_account', 'unsuspend_member'])
+  loop
+    begin
+      execute format('drop function if exists %s', r.sig);
+    exception when others then
+      null;
+    end;
+  end loop;
+end $$;
 
 -- ── Roles ────────────────────────────────────────────────────────────────
 --
@@ -2878,22 +2907,9 @@ where not exists (select 1 from public.resources r where r.slug = v.slug);
 -- ║  5. Online-listening sample signals                                     ║
 -- ╚════════════════════════════════════════════════════════════════════════╝
 
-insert into public.listening_results (source, source_id, permalink, author, content, matched_keywords, severity, status)
-select v.source, v.source_id, v.permalink, v.author, v.content, v.kw, v.severity, 'new'
-from (values
-  ('facebook', 'demo-1', 'https://facebook.com/', 'Public page comment',
-   'Threatening language directed at a named defender following a county assembly hearing.',
-   array['threat'], 'medium'),
-  ('facebook', 'demo-2', 'https://facebook.com/', 'Public page comment',
-   'Coordinated harassment thread naming several women organisers.',
-   array['harassment'], 'high')
-) as v(source, source_id, permalink, author, content, kw, severity)
--- The unique index on (source, source_id) is partial, so ON CONFLICT cannot
--- target it without restating the predicate. A guard is clearer.
-where not exists (
-  select 1 from public.listening_results lr
-   where lr.source = v.source and lr.source_id = v.source_id
-);
+-- No sample posts are seeded any more: listening shows only what was really captured.
+-- This clears the two that earlier versions of this script inserted.
+delete from public.listening_results where source_id in ('demo-1', 'demo-2');
 
 -- ── Referral states, so the matching console shows a real spread ────────────
 --
@@ -2971,3 +2987,340 @@ begin
      where report_id = r_ussd;
   end if;
 end $$;
+
+-- Reporting updates (016)
+-- Reporting updates: risks, free-text support details, country, service scope.
+-- Idempotent. Also appended to install.sql, so run whichever you prefer once.
+
+alter table public.reports
+  add column if not exists risks text[] DEFAULT '{}'::text[],
+  add column if not exists support_other text,
+  add column if not exists country text;
+
+alter table public.services
+  add column if not exists country text;
+
+-- Backfill the country for reports already filed (every earlier report came
+-- from a Kenyan county or was typed by hand).
+update public.reports
+   set country = 'Kenya'
+ where country is null and county is not null
+   and county not in ('Uganda','Tanzania','DRC','Guinea');
+update public.reports
+   set country = county
+ where country is null and county in ('Uganda','Tanzania','DRC','Guinea');
+
+-- Matching: a service can be offered in one county, across a whole country, or
+-- everywhere. Local beats country-wide beats everywhere.
+create or replace function public.match_report_services(target uuid)
+returns integer language plpgsql security definer set search_path = public as $$
+declare
+  r public.reports%rowtype;
+  n integer := 0;
+begin
+  select * into r from public.reports where id = target;
+  if not found or r.deleted_at is not null then return 0; end if;
+  if coalesce(array_length(r.support_needed, 1), 0) = 0 then return 0; end if;
+
+  with matched as (
+    select s.id,
+           (case
+              when r.county is not null and s.county = r.county then 80
+              when s.county is null and s.country is not null and s.country = r.country then 70
+              when s.county is null and s.country is null then 60
+              else 35
+            end
+            + case r.urgency::text when 'immediate' then 15 when 'within_week' then 5 else 0 end
+           ) as score,
+           case
+             when r.county is not null and s.county = r.county
+               then 'Matched: ' || s.category::text || ' support in ' || r.county
+             when s.county is null and s.country is not null and s.country = r.country
+               then 'Matched: ' || s.category::text || ' support across ' || r.country
+             when s.county is null and s.country is null
+               then 'Matched: national ' || s.category::text || ' support'
+             else 'Matched: nearest available ' || s.category::text || ' support'
+           end as note
+    from public.services s
+    where s.is_active
+      and s.category::text = any(r.support_needed)
+      and (
+        (r.county is not null and s.county = r.county)
+        or (s.county is null and (s.country is null or r.country is null or s.country = r.country))
+        or not exists (
+          select 1 from public.services s2
+           where s2.is_active and s2.category = s.category
+             and (s2.county = r.county
+                  or (s2.county is null and (s2.country is null or s2.country = r.country)))
+        )
+      )
+  )
+  insert into public.report_services (report_id, service_id, assigned_by, note, match_status, match_score)
+  select r.id, m.id, r.verified_by, m.note, 'proposed', m.score from matched m
+  on conflict (report_id, service_id) do nothing;
+
+  get diagnostics n = row_count;
+  return n;
+end $$;
+
+-- All 47 counties as networks (eight are live; the rest are selectable when
+-- someone registers).
+insert into public.county_networks (name, slug, is_active) values
+  ('Baringo','baringo',false),('Bomet','bomet',true),('Bungoma','bungoma',false),('Busia','busia',false),
+  ('Elgeyo Marakwet','elgeyo-marakwet',false),('Embu','embu',false),('Garissa','garissa',false),
+  ('Homa Bay','homa-bay',false),('Isiolo','isiolo',false),('Kajiado','kajiado',false),
+  ('Kakamega','kakamega',false),('Kericho','kericho',false),('Kiambu','kiambu',false),
+  ('Kilifi','kilifi',false),('Kirinyaga','kirinyaga',false),('Kisii','kisii',false),
+  ('Kisumu','kisumu',true),('Kitui','kitui',true),('Kwale','kwale',false),('Laikipia','laikipia',false),
+  ('Lamu','lamu',false),('Machakos','machakos',false),('Makueni','makueni',false),
+  ('Mandera','mandera',false),('Marsabit','marsabit',true),('Meru','meru',true),
+  ('Migori','migori',false),('Mombasa','mombasa',true),('Murang''a','muranga',false),
+  ('Nairobi','nairobi',true),('Nakuru','nakuru',true),('Nandi','nandi',false),('Narok','narok',false),
+  ('Nyamira','nyamira',false),('Nyandarua','nyandarua',false),('Nyeri','nyeri',false),
+  ('Samburu','samburu',false),('Siaya','siaya',false),('Taita Taveta','taita-taveta',false),
+  ('Tana River','tana-river',false),('Tharaka Nithi','tharaka-nithi',false),
+  ('Trans Nzoia','trans-nzoia',false),('Turkana','turkana',false),('Uasin Gishu','uasin-gishu',false),
+  ('Vihiga','vihiga',false),('Wajir','wajir',false),('West Pokot','west-pokot',false)
+on conflict (slug) do nothing;
+
+-- Alerts, voice notes and AI triage (017)
+-- Urgent-case alerts, voice notes and AI triage of online listening.
+-- Idempotent. Run once in the Supabase SQL editor (also safe to re-run).
+
+-- ── Web push subscriptions (one row per device) ───────────────────────────
+create table if not exists public.push_subscriptions (
+  id uuid DEFAULT gen_random_uuid() NOT NULL,
+  user_id uuid NOT NULL,
+  endpoint text NOT NULL,
+  p256dh text NOT NULL,
+  auth text NOT NULL,
+  user_agent text,
+  created_at timestamp with time zone DEFAULT now(),
+  primary key (id),
+  unique (endpoint)
+);
+
+do $$ begin
+  alter table public.push_subscriptions add constraint push_subscriptions_user_id_fkey
+    foreign key (user_id) references auth.users(id) ON DELETE CASCADE;
+exception when duplicate_object then null; when others then null; end $$;
+
+create index if not exists push_subscriptions_user_idx on public.push_subscriptions (user_id);
+
+alter table public.push_subscriptions enable row level security;
+drop policy if exists push_subs_own on public.push_subscriptions;
+create policy push_subs_own on public.push_subscriptions for all
+  using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+-- ── Alert tracking on reports ─────────────────────────────────────────────
+alter table public.reports
+  add column if not exists alert_severity text,
+  add column if not exists escalation_level integer DEFAULT 0,
+  add column if not exists escalated_at timestamp with time zone,
+  add column if not exists acknowledged_at timestamp with time zone,
+  add column if not exists acknowledged_by uuid,
+  add column if not exists voice_note_paths text[];
+
+do $$ begin
+  alter table public.reports add constraint reports_acknowledged_by_fkey
+    foreign key (acknowledged_by) references auth.users(id) ON DELETE SET NULL;
+exception when duplicate_object then null; when others then null; end $$;
+
+-- The cron job looks for critical, unacknowledged reports.
+create index if not exists reports_unacked_critical_idx
+  on public.reports (created_at)
+  where alert_severity = 'critical' and acknowledged_at is null;
+
+-- ── AI triage of online listening ─────────────────────────────────────────
+alter table public.listening_results
+  add column if not exists ai_class text,
+  add column if not exists ai_confidence real;
+
+-- ── "Referral" is not a service category people offer ─────────────────────
+update public.services set category = 'other' where category::text = 'referral';
+
+-- Account kinds, profile guard, listening sources, USSD follow-up (018)
+-- Account kinds, the profile privilege guard, watched listening sources and USSD follow-up.
+-- Idempotent. Run once in the Supabase SQL editor (also safe to re-run).
+
+-- ── 1. Three ways to join ─────────────────────────────────────────────────
+--   anonymous  a generated username and password, no email
+--   reporter   an email account that only reports
+--   member     an email account that joins a chapter (goes through onboarding)
+alter table public.profiles
+  add column if not exists account_kind text;
+
+do $$ begin
+  alter table public.profiles add constraint profiles_account_kind_check
+    check (account_kind is null or account_kind in ('anonymous','reporter','member'));
+exception when duplicate_object then null; when others then null; end $$;
+
+-- Existing rows: infer the kind from what they already are.
+update public.profiles set account_kind = 'anonymous'
+ where account_kind is null and is_anonymous is true;
+update public.profiles set account_kind = 'member'
+ where account_kind is null and (hub_onboarded is true or user_type::text = 'defender');
+update public.profiles set account_kind = 'reporter'
+ where account_kind is null and user_type::text = 'reporter';
+
+-- ── 2. New accounts can no longer choose their own role ───────────────────
+-- Sign-up metadata comes from the browser, so it must never decide
+-- user_type. Staff roles are granted by an administrator only.
+create or replace function public.handle_new_user()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare
+  anon boolean := coalesce((new.raw_user_meta_data->>'is_anonymous')::boolean, false);
+  asked text := new.raw_user_meta_data->>'account_kind';
+begin
+  insert into public.profiles (id, email, username, is_anonymous, user_type, account_kind)
+  values (
+    new.id,
+    new.email,
+    coalesce(new.raw_user_meta_data->>'username', split_part(coalesce(new.email,''), '@', 1)),
+    anon,
+    'reporter',
+    case
+      when anon then 'anonymous'
+      when asked in ('reporter','member') then asked
+      else 'member'
+    end
+  )
+  on conflict (id) do nothing;
+  return new;
+end $$;
+
+-- ── 3. Nobody can promote themselves ──────────────────────────────────────
+-- profiles_own lets people update their own row, which included is_hub_admin
+-- and user_type. This trigger stops anyone but an administrator (or the
+-- service role, where auth.uid() is null) changing the privileged columns.
+create or replace function public.guard_profile_privileges()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  if auth.uid() is null or public.is_hub_admin() then
+    return NEW;
+  end if;
+
+  if TG_OP = 'INSERT' then
+    NEW.is_hub_admin := false;
+    NEW.user_type := 'reporter';
+    NEW.banned_at := null;
+    NEW.ban_reason := null;
+    return NEW;
+  end if;
+
+  if NEW.is_hub_admin is distinct from OLD.is_hub_admin
+     or NEW.user_type is distinct from OLD.user_type
+     or NEW.banned_at is distinct from OLD.banned_at
+     or NEW.ban_reason is distinct from OLD.ban_reason then
+    raise exception 'Only an administrator can change roles or suspensions'
+      using errcode = '42501';
+  end if;
+  return NEW;
+end $$;
+
+drop trigger if exists trg_profiles_guard on public.profiles;
+create trigger trg_profiles_guard before insert or update on public.profiles
+  for each row execute function public.guard_profile_privileges();
+
+-- Audit: who can open the reporting console right now? Run this and remove
+-- anyone who should not be there (set user_type back to 'reporter').
+--   select id, email, username, user_type, is_hub_admin, created_at
+--     from public.profiles
+--    where is_hub_admin or user_type::text in ('admin','defender')
+--    order by created_at;
+
+-- ── 4. Watched accounts and hashtags for online listening ─────────────────
+create table if not exists public.listening_sources (
+  id uuid DEFAULT gen_random_uuid() NOT NULL,
+  platform text DEFAULT 'instagram' NOT NULL,
+  kind text DEFAULT 'profile' NOT NULL,        -- profile | hashtag
+  handle text NOT NULL,                        -- without @ or #
+  note text,
+  active boolean DEFAULT true NOT NULL,
+  last_scanned_at timestamp with time zone,
+  last_result text,
+  created_at timestamp with time zone DEFAULT now() NOT NULL,
+  primary key (id)
+);
+
+create unique index if not exists listening_sources_uidx
+  on public.listening_sources (platform, kind, lower(handle));
+
+alter table public.listening_sources enable row level security;
+drop policy if exists listening_src on public.listening_sources;
+create policy listening_src on public.listening_sources for all
+  using (public.can_administer_reports()) with check (public.can_administer_reports());
+
+-- ── 5. USSD: check a report later with a PIN ──────────────────────────────
+alter table public.reports
+  add column if not exists ussd_pin_hash text,
+  add column if not exists ussd_pin_attempts integer DEFAULT 0;
+
+-- Listening: who handled each capture (019)
+-- Online listening is a shared inbox: every admin sees every capture. Record who
+-- took on or closed each one, so two people do not work the same capture.
+-- Idempotent. Run once in the Supabase SQL editor (also safe to re-run).
+
+alter table public.listening_results
+  add column if not exists handled_by uuid,
+  add column if not exists handled_at timestamp with time zone;
+
+do $$ begin
+  alter table public.listening_results add constraint listening_results_handled_by_fkey
+    foreign key (handled_by) references auth.users(id) ON DELETE SET NULL;
+exception when duplicate_object then null; when others then null; end $$;
+
+-- Listening packs (020)
+-- Preset listening packs (Usikimye and Political), and accounts whose posts are indexed automatically.
+-- Idempotent. Run once in the Supabase SQL editor (also safe to re-run).
+
+alter table public.listening_sources
+  add column if not exists index_all boolean DEFAULT false,
+  add column if not exists pack text;
+
+alter table public.listening_keywords
+  add column if not exists pack text;
+
+-- Which packs are switched on. The app adds each pack's accounts and words the
+-- first time it sees the pack, so a new deployment starts with both enabled.
+create table if not exists public.listening_packs (
+  id text NOT NULL,
+  enabled boolean DEFAULT true NOT NULL,
+  version integer DEFAULT 0 NOT NULL,
+  applied_at timestamp with time zone,
+  primary key (id)
+);
+
+alter table public.listening_packs enable row level security;
+drop policy if exists listening_packs_admin on public.listening_packs;
+create policy listening_packs_admin on public.listening_packs for all
+  using (public.can_administer_reports()) with check (public.can_administer_reports());
+
+insert into public.listening_packs (id, enabled) values ('usikimye', true), ('political', true)
+on conflict (id) do nothing;
+
+-- Captures were never being saved: the unique index on (source, source_id) was a partial one, and Postgres
+-- cannot use a partial index as the target of an upsert. A plain unique index is equivalent (NULL source ids
+-- are never equal to each other) and works.
+drop index if exists public.listening_results_source_uidx;
+create unique index if not exists listening_results_source_uidx on public.listening_results (source, source_id);
+
+-- Capture to case links (021)
+-- Taking on an online-listening capture turns it into a normal case. Link the two
+-- ways, so the case can show the original post and the capture can open the case.
+-- Idempotent. Run once in the Supabase SQL editor (also safe to re-run).
+
+alter table public.listening_results add column if not exists report_id uuid;
+alter table public.reports add column if not exists source_capture_id uuid;
+
+do $$ begin
+  alter table public.listening_results add constraint listening_results_report_id_fkey
+    foreign key (report_id) references public.reports(id) ON DELETE SET NULL;
+exception when duplicate_object then null; when others then null; end $$;
+
+do $$ begin
+  alter table public.reports add constraint reports_source_capture_id_fkey
+    foreign key (source_capture_id) references public.listening_results(id) ON DELETE SET NULL;
+exception when duplicate_object then null; when others then null; end $$;
+
+create index if not exists reports_source_capture_idx on public.reports (source_capture_id) where source_capture_id is not null;

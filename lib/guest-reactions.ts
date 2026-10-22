@@ -19,12 +19,25 @@ export function getGuestLikes(): string[] {
   }
 }
 
+const CHANGED = "whrd-guest-likes-changed";
+
+/** For useSyncExternalStore: re-read whenever a guest like is added or removed. */
+export function subscribeGuestLikes(cb: () => void): () => void {
+  window.addEventListener(CHANGED, cb);
+  window.addEventListener("storage", cb);
+  return () => {
+    window.removeEventListener(CHANGED, cb);
+    window.removeEventListener("storage", cb);
+  };
+}
+
 function save(ids: string[]) {
   try {
     localStorage.setItem(KEY, JSON.stringify(ids));
   } catch {
     /* ignore */
   }
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(CHANGED));
 }
 
 export function isGuestLiked(id: string): boolean {
@@ -58,6 +71,7 @@ export function clearGuestLikes() {
   } catch {
     /* ignore */
   }
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(CHANGED));
 }
 
 /** Why the sign-in prompt appeared, so its copy can say the right thing. */

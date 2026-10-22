@@ -1,40 +1,28 @@
 import { Suspense } from "react";
-import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
-import { Badge } from "@/components/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Pill } from "@/components/ui/pill";
+import { ChevronLeft, ChevronRight, SearchX } from "lucide-react";
+import { createClient } from "@/lib/supabase/server";
+import { ReportRow, type ReportSummary } from "@/components/reporting/report-row";
+import { UrlFilterBar, type FilterDef, type Preset } from "@/components/ui/filter-bar";
 import { summariseReport } from "@/lib/match-state";
 
-const PAGE_SIZE = 15;
+const PAGE_SIZE = 25;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-const URGENCY_BADGE: Record<string, "destructive" | "warning" | "secondary"> = {
-  immediate: "destructive", within_week: "warning", no_rush: "secondary",
-};
-const VERIFICATION_BADGE: Record<string, "info" | "success" | "destructive" | "warning" | "secondary"> = {
-  pending: "info", verified: "success", unverified: "destructive", needs_more_info: "warning",
-};
-const STATUS_BADGE: Record<string, "secondary" | "info" | "success" | "warning" | "destructive"> = {
-  submitted: "secondary", under_review: "info", referred: "success", closed: "secondary", flagged: "destructive",
-};
-const CHANNEL_BADGE: Record<string, "secondary" | "info" | "success" | "warning"> = {
-  web: "secondary", ussd: "warning", api: "info", mobile: "success",
+type Params = {
+  page: number; q?: string; county?: string; urgency?: string; verif?: string; reporter?: string;
+  channel?: string; match?: string; selfOnly?: boolean; currentUserId?: string;
 };
 
-async function ReportsTable({ page, county, urgency, verif, reporter, channel, match, selfOnly, currentUserId }: {
-  page: number; county?: string; urgency?: string; verif?: string; reporter?: string; channel?: string;
-  match?: string; selfOnly?: boolean; currentUserId?: string;
-}) {
+async function ReportsList({ page, q, county, urgency, verif, reporter, channel, match, selfOnly, currentUserId }: Params) {
   const supabase = await createClient();
   const from = (page - 1) * PAGE_SIZE;
 
   // A match filter has to join through report_services, so the embed becomes an
-  // inner join. The referral states shown in the column are then re-fetched
-  // separately below — otherwise the join would only hand back the referrals
-  // that matched the filter and the column would understate the case.
-  const columns = "id, incident_types, status, urgency, verification_status, reporter_type, county, created_at, perpetrator_type, consent_to_followup, channel";
+  // inner join. The referral states shown on each row are then re-fetched
+  // separately below, otherwise the join would only hand back the referrals
+  // that matched the filter and the row would understate the case.
+  const columns = "id, incident_types, status, urgency, verification_status, reporter_type, county, created_at, perpetrator_type, channel";
 
   let query = supabase
     .from("reports")
@@ -52,21 +40,25 @@ async function ReportsTable({ page, county, urgency, verif, reporter, channel, m
   if (selfOnly && currentUserId) query = query.eq("user_id", currentUserId);
   if (match) query = query.eq("report_services.match_status", match);
 
+  // Search: a pasted case ID, or words from what was reported and where.
+  if (q) {
+    if (UUID.test(q)) query = query.eq("id", q);
+    else {
+      // Characters that mean something inside a PostgREST filter are dropped rather than escaped.
+      const safe = q.replace(/[,()%*\\]/g, " ").trim();
+      if (safe) query = query.or(`description.ilike.%${safe}%,county.ilike.%${safe}%,location_description.ilike.%${safe}%,perpetrator_detail.ilike.%${safe}%`);
+    }
+  }
+
   const { data: rawReports, count } = await query;
-  const reports = (rawReports ?? []) as unknown as {
-    id: string; incident_types: string[]; status: string | null; urgency: string | null;
-    verification_status: string | null; reporter_type: string | null; county: string | null;
-    created_at: string | null; perpetrator_type: string | null; channel: string | null;
-  }[];
-  const totalPages = Math.ceil((count ?? 0) / PAGE_SIZE);
+  const reports = (rawReports ?? []) as unknown as ReportSummary[];
+  const total = count ?? 0;
+  const totalPages = Math.ceil(total / PAGE_SIZE);
 
   // Referral states for the rows on this page, in one round trip.
   const states = new Map<string, string[]>();
   if (reports.length) {
-    const { data: refs } = await supabase
-      .from("report_services")
-      .select("report_id, match_status")
-      .in("report_id", reports.map(r => r.id));
+    const { data: refs } = await supabase.from("report_services").select("report_id, match_status").in("report_id", reports.map((r) => r.id));
     for (const r of (refs ?? []) as { report_id: string; match_status: string | null }[]) {
       const list = states.get(r.report_id) ?? [];
       list.push(r.match_status ?? "proposed");
@@ -77,6 +69,7 @@ async function ReportsTable({ page, county, urgency, verif, reporter, channel, m
   const buildUrl = (p: number) => {
     const params = new URLSearchParams();
     params.set("page", String(p));
+    if (q) params.set("q", q);
     if (county) params.set("county", county);
     if (urgency) params.set("urgency", urgency);
     if (verif) params.set("verif", verif);
@@ -88,224 +81,100 @@ async function ReportsTable({ page, county, urgency, verif, reporter, channel, m
   };
 
   return (
-    <div className="space-y-4">
-      <div className="rounded-2xl border border-line bg-surface shadow-[0_1px_2px_rgba(28,21,34,0.04)] overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow className="bg-paper">
-              <TableHead>Date</TableHead>
-              <TableHead>Incident Types</TableHead>
-              <TableHead>County</TableHead>
-              <TableHead>Perpetrator</TableHead>
-              <TableHead>Urgency</TableHead>
-              <TableHead>Fact-Check</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Matching</TableHead>
-              <TableHead>Channel</TableHead>
-              <TableHead>Reporter</TableHead>
-              <TableHead></TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {reports.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={11} className="text-center text-muted py-12">No reports found</TableCell>
-              </TableRow>
-            ) : reports.map(r => (
-              <TableRow key={r.id}>
-                <TableCell className="text-xs text-muted whitespace-nowrap">
-                  {new Date(r.created_at!).toLocaleDateString("en-KE", { day: "numeric", month: "short", year: "numeric" })}
-                </TableCell>
-                <TableCell>
-                  <div className="flex flex-wrap gap-1">
-                    {(r.incident_types as string[]).slice(0, 2).map(t => (
-                      <span key={t} className="text-xs bg-paper px-1.5 py-0.5 rounded text-muted">{t.replace(/_/g, " ")}</span>
-                    ))}
-                    {(r.incident_types as string[]).length > 2 && <span className="text-xs text-muted">+{(r.incident_types as string[]).length - 2}</span>}
-                  </div>
-                </TableCell>
-                <TableCell className="text-sm">{r.county || "-"}</TableCell>
-                <TableCell className="text-xs text-muted">{r.perpetrator_type?.replace(/_/g, " ") || "-"}</TableCell>
-                <TableCell>
-                  <Badge variant={(r.urgency && URGENCY_BADGE[r.urgency]) || "secondary"}>
-                    {r.urgency?.replace(/_/g, " ")}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <Badge variant={(r.verification_status && VERIFICATION_BADGE[r.verification_status]) || "secondary"}>
-                    {r.verification_status?.replace(/_/g, " ")}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <Badge variant={(r.status && STATUS_BADGE[r.status]) || "secondary"}>
-                    {r.status?.replace(/_/g, " ")}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  {(() => {
-                    const m = summariseReport(states.get(r.id) ?? []);
-                    return <Pill tone={m.tone}>{m.label}</Pill>;
-                  })()}
-                </TableCell>
-                <TableCell>
-                  <Badge variant={CHANNEL_BADGE[r.channel ?? "web"] || "secondary"} className="uppercase">
-                    {r.channel ?? "web"}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <Badge variant={r.reporter_type === "anonymous" ? "outline" : "info"}>
-                    {r.reporter_type}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <Link href={`/hub/reporting/reports/${r.id}`}>
-                    <Button variant="ghost" size="sm" className="gap-1">
-                      <ExternalLink className="w-3.5 h-3.5" /> View
-                    </Button>
-                  </Link>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+    <div className="overflow-hidden rounded-2xl border border-line bg-surface shadow-[0_1px_2px_rgba(28,21,34,0.04)]">
+      <div className="flex items-center justify-between gap-3 border-b border-line bg-paper/60 px-4 py-2 text-xs text-muted">
+        <span>
+          {total === 0 ? "No reports" : <>Showing <span className="font-semibold text-ink">{from + 1}–{Math.min(from + PAGE_SIZE, total)}</span> of {total}</>}
+        </span>
+        {totalPages > 1 && (
+          <span className="flex items-center gap-1">
+            {page > 1 ? <Link href={buildUrl(page - 1)} aria-label="Previous page" className="rounded-md p-1 hover:bg-surface hover:text-ink"><ChevronLeft className="h-4 w-4" /></Link> : <span className="p-1 opacity-30"><ChevronLeft className="h-4 w-4" /></span>}
+            <span>Page {page} of {totalPages}</span>
+            {page < totalPages ? <Link href={buildUrl(page + 1)} aria-label="Next page" className="rounded-md p-1 hover:bg-surface hover:text-ink"><ChevronRight className="h-4 w-4" /></Link> : <span className="p-1 opacity-30"><ChevronRight className="h-4 w-4" /></span>}
+          </span>
+        )}
       </div>
 
-      {/* Pagination */}
+      {reports.length === 0 ? (
+        <div className="grid place-items-center px-6 py-16 text-center">
+          <span className="grid h-11 w-11 place-items-center rounded-2xl bg-purple-050 text-purple"><SearchX className="h-5 w-5" /></span>
+          <p className="mt-3 font-semibold text-ink">No reports match</p>
+          <p className="mt-1 text-sm text-muted">Try a different word, or clear a filter.</p>
+        </div>
+      ) : (
+        <ul className="divide-y divide-line">
+          {reports.map((r) => (
+            <li key={r.id}><ReportRow r={r} match={states.has(r.id) ? summariseReport(states.get(r.id) ?? []) : null} /></li>
+          ))}
+        </ul>
+      )}
+
       {totalPages > 1 && (
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-muted">
-            Showing {from + 1}–{Math.min(from + PAGE_SIZE, count ?? 0)} of {count} reports
-          </p>
-          <div className="flex gap-2">
-            {page > 1 && (
-              <Button variant="outline" size="sm" asChild>
-                <Link href={buildUrl(page - 1)}><ChevronLeft className="w-4 h-4 mr-1" />Previous</Link>
-              </Button>
-            )}
-            <span className="text-sm text-muted flex items-center px-2">Page {page} of {totalPages}</span>
-            {page < totalPages && (
-              <Button variant="outline" size="sm" asChild>
-                <Link href={buildUrl(page + 1)}>Next<ChevronRight className="w-4 h-4 ml-1" /></Link>
-              </Button>
-            )}
-          </div>
+        <div className="flex items-center justify-between border-t border-line px-4 py-2.5 text-xs">
+          {page > 1 ? <Link href={buildUrl(page - 1)} className="font-semibold text-purple hover:underline">← Newer</Link> : <span />}
+          {page < totalPages ? <Link href={buildUrl(page + 1)} className="font-semibold text-purple hover:underline">Older →</Link> : <span />}
         </div>
       )}
     </div>
   );
 }
 
+const FILTERS = (counties: string[]): FilterDef[] => [
+  { key: "county", label: "County", options: counties.map((c) => ({ value: c, label: c })) },
+  { key: "urgency", label: "Urgency", options: [{ value: "immediate", label: "Immediate" }, { value: "within_week", label: "Within a week" }, { value: "no_rush", label: "No rush" }] },
+  { key: "verif", label: "Fact-check", options: [{ value: "pending", label: "Pending" }, { value: "verified", label: "Verified" }, { value: "unverified", label: "Could not verify" }, { value: "needs_more_info", label: "Needs more info" }] },
+  { key: "match", label: "Matching", options: [
+    { value: "proposed", label: "Matched, no reply" },
+    { value: "provider_accepted", label: "Service accepted" },
+    { value: "accepted", label: "Both accepted" },
+    { value: "declined", label: "Declined" },
+    { value: "completed", label: "Completed" },
+  ] },
+  { key: "channel", label: "Channel", options: [{ value: "web", label: "Web" }, { value: "ussd", label: "USSD" }, { value: "mobile", label: "Mobile" }, { value: "api", label: "Online listening" }] },
+  { key: "reporter", label: "Reporter", options: [{ value: "anonymous", label: "Anonymous" }, { value: "authenticated", label: "With an account" }] },
+];
+
 async function AdminReportsContent({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   const sp = await searchParams;
-  const page = Math.max(1, parseInt(sp.page || "1"));
-  const county = sp.county;
-  const urgency = sp.urgency;
-  const verif = sp.verif;
-  const reporter = sp.reporter;
-  const channel = sp.channel;
-  const match = sp.match;
+  const page = Math.max(1, parseInt(sp.page || "1") || 1);
+  const q = sp.q?.trim().slice(0, 80) || undefined;
   const selfOnly = sp.self === "1";
 
   const supabase = await createClient();
   const { data: { session } } = await supabase.auth.getSession();
   const currentUserId = session?.user?.id;
 
-  const { data: counties } = await supabase
-    .from("reports")
-    .select("county")
-    .not("county", "is", null)
-    .is("deleted_at", null);
-  const uniqueCounties = [...new Set((counties ?? []).map(r => r.county).filter(Boolean))].sort();
+  const head = () => supabase.from("reports").select("id", { count: "exact", head: true }).is("deleted_at", null);
+  const [{ data: counties }, urgent, pending, needsInfo, mine] = await Promise.all([
+    supabase.from("reports").select("county").not("county", "is", null).is("deleted_at", null),
+    head().eq("urgency", "immediate"),
+    head().eq("verification_status", "pending"),
+    head().eq("verification_status", "needs_more_info"),
+    currentUserId ? head().eq("user_id", currentUserId) : Promise.resolve({ count: 0 }),
+  ]);
+  const uniqueCounties = [...new Set((counties ?? []).map((r) => r.county as string).filter(Boolean))].sort();
+
+  const presets: Preset[] = [
+    { id: "all", label: "All", params: {} },
+    { id: "urgent", label: "Urgent", params: { urgency: "immediate" }, count: urgent.count ?? 0 },
+    { id: "pending", label: "Awaiting fact-check", params: { verif: "pending" }, count: pending.count ?? 0 },
+    { id: "info", label: "Needs more info", params: { verif: "needs_more_info" }, count: needsInfo.count ?? 0 },
+    ...((mine.count ?? 0) > 0 ? [{ id: "mine", label: "My own reports", params: { self: "1" }, count: mine.count ?? 0 } as Preset] : []),
+  ];
 
   return (
-    <div className="p-4 sm:p-8 space-y-6">
-      <div>
-        <h1 className="text-2xl font-black text-ink">All Reports</h1>
-        <p className="text-muted text-sm">Review, filter, and fact-check incoming reports.</p>
-      </div>
+    <div className="space-y-4">
+      <header className="flex flex-wrap items-baseline gap-x-3">
+        <h1 className="font-display text-3xl font-bold tracking-tight text-ink">Reports</h1>
+        <p className="text-sm text-muted">Review, fact-check and respond to what has been reported.</p>
+      </header>
 
-      {/* Filters */}
-      <form method="GET" className="rounded-2xl border border-line bg-surface shadow-[0_1px_2px_rgba(28,21,34,0.04)] p-4 flex flex-wrap gap-3 items-end">
-        <div>
-          <label className="block text-xs font-semibold mb-1 text-muted">County</label>
-          <select name="county" defaultValue={county || ""} className="rounded-lg border border-line px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple">
-            <option value="">All counties</option>
-            {uniqueCounties.map(c => <option key={c} value={c!}>{c}</option>)}
-          </select>
-        </div>
-        <div>
-          <label className="block text-xs font-semibold mb-1 text-muted">Urgency</label>
-          <select name="urgency" defaultValue={urgency || ""} className="rounded-lg border border-line px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple">
-            <option value="">All</option>
-            <option value="immediate">Immediate</option>
-            <option value="within_week">Within Week</option>
-            <option value="no_rush">No Rush</option>
-          </select>
-        </div>
-        <div>
-          <label className="block text-xs font-semibold mb-1 text-muted">Fact-Check Status</label>
-          <select name="verif" defaultValue={verif || ""} className="rounded-lg border border-line px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple">
-            <option value="">All</option>
-            <option value="pending">Pending</option>
-            <option value="verified">Verified</option>
-            <option value="unverified">Unverified</option>
-            <option value="needs_more_info">Needs More Info</option>
-          </select>
-        </div>
-        <div>
-          <label className="block text-xs font-semibold mb-1 text-muted">Reporter Type</label>
-          <select name="reporter" defaultValue={reporter || ""} className="rounded-lg border border-line px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple">
-            <option value="">All</option>
-            <option value="anonymous">Anonymous</option>
-            <option value="authenticated">Authenticated</option>
-          </select>
-        </div>
-        <div>
-          <label className="block text-xs font-semibold mb-1 text-muted">Channel</label>
-          <select name="channel" defaultValue={channel || ""} className="rounded-lg border border-line px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple">
-            <option value="">All channels</option>
-            <option value="web">Web</option>
-            <option value="ussd">USSD</option>
-            <option value="mobile">Mobile</option>
-            <option value="api">API</option>
-          </select>
-        </div>
-        <div>
-          <label className="block text-xs font-semibold mb-1 text-muted">Matching</label>
-          <select name="match" defaultValue={match || ""} className="rounded-lg border border-line px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple">
-            <option value="">Any match state</option>
-            <option value="proposed">Matched — no response yet</option>
-            <option value="provider_accepted">Service accepted — awaiting survivor</option>
-            <option value="accepted">Both accepted</option>
-            <option value="declined">Declined</option>
-            <option value="completed">Completed</option>
-          </select>
-        </div>
-        <div>
-          <label className="block text-xs font-semibold mb-1 text-muted">View</label>
-          <select name="self" defaultValue={selfOnly ? "1" : ""} className="rounded-lg border border-line px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple">
-            <option value="">All reports</option>
-            <option value="1">My self-reports</option>
-          </select>
-        </div>
-        <input type="hidden" name="page" value="1" />
-        <Button type="submit" size="sm">Apply Filters</Button>
-        <Button type="button" variant="ghost" size="sm" asChild>
-          <Link href="/hub/reporting/reports">Clear</Link>
-        </Button>
-      </form>
+      <UrlFilterBar presets={presets} filters={FILTERS(uniqueCounties)} searchPlaceholder="Search what was reported, a place, or a case ID" />
 
-      {selfOnly && (
-        <div className="flex items-center gap-2 text-sm bg-purple/5 border border-purple/20 text-purple px-4 py-2.5 rounded-xl">
-          <span className="font-semibold">Showing your self-reports only.</span>
-          <Link href="/hub/reporting/reports" className="underline text-xs">Show all</Link>
-        </div>
-      )}
-
-      <Suspense fallback={<div className="rounded-2xl border border-line bg-surface shadow-[0_1px_2px_rgba(28,21,34,0.04)] p-12 text-center text-muted animate-pulse">Loading reports...</div>}>
-        <ReportsTable
-          page={page} county={county} urgency={urgency} verif={verif} reporter={reporter} channel={channel}
-          match={match} selfOnly={selfOnly} currentUserId={currentUserId}
+      <Suspense fallback={<div className="animate-pulse rounded-2xl border border-line bg-surface p-16 text-center text-sm text-muted">Loading reports…</div>}>
+        <ReportsList
+          page={page} q={q} county={sp.county} urgency={sp.urgency} verif={sp.verif} reporter={sp.reporter}
+          channel={sp.channel} match={sp.match} selfOnly={selfOnly} currentUserId={currentUserId}
         />
       </Suspense>
     </div>
@@ -314,7 +183,7 @@ async function AdminReportsContent({ searchParams }: { searchParams: Promise<Rec
 
 export default function AdminReportsPage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   return (
-    <Suspense fallback={<div className="p-8 text-center text-muted">Loading...</div>}>
+    <Suspense fallback={<div className="p-8 text-center text-muted">Loading…</div>}>
       <AdminReportsContent searchParams={searchParams} />
     </Suspense>
   );

@@ -19,8 +19,10 @@ export function Composer({ isHub = false, onDone }: { isHub?: boolean; onDone?: 
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
 
-  // post
-  const [body, setBody] = useState("");
+  // post: written as three short sections rather than one block
+  const [achievement, setAchievement] = useState("");
+  const [gaps, setGaps] = useState("");
+  const [nextSteps, setNextSteps] = useState("");
   const [media, setMedia] = useState<MediaItem[]>([]);
   const [youtube, setYoutube] = useState("");
   const [pin, setPin] = useState(false);
@@ -33,8 +35,19 @@ export function Composer({ isHub = false, onDone }: { isHub?: boolean; onDone?: 
   const [doneKind, setDoneKind] = useState<"published" | "review" | "draft" | "queued">("review");
   const online = useOnline();
 
+  // Stored as plain text with a heading per section, so it reads the same everywhere a post is shown.
+  const sections: [string, string][] = [
+    ["Achievement", achievement],
+    ["Gaps", gaps],
+    ["Next steps", nextSteps],
+  ];
+  const body = sections
+    .filter(([, text]) => text.trim())
+    .map(([title, text]) => `${title}\n${text.trim()}`)
+    .join("\n\n");
+
   const clear = () => {
-    setBody(""); setMedia([]); setYoutube(""); setPin(false);
+    setAchievement(""); setGaps(""); setNextSteps(""); setMedia([]); setYoutube(""); setPin(false);
     setTitle(""); setExcerpt(""); setBlogBody(""); setCover([]);
   };
 
@@ -108,9 +121,17 @@ export function Composer({ isHub = false, onDone }: { isHub?: boolean; onDone?: 
         </div>
       ) : tab === "post" ? (
         <div className="space-y-3">
-          <textarea rows={4} value={body} onChange={(e) => setBody(e.target.value)}
-            placeholder="Share an update from your work or community..."
-            className="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-[15px] text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-purple/30 resize-y" />
+          {([
+            ["Achievement", "What was achieved? A win, a milestone, something that went well.", achievement, setAchievement],
+            ["Gaps", "What is still missing or getting in the way?", gaps, setGaps],
+            ["Next steps", "What happens next, and who is needed?", nextSteps, setNextSteps],
+          ] as const).map(([label, hint, value, setValue]) => (
+            <div key={label}>
+              <Label>{label}</Label>
+              <textarea rows={3} value={value} onChange={(e) => setValue(e.target.value)} placeholder={hint}
+                className="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-[15px] text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-purple/30 resize-y" />
+            </div>
+          ))}
           {online ? (
             <MediaUploader value={media} onChange={setMedia} />
           ) : (

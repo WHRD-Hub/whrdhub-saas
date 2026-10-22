@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Eye, EyeOff, Shield, AlertCircle, Link as LinkIcon,
   Check, MapPin, Upload, X, Loader2, Image as ImageIcon, ChevronDown,
@@ -17,6 +17,14 @@ import { CopyButton } from "@/components/reporting/copy-button";
 import { toast } from "@/components/ui/toast";
 import { useLanguage, useT } from "@/lib/i18n/context";
 import { translations } from "@/lib/i18n/translations";
+import { INCIDENT_TYPES, ONLINE_INCIDENT_TYPES, SUPPORT_TYPES, KENYA_COUNTIES, OTHER_COUNTRIES, countryOf } from "@/lib/reporting-options";
+import { URGENCY_META } from "@/lib/urgency";
+import { VoiceInput } from "@/components/reporting/voice-input";
+import { useOnline } from "@/lib/use-online";
+import { uploadReportVoiceNote } from "@/lib/supabase/storage";
+import { attachVoiceNote, attachScreenshots } from "@/app/actions/report-update";
+import { previewSharedPost } from "@/app/actions/share";
+import { readShared, clearShared, firstUrl, platformFromUrl, type SharedItem } from "@/lib/shared-intake";
 
 // ─── dual-language label helper ──────────────────────────────────────────────
 // When isDualLang is true (EN or SW), show primary label + secondary in parentheses.
@@ -42,12 +50,12 @@ function Pill({
       onClick={onClick}
       aria-pressed={selected}
       className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-full border text-sm font-medium select-none
-        transition-[transform,background-color,border-color,color,box-shadow] duration-150 ease-out
-        active:scale-[0.97]
+        transition-[transform,background-color,border-color,color,box-shadow] duration-200 ease-out
+        active:scale-[0.97] hover:border-purple/40 hover:bg-purple-050/60
         ${selected
           ? danger
             ? "bg-rose-600 text-white border-rose-600 shadow-sm"
-            : "bg-purple text-white border-purple shadow-sm"
+            : "bg-purple text-white border-purple shadow-sm hover:bg-purple hover:border-purple"
           : "bg-surface border-line text-ink"
         }`}
       style={{ willChange: "transform" }}
@@ -63,11 +71,11 @@ function Card({ title, subtitle, children }: {
   title?: string; subtitle?: string; children: React.ReactNode;
 }) {
   return (
-    <div className="bg-surface rounded-xl sm:rounded-2xl border border-line shadow-sm p-4 sm:p-6 md:p-8 space-y-4 sm:space-y-5">
+    <div className="card-premium rise p-5 sm:p-7 md:p-9 space-y-5 sm:space-y-6">
       {title && (
-        <div className="space-y-0.5">
-          <h2 className="font-bold text-base text-ink">{title}</h2>
-          {subtitle && <p className="text-xs text-muted">{subtitle}</p>}
+        <div className="space-y-1">
+          <h2 className="font-display text-xl font-bold tracking-tight text-ink">{title}</h2>
+          {subtitle && <p className="text-sm text-muted leading-relaxed">{subtitle}</p>}
         </div>
       )}
       {children}
@@ -87,7 +95,7 @@ function Field({ label, hint, required, error, children, id: idProp }: {
   return (
     <div className="space-y-1.5">
       {label && (
-        <label htmlFor={id} className="block text-sm font-semibold text-ink">
+        <label htmlFor={id} className="block text-[13px] font-semibold text-ink">
           {label}
           {required && <span className="text-rose-600 ml-0.5" aria-hidden="true">*</span>}
           {required && <span className="sr-only">(required)</span>}
@@ -140,14 +148,6 @@ const PLATFORMS = [
   "YouTube", "Telegram", "LinkedIn", "Snapchat", "Signal", "Email", "SMS", "Other",
 ];
 
-const COUNTIES = [
-  "Nairobi","Mombasa","Kisumu","Nakuru","Uasin Gishu","Kilifi","Kwale","Kakamega",
-  "Bungoma","Machakos","Kajiado","Nyeri","Meru","Embu","Kisii","Migori","Homa Bay",
-  "Siaya","Trans Nzoia","Turkana","Garissa","Wajir","Mandera","Marsabit","Isiolo",
-  "Laikipia","Nyandarua","Kirinyaga","Murang'a","Kiambu","Narok","Bomet","Kericho",
-  "Baringo","Nandi","Samburu","Kitui","Makueni","Taita Taveta","Tana River","Lamu",
-  "Other / Outside Kenya",
-];
 
 // ─── props ────────────────────────────────────────────────────────────────────
 interface ReportFormProps {
@@ -188,14 +188,19 @@ export default function ReportForm({ isAuthenticated = false, userEmail }: Repor
 
   // Context
   const [reportingFor, setReportingFor] = useState<"self"|"someone_else"|"child"|"community">("self");
-  const [violenceType, setViolenceType] = useState<"online"|"physical"|"both"|"">("");
+  const [incidentTypes, setIncidentTypes] = useState<string[]>([]);
+  const [voiceBlob, setVoiceBlob] = useState<Blob | null>(null);
+  const online = useOnline();
+  const searchParams = useSearchParams();
+  const [contentText, setContentText] = useState("");
+  const [sharedNote, setSharedNote] = useState<string | null>(null);
 
   // What happened
   const [description, setDescription]   = useState("");
   const [county, setCounty]             = useState("");
-  const [countyOther, setCountyOther]   = useState("");
   const [locationDesc, setLocationDesc] = useState("");
   const [occurredDate, setOccurredDate] = useState("");
+  const [occurredTime, setOccurredTime] = useState("");
   const [isOngoing, setIsOngoing]       = useState(false);
   const [latitude, setLatitude]         = useState<number|null>(null);
   const [longitude, setLongitude]       = useState<number|null>(null);
@@ -229,7 +234,7 @@ export default function ReportForm({ isAuthenticated = false, userEmail }: Repor
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [offlineSaved, setOfflineSaved] = useState(false);
 
-  const isOnline = violenceType === "online" || violenceType === "both";
+  const isOnline = incidentTypes.some(t => ONLINE_INCIDENT_TYPES.includes(t));
 
   useEffect(() => {
     navigator.geolocation?.getCurrentPosition(
@@ -238,11 +243,49 @@ export default function ReportForm({ isAuthenticated = false, userEmail }: Repor
     );
   }, []);
 
+  // Something shared to the app from another app (a link, a screenshot, a photo) opens the form
+  // already filled in. Nothing is sent until the person presses submit.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      await Promise.resolve();
+      let shared: SharedItem | null = null;
+      if (searchParams.get("shared") === "1") shared = await readShared();
+      else if (searchParams.get("link") || searchParams.get("text")) {
+        shared = { title: "", text: searchParams.get("text") ?? "", url: searchParams.get("link") ?? "", files: [], at: Date.now() };
+      }
+      if (!shared || cancelled) return;
+
+      const url = shared.url || firstUrl(`${shared.text} ${shared.title}`) || "";
+      // The words people share usually are the address; keep anything else they wrote.
+      const words = [shared.title, shared.text].filter(Boolean).join("\n\n").replace(url, "").trim();
+      const files = shared.files.slice(0, 10).map((f) => new File([f.blob], f.name, { type: f.type }));
+
+      if (url) {
+        setLink(url);
+        const plat = platformFromUrl(url);
+        if (plat) setPlatform(plat);
+        setIncidentTypes((cur) => (cur.includes("digital_threats") ? cur : [...cur, "digital_threats"]));
+        const preview = await previewSharedPost(url).catch(() => null);
+        if (preview && !cancelled) setContentText(`${preview.author ? preview.author + ": " : ""}${preview.text}`);
+      }
+      if (words) setDescription((d) => d || words);
+      if (files.length) setScreenshotFiles((cur) => [...cur, ...files].slice(0, 10));
+      const parts = [url && "a link", files.length && `${files.length} file${files.length === 1 ? "" : "s"}`, words && "some words"].filter(Boolean);
+      setSharedNote(`Shared with WHRD Hub: ${parts.join(", ") || "something"}. Add what happened and press submit; nothing has been sent yet.`);
+      await clearShared();
+    })();
+    return () => { cancelled = true; };
+    // Runs once, when the form opens.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const validate = (): Record<string, string> => {
     const errs: Record<string, string> = {};
-    if (!violenceType) errs.violenceType = tr.errors.violenceType;
+    if (incidentTypes.length === 0) errs.violenceType = tr.errors.violenceType;
     if (description.trim().length < 20) errs.description = tr.errors.descriptionMin(description.trim().length);
     if (!county) errs.county = tr.errors.county;
+    if (!perpetratorType) errs.perpetrator = "Please tell us who did this, or choose Unknown.";
     if (!isAuthenticated && password.length < 8) errs.password = tr.errors.password;
     return errs;
   };
@@ -268,7 +311,8 @@ export default function ReportForm({ isAuthenticated = false, userEmail }: Repor
     // Persist a report to the on-device offline queue and show confirmation.
     const saveOffline = async (p: ReportData): Promise<boolean> => {
       try {
-        await enqueueReport(p);
+        // A voice note can wait too, but only for someone signed in: it needs their session to be saved.
+        await enqueueReport(p, isAuthenticated ? voiceBlob ?? undefined : undefined);
         await requestBackgroundSync();
         if (typeof window !== "undefined") window.dispatchEvent(new Event(QUEUE_CHANGED_EVENT));
         setOfflineSaved(true);
@@ -291,33 +335,40 @@ export default function ReportForm({ isAuthenticated = false, userEmail }: Repor
         setUploading(false);
       }
 
-      const incidentTypes: string[] = [];
-      if (violenceType === "online" || violenceType === "both") incidentTypes.push("online_harassment");
-      if (violenceType === "physical" || violenceType === "both") incidentTypes.push("physical_violence");
+      // "Other" only counts when the person said what they need.
+      const allSupport = supportNeeded.filter(s => s !== "other" || supportOther.trim());
 
-      const allSupport = [...supportNeeded.filter(s => s !== "other")];
-      if (supportNeeded.includes("other") && supportOther.trim()) allSupport.push("other");
+      // A signed-in reporter can attach a voice note straight away. Anonymous reporters
+      // have no account until the report is filed, so theirs is attached just after.
+      let voicePaths: string[] = [];
+      if (!isOffline && voiceBlob && isAuthenticated) {
+        const path = await uploadReportVoiceNote(voiceBlob);
+        if (path) voicePaths = [path]; else toast.error("Your voice note could not be saved. The report will be sent without it.");
+      }
 
       payload = {
+        voice_note_paths: voicePaths.length ? voicePaths : undefined,
         incident_types: incidentTypes,
         description,
         reporting_for: reportingFor === "child" || reportingFor === "community"
           ? "someone_else"
           : (reportingFor as "self"|"someone_else"),
-        county: county === "Other / Outside Kenya" && countyOther.trim()
-          ? countyOther.trim()
-          : county,
+        county,
+        country: countryOf(county) ?? undefined,
         location_description: locationDesc || undefined,
         latitude:  latitude  ?? undefined,
         longitude: longitude ?? undefined,
         occurred_at: occurredDate || undefined,
+        occurred_time: occurredTime || undefined,
         is_ongoing: isOngoing,
         perpetrator_type: perpetratorType || undefined,
         perpetrator_detail: perpetratorDetail || undefined,
         tfgbv_platform: isOnline && platform ? platform : undefined,
         tfgbv_link: isOnline && link ? link : undefined,
+        tfgbv_content_text: isOnline && contentText.trim() ? contentText.trim() : undefined,
         tfgbv_screenshot_urls: uploadedUrls.length ? uploadedUrls : undefined,
         support_needed: allSupport,
+        support_other: allSupport.includes("other") ? supportOther.trim() : undefined,
         urgency,
         consent_to_followup: consent,
         contact_method: consent && contactMethod ? contactMethod : undefined,
@@ -337,6 +388,8 @@ export default function ReportForm({ isAuthenticated = false, userEmail }: Repor
 
       const result = await submitReport(payload);
       if (result.success) {
+        // Remembered for this tab only, so the next page can show a safety plan that fits what happened.
+        try { sessionStorage.setItem("whrd:last-incident-types", JSON.stringify(incidentTypes)); } catch { /* storage blocked */ }
         if (isAuthenticated) {
           toast.success("Report submitted. Thank you for your courage.");
           router.push("/dashboard/reports");
@@ -346,6 +399,18 @@ export default function ReportForm({ isAuthenticated = false, userEmail }: Repor
             email: result.virtualEmail!,
             password,
           });
+          // Anonymous reporters have no account until now, so their screenshots were never uploaded.
+          // With a session in hand, save them against the new report.
+          if (screenshotFiles.length > 0 && result.reportId) {
+            const { urls, errors } = await uploadReportScreenshots("", screenshotFiles);
+            if (urls.length) await attachScreenshots(result.reportId, urls).catch(() => undefined);
+            if (errors.length) toast.error(`${tr.uploadFailed}: ${errors[0]}`);
+          }
+          // Now there is a session, the voice note can be saved against the new report.
+          if (voiceBlob && result.reportId) {
+            const path = await uploadReportVoiceNote(voiceBlob);
+            if (path) await attachVoiceNote(result.reportId, [path]).catch(() => undefined);
+          }
           const params = new URLSearchParams({ u: result.username!, rid: result.reportId || "" });
           router.push(`/report/success?${params}`);
         }
@@ -371,7 +436,11 @@ export default function ReportForm({ isAuthenticated = false, userEmail }: Repor
 
   // Perpetrator options from translations
   const PERPETRATOR_TYPES = Object.entries(tr.options.perpetrators).map(([value, label]) => ({ value, label }));
-  const SUPPORT_OPTIONS   = Object.entries(tr.options.support).map(([value, label]) => ({ value, label }));
+  // Labels come from the active language where we have them; referral is not something to ask for.
+  const SUPPORT_OPTIONS   = SUPPORT_TYPES.map(({ value, label }) => ({
+    value,
+    label: (tr.options.support as Record<string, string>)[value] ?? label,
+  }));
 
   // Offline confirmation — shown after a report is queued on-device.
   if (offlineSaved) {
@@ -415,6 +484,13 @@ export default function ReportForm({ isAuthenticated = false, userEmail }: Repor
         }
       </div>
 
+      {sharedNote && (
+        <div role="status" className="flex items-start justify-between gap-3 rounded-2xl border border-purple/20 bg-purple-050 px-4 py-3 text-sm text-purple-700">
+          <p>{sharedNote}</p>
+          <button type="button" onClick={() => setSharedNote(null)} aria-label="Dismiss" className="shrink-0 text-purple-700/70 hover:text-purple-700"><X className="h-4 w-4" /></button>
+        </div>
+      )}
+
       {/* ── Context ─────────────────────────────────────────────── */}
       <Card title={tr.sections.aboutReport} subtitle={tr.sections.aboutReportSub}>
         <Field label={L("reportingFor")}>
@@ -435,18 +511,19 @@ export default function ReportForm({ isAuthenticated = false, userEmail }: Repor
           label={L("whereViolence")}
           required
           error={fieldErrors.violenceType}
+          hint="Choose every type that applies."
         >
           <div className="flex flex-wrap gap-2">
-            {(["online", "physical", "both"] as const).map(opt => (
+            {INCIDENT_TYPES.map(opt => (
               <Pill
-                key={opt}
-                selected={violenceType === opt}
+                key={opt.value}
+                selected={incidentTypes.includes(opt.value)}
                 onClick={() => {
-                  setViolenceType(opt);
+                  toggle(incidentTypes, opt.value, setIncidentTypes);
                   setFieldErrors(p => ({ ...p, violenceType: "" }));
                 }}
               >
-                {optLabel("violenceType", opt)}
+                {opt.label}
               </Pill>
             ))}
           </div>
@@ -478,39 +555,50 @@ export default function ReportForm({ isAuthenticated = false, userEmail }: Repor
           />
         </Field>
 
+        <VoiceInput
+          defaultLang={language === "sw" ? "sw-KE" : "en-KE"}
+          onText={(t) => setDescription((d) => (d.trim() ? `${d.trimEnd()} ${t}` : t))}
+          onRecording={setVoiceBlob}
+          canAttach={online || isAuthenticated}
+        />
+
         <div className="grid sm:grid-cols-2 gap-4">
-          <Field label={L("when")}>
-            <input
-              type="date"
-              value={occurredDate}
-              onChange={e => setOccurredDate(e.target.value)}
-              max={new Date().toISOString().split("T")[0]}
-              className="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple"
-            />
-          </Field>
+          <div className="space-y-4">
+            <Field label={L("when")}>
+              <input
+                type="date"
+                value={occurredDate}
+                onChange={e => setOccurredDate(e.target.value)}
+                max={new Date().toISOString().split("T")[0]}
+                className="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple"
+              />
+            </Field>
+            <Field label="Specify the time" hint="Optional. Your best estimate is fine.">
+              <input
+                type="time"
+                value={occurredTime}
+                onChange={e => setOccurredTime(e.target.value)}
+                className="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple"
+              />
+            </Field>
+          </div>
 
           <Field id="field-county" label={L("county")} required error={fieldErrors.county}>
             <Select
               id="field-county"
               value={county}
-              onChange={v => { setCounty(v); setCountyOther(""); if (v) setFieldErrors(p => ({ ...p, county: "" })); }}
+              onChange={v => { setCounty(v); if (v) setFieldErrors(p => ({ ...p, county: "" })); }}
               placeholder={tr.fields.countyPlaceholder}
               hasError={!!fieldErrors.county}
               describedBy={fieldErrors.county ? "field-county-error" : undefined}
             >
-              {COUNTIES.map(c => <option key={c} value={c}>{c}</option>)}
+              <optgroup label="Kenya: counties">
+                {KENYA_COUNTIES.map(c => <option key={c} value={c}>{c}</option>)}
+              </optgroup>
+              <optgroup label="Other countries">
+                {OTHER_COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
+              </optgroup>
             </Select>
-            {county === "Other / Outside Kenya" && (
-              <input
-                type="text"
-                value={countyOther}
-                onChange={e => setCountyOther(e.target.value)}
-                placeholder="Please specify your country or region"
-                className="mt-2 w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple"
-                aria-label="Country or region name"
-                autoFocus
-              />
-            )}
           </Field>
         </div>
 
@@ -549,17 +637,19 @@ export default function ReportForm({ isAuthenticated = false, userEmail }: Repor
 
       {/* ── Who did this ─────────────────────────────────────────── */}
       <Card title={tr.sections.whoDid} subtitle={tr.sections.whoDid_sub}>
-        <div className="flex flex-wrap gap-2">
-          {PERPETRATOR_TYPES.map(opt => (
-            <Pill
-              key={opt.value}
-              selected={perpetratorType === opt.value}
-              onClick={() => setPerpType(perpetratorType === opt.value ? "" : opt.value)}
-            >
-              {opt.label}
-            </Pill>
-          ))}
-        </div>
+        <Field required error={fieldErrors.perpetrator} label={<span className="sr-only">Who did this</span>}>
+          <div className="flex flex-wrap gap-2">
+            {PERPETRATOR_TYPES.map(opt => (
+              <Pill
+                key={opt.value}
+                selected={perpetratorType === opt.value}
+                onClick={() => { setPerpType(opt.value); setFieldErrors(p => ({ ...p, perpetrator: "" })); }}
+              >
+                {opt.label}
+              </Pill>
+            ))}
+          </div>
+        </Field>
         {perpetratorType && (
           <Field label={tr.fields.perpetratorDetail} hint={tr.fields.perpetratorDetailHint}>
             <input
@@ -593,6 +683,15 @@ export default function ReportForm({ isAuthenticated = false, userEmail }: Repor
                 className="w-full rounded-xl border border-line bg-surface pl-9 pr-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple"
               />
             </div>
+          </Field>
+
+          <Field label="What the post says (optional)" hint="Copy or paste the words, so they are kept even if the post is deleted.">
+            <Textarea
+              value={contentText}
+              onChange={e => setContentText(e.target.value)}
+              rows={3}
+              className="rounded-xl"
+            />
           </Field>
 
           <Field label={L("screenshots")}>
@@ -667,7 +766,8 @@ export default function ReportForm({ isAuthenticated = false, userEmail }: Repor
               value={supportOther}
               onChange={e => setSupportOther(e.target.value)}
               rows={2}
-              placeholder="..."
+              placeholder="Tell us what support you need"
+              aria-label="Describe the support you need"
               className="rounded-xl mt-2"
             />
           )}
@@ -675,27 +775,30 @@ export default function ReportForm({ isAuthenticated = false, userEmail }: Repor
 
         <Field label={L("urgency")} required>
           <div className="space-y-2">
-            {([
-              { value: "immediate",   danger: true  },
-              { value: "within_week", danger: false },
-              { value: "no_rush",     danger: false },
-            ] as const).map(opt => {
-              const label = (tr.options.urgency as Record<string, string>)[opt.value] ?? opt.value;
+            {(["immediate", "within_week", "no_rush"] as const).map(value => {
+              const label = (tr.options.urgency as Record<string, string>)[value] ?? value;
               const sub   = isDualLang && sec
-                ? (sec.options.urgency as Record<string, string>)[opt.value]
+                ? (sec.options.urgency as Record<string, string>)[value]
                 : undefined;
+              const tone = URGENCY_META[value].tone;
+              const on = {
+                red:   "bg-rose-600 text-white border-rose-600",
+                amber: "bg-amber-500 text-white border-amber-500",
+                green: "bg-emerald-600 text-white border-emerald-600",
+              }[tone];
+              const idle = {
+                red:   "hover:border-rose-600/40",
+                amber: "hover:border-amber-500/40",
+                green: "hover:border-emerald-600/40",
+              }[tone];
               return (
                 <button
-                  key={opt.value}
+                  key={value}
                   type="button"
-                  onClick={() => setUrgency(opt.value)}
+                  onClick={() => setUrgency(value)}
+                  aria-pressed={urgency === value}
                   className={`w-full text-left px-4 py-3 rounded-xl border text-sm transition-all
-                    ${urgency === opt.value
-                      ? opt.danger
-                        ? "bg-rose-600 text-white border-rose-600"
-                        : "bg-purple text-white border-purple"
-                      : `bg-surface border-line hover:border-purple/30 ${opt.danger ? "hover:border-rose-600/30" : ""}`
-                    }`}
+                    ${urgency === value ? on : `bg-surface border-line ${idle}`}`}
                 >
                   <span className="font-semibold">{label}</span>
                   {sub && <span className="block text-[11px] mt-0.5 opacity-70">{sub}</span>}

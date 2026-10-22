@@ -3,24 +3,9 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
-
-const ADJECTIVES = [
-  "brave","strong","bold","fierce","proud","wise","calm","bright",
-  "steady","gentle","swift","clear","free","safe","sure","true",
-  "kind","warm","fair","pure","keen","vast","deep","cool",
-];
-const NOUNS = [
-  "voice","heart","shield","light","hope","star","path","flame",
-  "river","dawn","seed","rose","oak","bird","reef","tide",
-  "peak","leaf","wave","song","wind","field","moon","sun",
-];
-
-function generateUsername(): string {
-  const adj = ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)];
-  const noun = NOUNS[Math.floor(Math.random() * NOUNS.length)];
-  const suffix = Math.random().toString(36).slice(2, 6);
-  return `${adj}-${noun}-${suffix}`;
-}
+import { after } from "next/server";
+import { alertOnReport } from "@/lib/alerts";
+import { generateUsername } from "@/lib/anonymous-username";
 
 export interface ReportData {
   // WHAT
@@ -40,6 +25,7 @@ export interface ReportData {
   reporting_for: "self" | "someone_else" | "community_leader";
   // WHERE & WHEN
   county?: string;
+  country?: string;
   location_description?: string;
   latitude?: number;
   longitude?: number;
@@ -54,6 +40,11 @@ export interface ReportData {
   why_description?: string;
   // SUPPORT
   support_needed: string[];
+  /** What the reporter typed under "Other" support. */
+  support_other?: string;
+  /** Storage paths of recorded voice notes (private bucket). */
+  voice_note_paths?: string[];
+  risks?: string[];
   urgency: "immediate" | "within_week" | "no_rush";
   consent_to_followup: boolean;
   contact_method?: string;
@@ -99,7 +90,7 @@ export async function submitReport(data: ReportData): Promise<SubmitReportResult
       email: virtualEmail,
       password: data.password!,
       email_confirm: true,
-      user_metadata: { username, is_anonymous: true, user_type: "reporter" },
+      user_metadata: { username, is_anonymous: true, account_kind: "anonymous" },
     });
 
     if (signupError || !signupData.user) {
@@ -151,6 +142,7 @@ export async function submitReport(data: ReportData): Promise<SubmitReportResult
       reporting_for:      data.reporting_for,
       // WHERE & WHEN
       county:               data.county               || null,
+      country:              data.country              || null,
       location_description: data.location_description || null,
       latitude:             data.latitude             ?? null,
       longitude:            data.longitude            ?? null,
@@ -164,6 +156,10 @@ export async function submitReport(data: ReportData): Promise<SubmitReportResult
       activism_context: data.activism_context || null,
       // SUPPORT
       support_needed:      data.support_needed,
+      support_other:       data.support_other || null,
+      // Only sent when there is one, so filing keeps working before the voice-note column exists.
+      ...(data.voice_note_paths?.length ? { voice_note_paths: data.voice_note_paths } : {}),
+      risks:               data.risks?.length ? data.risks : [],
       urgency:             data.urgency,
       consent_to_followup: data.consent_to_followup,
       contact_method:      data.contact_method || null,
@@ -190,6 +186,9 @@ export async function submitReport(data: ReportData): Promise<SubmitReportResult
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/reports");
   revalidatePath("/hub/reporting");
+
+  // Alert the response team once the response has been sent, so the reporter never waits on it.
+  if (reportRow?.id) after(() => alertOnReport(reportRow.id as string));
 
   return {
     success: true,

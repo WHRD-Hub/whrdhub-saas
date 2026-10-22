@@ -1,10 +1,10 @@
 "use client";
 
-import { useMemo, useState, useSyncExternalStore } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  ChevronLeft, ChevronRight, ChevronDown, Search, Bell, LogOut, User, LayoutGrid, Megaphone,
+  ChevronLeft, ChevronRight, ChevronDown, Bell, LogOut, User, Menu, Megaphone, Accessibility,
 } from "lucide-react";
 import { signOut as signOutAction } from "@/app/actions/auth";
 import { links } from "@/lib/site-nav";
@@ -12,47 +12,24 @@ import { cn } from "@/lib/utils";
 import { RoleSwitcher } from "@/components/dashboard/role-switcher";
 import { ICONS, type NavItem } from "@/components/dashboard/icons";
 import { BottomNav } from "@/components/dashboard/bottom-nav";
+import { Modal } from "@/components/ui/modal";
+import { AccessibilityControls } from "@/components/accessibility-controls";
 
 export type { NavItem };
 
 const LOGO = "/main-logo.png";
 
 /**
- * Folded sidebar sections, kept in localStorage.
+ * The console frame.
  *
- * A Hub administrator sees eighteen destinations across two consoles. Folding
- * the groups they are not working in today is the difference between a sidebar
- * you scan and one you scroll -- and being made to re-fold the same four groups
- * every morning is its own small tax, so the choice is remembered.
- *
- * Exposed as an external store so the value is read during render instead of
- * being copied in by an effect, which would paint the wrong state first.
+ * A sidebar has to be scanned, not read. Three things keep it that way:
+ *   - One area at a time. An administrator belongs to two consoles (community
+ *     and reporting); showing both at once is what made it a wall. A switch at
+ *     the top moves between them.
+ *   - The everyday pages are listed; the rarely used ones sit under "More".
+ *   - The person, their settings and accessibility live in one menu at the
+ *     bottom instead of being scattered across the screen.
  */
-const FOLD_KEY = "whrd-nav-folded";
-const foldListeners = new Set<() => void>();
-
-function subscribeFolded(listener: () => void) {
-  foldListeners.add(listener);
-  return () => foldListeners.delete(listener);
-}
-
-function readFolded(): string {
-  try {
-    return localStorage.getItem(FOLD_KEY) ?? "";
-  } catch {
-    return ""; // private mode: every section simply stays open
-  }
-}
-
-function writeFolded(value: string) {
-  try {
-    localStorage.setItem(FOLD_KEY, value);
-  } catch {
-    /* ignore */
-  }
-  foldListeners.forEach((l) => l());
-}
-
 export function DashboardShell({
   role,
   userName,
@@ -78,232 +55,222 @@ export function DashboardShell({
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userMenu, setUserMenu] = useState(false);
+  const [a11yOpen, setA11yOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
 
-  // Which section headings are folded away, read straight from localStorage
-  // rather than copied into state by an effect -- that pattern renders once
-  // with the wrong value and again with the right one, and on a sidebar the
-  // flicker is visible.
-  const raw = useSyncExternalStore(subscribeFolded, readFolded, () => "");
-  const folded = useMemo<Set<string>>(() => {
-    if (!raw) return new Set();
-    try {
-      return new Set(JSON.parse(raw) as string[]);
-    } catch {
-      return new Set();
-    }
-  }, [raw]);
-
-  const toggleSection = (section: string) => {
-    const next = new Set(folded);
-    if (next.has(section)) next.delete(section);
-    else next.add(section);
-    writeFolded(JSON.stringify([...next]));
-  };
-
-  // Title in the top bar follows the active nav item.
   const isActive = (href: string) =>
     pathname === href ||
     (href !== "/dashboard" && href !== "/hub" && pathname.startsWith(href + "/"));
 
   // The most specific match wins, so /hub/reporting/reports highlights Reports
   // rather than the Reporting overview.
-  const activeTitle =
-    [...nav].sort((a, b) => b.href.length - a.href.length).find((n) => isActive(n.href))?.label ??
-    title;
+  const activeItem = [...nav].sort((a, b) => b.href.length - a.href.length).find((n) => isActive(n.href));
+  const activeTitle = activeItem?.label ?? title;
+
+  // Areas: only when items declare one. The area you are in follows the page you are on.
+  const areas = useMemo(() => [...new Set(nav.map((n) => n.area).filter(Boolean) as string[])], [nav]);
+  const area = areas.length > 1 ? (activeItem?.area ?? areas[0]) : undefined;
+  const visible = area ? nav.filter((n) => n.area === area) : nav;
+  const main = visible.filter((n) => !n.secondary);
+  const more = visible.filter((n) => n.secondary);
+  const moreActive = more.some((n) => isActive(n.href));
+  const showMore = moreOpen || moreActive;
 
   const initials = userName.split(/\s+/).slice(0, 2).map((s) => s[0]?.toUpperCase()).join("") || "W";
 
-  // The bottom bar carries four destinations. Anything marked primary wins;
-  // otherwise the first four in the sidebar are a reasonable stand-in, since
-  // that order is already the order of importance.
-  const flagged = nav.filter((n) => n.primary);
-  const bottomItems = (flagged.length ? flagged : nav).slice(0, 4);
+  // The bottom bar carries four destinations from the area you are in.
+  const flagged = visible.filter((n) => n.primary);
+  const bottomItems = (flagged.length ? flagged : visible).slice(0, 4);
 
-  const SideContent = () => (
-    <div className="flex flex-col h-full">
+  const renderItem = (item: NavItem) => {
+    const Icon = ICONS[item.icon];
+    const active = isActive(item.href);
+    return (
+      <Link
+        key={item.href}
+        href={item.href}
+        onClick={() => setMobileOpen(false)}
+        aria-current={active ? "page" : undefined}
+        title={collapsed ? item.label : undefined}
+        className={cn(
+          "group relative flex items-center gap-3 rounded-lg px-3 py-2 text-[13.5px] transition-colors",
+          active ? "bg-purple-050 font-semibold text-purple-700" : "font-medium text-ink/65 hover:bg-paper hover:text-ink",
+          collapsed && "justify-center px-0",
+        )}
+      >
+        <Icon className="h-[18px] w-[18px] shrink-0" />
+        {!collapsed && <span className="truncate">{item.label}</span>}
+        {!collapsed && item.badge ? (
+          <span className="ml-auto rounded-full bg-magenta/10 px-1.5 text-[11px] font-bold leading-5 text-magenta-700">{item.badge}</span>
+        ) : null}
+        {collapsed && item.badge ? <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-magenta" aria-hidden /> : null}
+      </Link>
+    );
+  };
+
+  const sidebar = (
+    <div className="flex h-full flex-col">
       {/* Brand */}
-      <div className="flex items-center justify-between px-4 h-16 border-b border-line">
-        <Link href="/" className="flex items-center gap-2 min-w-0">
+      <div className="flex h-14 items-center justify-between px-4">
+        <Link href="/" className="flex min-w-0 items-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={LOGO} alt="WHRD Hub" className={cn("w-auto object-contain", collapsed ? "h-8" : "h-9")} />
+          <img src={LOGO} alt="WHRD Hub" className={cn("w-auto object-contain", collapsed ? "h-7" : "h-8")} />
         </Link>
-        <button onClick={() => setCollapsed((c) => !c)} className="hidden lg:inline-flex text-muted hover:text-ink p-1 rounded-lg hover:bg-purple-050" aria-label="Toggle sidebar">
-          {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+        <button onClick={() => setCollapsed((c) => !c)} className="hidden rounded-md p-1 text-muted/70 hover:bg-paper hover:text-ink lg:inline-flex" aria-label="Collapse sidebar">
+          {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
         </button>
       </div>
 
-      {/* User chip + dropdown */}
-      <div className="px-3 py-3 border-b border-line relative">
-        <button onClick={() => setUserMenu((o) => !o)} className="w-full flex items-center gap-2.5 rounded-xl p-2 hover:bg-purple-050 transition-colors">
-          {avatarUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={avatarUrl} alt="" className="w-9 h-9 rounded-full object-cover shrink-0" />
-          ) : (
-            <span className="w-9 h-9 rounded-full bg-purple text-white grid place-items-center text-xs font-bold shrink-0">{initials}</span>
-          )}
-          {!collapsed && (
-            <>
-              <span className="min-w-0 text-left flex-1">
-                <span className="block text-sm font-bold text-ink truncate">{userName}</span>
-                <span className="block text-xs text-muted truncate">{userRole}</span>
-              </span>
-              <ChevronDown className={cn("w-4 h-4 text-muted transition-transform", userMenu && "rotate-180")} />
-            </>
-          )}
-        </button>
+      {/* Area switch, for people who work in more than one console */}
+      {areas.length > 1 && !collapsed && (
+        <div className="px-3 pb-2">
+          <div role="tablist" aria-label="Console area" className="flex rounded-xl bg-paper p-1">
+            {areas.map((a) => {
+              const first = nav.find((n) => n.area === a);
+              const on = a === area;
+              return (
+                <Link
+                  key={a}
+                  href={first?.href ?? "/hub"}
+                  role="tab"
+                  aria-selected={on}
+                  onClick={() => setMobileOpen(false)}
+                  className={cn(
+                    "flex-1 rounded-lg px-2 py-1.5 text-center text-xs font-semibold transition-colors",
+                    on ? "bg-surface text-ink shadow-sm" : "text-muted hover:text-ink",
+                  )}
+                >
+                  {a}
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Nav */}
+      <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 py-2" aria-label="Main">
+        {main.map((item, i) => {
+          const startsSection = !!item.section && item.section !== main[i - 1]?.section;
+          return (
+            <div key={item.href}>
+              {startsSection && !collapsed && (
+                <p className={cn("px-3 pb-1 text-[11px] font-semibold tracking-wide text-muted/80", i > 0 ? "mt-5" : "mt-1")}>{item.section}</p>
+              )}
+              {startsSection && collapsed && i > 0 && <div className="my-2 border-t border-line" />}
+              {renderItem(item)}
+            </div>
+          );
+        })}
+
+        {more.length > 0 && !collapsed && (
+          <div className="pt-4">
+            <button
+              type="button"
+              onClick={() => setMoreOpen((o) => !o)}
+              aria-expanded={showMore}
+              className="flex w-full items-center gap-1.5 px-3 pb-1 text-[11px] font-semibold tracking-wide text-muted/80 hover:text-ink"
+            >
+              More <ChevronDown className={cn("h-3 w-3 transition-transform", showMore && "rotate-180")} />
+            </button>
+            {showMore && <div className="space-y-0.5">{more.map(renderItem)}</div>}
+          </div>
+        )}
+        {more.length > 0 && collapsed && <div className="space-y-0.5 pt-2">{more.map(renderItem)}</div>}
+      </nav>
+
+      {/* The person: one quiet menu at the bottom */}
+      <div className="relative border-t border-line/70 p-3">
         {userMenu && (
-          <div className="absolute left-3 right-3 top-full mt-1 z-20 rounded-xl border border-line bg-surface shadow-lg p-1.5">
-            <Link href="/profile" onClick={() => { setUserMenu(false); setMobileOpen(false); }} className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-semibold text-ink/80 hover:bg-purple-050 hover:text-purple-700">
-              <User className="w-4 h-4" /> Profile &amp; settings
+          <div className="absolute inset-x-3 bottom-full z-20 mb-1 rounded-xl border border-line bg-surface p-1.5 shadow-premium">
+            <Link href="/profile" onClick={() => { setUserMenu(false); setMobileOpen(false); }} className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-ink/80 hover:bg-paper hover:text-ink">
+              <User className="h-4 w-4" /> Profile &amp; settings
+            </Link>
+            <button type="button" onClick={() => { setUserMenu(false); setMobileOpen(false); setA11yOpen(true); }} className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-ink/80 hover:bg-paper hover:text-ink">
+              <Accessibility className="h-4 w-4" /> Accessibility
+            </button>
+            <Link href={links.reportAbuse} onClick={() => { setUserMenu(false); setMobileOpen(false); }} className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-ink/80 hover:bg-paper hover:text-ink">
+              <Megaphone className="h-4 w-4" /> Report abuse
             </Link>
             {isAdmin && (
               <div className="my-1 border-t border-line pt-1" onClick={() => { setUserMenu(false); setMobileOpen(false); }}>
                 <RoleSwitcher variant="menu" />
               </div>
             )}
-            {/* Server action: the cookie is cleared before the response,
-                rather than in the browser and hoped for afterwards. */}
-            <form action={signOutAction}>
-              <button
-                type="submit"
-                className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-semibold text-rose-600 hover:bg-rose-50"
-              >
+            {/* Server action: the cookie is cleared before the response, rather than in the browser and hoped for afterwards. */}
+            <form action={signOutAction} className="mt-1 border-t border-line pt-1">
+              <button type="submit" className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-rose-600 hover:bg-rose-50">
                 <LogOut className="h-4 w-4" /> Sign out
               </button>
             </form>
           </div>
         )}
-      </div>
-
-      {/* Nav */}
-      <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-0.5">
-        {nav.map((item, i) => {
-          const Icon = ICONS[item.icon];
-          const active = isActive(item.href);
-          const section = item.section;
-          const startsSection = !!section && section !== nav[i - 1]?.section;
-          // A folded section keeps any item you are actually on visible --
-          // hiding the page somebody is looking at is disorienting, not tidy.
-          const hidden = !!section && folded.has(section) && !active && !collapsed;
-
-          return (
-            <div key={`${item.href}-wrap`}>
-              {startsSection && !collapsed && (
-                <button
-                  type="button"
-                  onClick={() => toggleSection(section!)}
-                  aria-expanded={!folded.has(section!)}
-                  className="mt-4 flex w-full items-center gap-1 rounded-lg px-3 pb-1 pt-1 text-[10px] font-bold uppercase tracking-[0.14em] text-muted transition-colors hover:text-ink"
-                >
-                  <ChevronDown
-                    className={cn(
-                      "h-3 w-3 transition-transform",
-                      folded.has(section!) && "-rotate-90",
-                    )}
-                  />
-                  {section}
-                </button>
-              )}
-              {startsSection && collapsed && <div className="my-2 border-t border-line" />}
-
-              {!hidden && (
-                <Link
-                  href={item.href}
-                  onClick={() => setMobileOpen(false)}
-                  aria-current={active ? "page" : undefined}
-                  className={cn(
-                    "group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors",
-                    active
-                      ? "bg-purple-050 text-purple-700"
-                      : "text-ink/70 hover:bg-purple-050 hover:text-ink",
-                    collapsed && "justify-center",
-                  )}
-                  title={collapsed ? item.label : undefined}
-                >
-                  {/* The active marker reads at a glance when collapsed to icons. */}
-                  {active && (
-                    <span className="absolute inset-y-1.5 left-0 w-1 rounded-r-full bg-purple" aria-hidden />
-                  )}
-                  <Icon className="h-5 w-5 shrink-0" />
-                  {!collapsed && <span className="truncate">{item.label}</span>}
-                  {!collapsed && item.badge ? (
-                    <span className="ml-auto rounded-full bg-magenta px-2 py-0.5 text-xs font-bold text-white">
-                      {item.badge}
-                    </span>
-                  ) : null}
-                  {collapsed && item.badge ? (
-                    <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-magenta" aria-hidden />
-                  ) : null}
-                </Link>
-              )}
-            </div>
-          );
-        })}
-      </nav>
-
-      {/* Footer: Report Abuse styled like a nav item. Extra bottom padding
-          keeps it clear of the fixed accessibility button in the corner. */}
-      <div className="px-3 pt-3 pb-24 border-t border-line">
-        <Link href={links.reportAbuse} className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-ink/70 hover:bg-purple-050 hover:text-ink transition-colors">
-          <Megaphone className="w-5 h-5 shrink-0 text-magenta-700" />
-          {!collapsed && "Report Abuse"}
-        </Link>
+        <button
+          onClick={() => setUserMenu((o) => !o)}
+          aria-expanded={userMenu}
+          className={cn("flex w-full items-center gap-2.5 rounded-xl p-2 text-left transition-colors hover:bg-paper", collapsed && "justify-center")}
+        >
+          {avatarUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={avatarUrl} alt="" className="h-8 w-8 shrink-0 rounded-full object-cover" />
+          ) : (
+            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-purple text-[11px] font-bold text-white">{initials}</span>
+          )}
+          {!collapsed && (
+            <>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[13px] font-semibold text-ink">{userName}</span>
+                <span className="block truncate text-[11px] text-muted">{userRole}</span>
+              </span>
+              <ChevronDown className={cn("h-4 w-4 text-muted transition-transform", userMenu && "rotate-180")} />
+            </>
+          )}
+        </button>
       </div>
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-[#f7f6fa]">
-      {/* Sidebar — desktop */}
-      <aside className={cn("hidden lg:flex fixed inset-y-0 left-0 z-30 flex-col bg-surface border-r border-line transition-[width] duration-200", collapsed ? "w-[76px]" : "w-64")}>
-        <SideContent />
+    <div className="min-h-screen bg-paper">
+      {/* Sidebar, desktop */}
+      <aside className={cn("fixed inset-y-0 left-0 z-30 hidden flex-col border-r border-line/70 bg-surface transition-[width] duration-200 lg:flex", collapsed ? "w-[72px]" : "w-60")}>
+        {sidebar}
       </aside>
 
-      {/* Sidebar — mobile drawer */}
+      {/* Sidebar, mobile drawer */}
       {mobileOpen && (
-        <div
-          className="fixed inset-0 z-50 bg-black/40 lg:hidden"
-          onClick={() => setMobileOpen(false)}
-          role="presentation"
-        >
-          <div
-            className="rise absolute inset-y-0 left-0 w-[17rem] max-w-[85vw] overflow-hidden bg-surface shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <SideContent />
+        <div className="fixed inset-0 z-50 bg-ink/40 backdrop-blur-[2px] lg:hidden" onClick={() => setMobileOpen(false)} role="presentation">
+          <div className="rise absolute inset-y-0 left-0 w-[17rem] max-w-[85vw] overflow-hidden bg-surface shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            {sidebar}
           </div>
         </div>
       )}
 
       {/* Main */}
-      <div className={cn("transition-[padding] duration-200", collapsed ? "lg:pl-[76px]" : "lg:pl-64")}>
-        {/* Top bar */}
-        <header className="sticky top-0 z-20 h-16 bg-surface/90 backdrop-blur border-b border-line flex items-center gap-2 sm:gap-3 px-3 sm:px-6">
-          <button onClick={() => setMobileOpen(true)} className="lg:hidden p-2 -ml-1 rounded-lg hover:bg-purple-050 shrink-0" aria-label="Menu">
-            <LayoutGrid className="w-6 h-6 text-ink" />
+      <div className={cn("transition-[padding] duration-200", collapsed ? "lg:pl-[72px]" : "lg:pl-60")}>
+        <header className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-line/70 bg-surface/80 px-4 backdrop-blur sm:px-8">
+          <button onClick={() => setMobileOpen(true)} className="-ml-1 shrink-0 rounded-lg p-2 hover:bg-paper lg:hidden" aria-label="Menu">
+            <Menu className="h-5 w-5 text-ink" />
           </button>
-          <div className="flex items-center gap-2 text-ink font-bold text-base shrink-0">
-            <span className="truncate max-w-[45vw]">{activeTitle}</span>
-          </div>
-          {/* Search on desktop; a flexible spacer on mobile pushes the bell right */}
-          <div className="flex-1 max-w-xl mx-auto hidden md:block">
-            <div className="relative">
-              <Search className="w-4 h-4 text-muted absolute left-3 top-1/2 -translate-y-1/2" />
-              <input placeholder="Search..." className="w-full rounded-full border border-line bg-paper pl-9 pr-4 h-10 text-sm focus:outline-none focus:ring-2 focus:ring-purple/20" />
-            </div>
-          </div>
-          <div className="flex-1 md:hidden" />
-          <Link href={role === "admin" ? "/hub/notifications" : "/dashboard/notifications"} className="relative p-2 rounded-lg hover:bg-purple-050 shrink-0" aria-label="Notifications">
-            <Bell className="w-5 h-5 text-ink" />
-            {notifCount > 0 && <span className="absolute top-1 right-1 w-4 h-4 bg-magenta text-white text-[10px] font-bold rounded-full grid place-items-center">{notifCount > 9 ? "9+" : notifCount}</span>}
+          <p className="truncate text-[17px] font-semibold tracking-tight text-ink">{activeTitle}</p>
+          <div className="flex-1" />
+          <Link href={role === "admin" ? "/hub/notifications" : "/dashboard/notifications"} className="relative shrink-0 rounded-lg p-2 hover:bg-paper" aria-label="Notifications">
+            <Bell className="h-5 w-5 text-ink/80" />
+            {notifCount > 0 && (
+              <span className="absolute right-1 top-1 grid h-4 min-w-4 place-items-center rounded-full bg-magenta px-1 text-[10px] font-bold text-white">{notifCount > 9 ? "9+" : notifCount}</span>
+            )}
           </Link>
         </header>
 
         {/* pb-24 on small screens keeps the last row clear of the bottom bar. */}
-        <main className="mx-auto max-w-6xl px-4 pb-24 pt-6 sm:px-6 lg:px-8 lg:pb-6">{children}</main>
+        <main className="mx-auto max-w-6xl px-4 pb-24 pt-8 sm:px-8 lg:pb-10">{children}</main>
       </div>
 
       <BottomNav items={bottomItems} notifCount={notifCount} />
+
+      <Modal open={a11yOpen} onClose={() => setA11yOpen(false)} title="Accessibility" subtitle="Make the Hub easier to read and use. Saved on this device.">
+        <AccessibilityControls />
+      </Modal>
     </div>
   );
 }

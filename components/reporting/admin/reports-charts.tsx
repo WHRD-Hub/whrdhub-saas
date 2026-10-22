@@ -4,6 +4,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend, LineChart, Line,
 } from "recharts";
+import { urgencyHexByLabel } from "@/lib/urgency";
 
 const PURPLE = "#734e9e";
 const GOLD = "#ce2087";
@@ -92,7 +93,7 @@ export function ReportsCharts({ data }: { data: ChartData }) {
             <Tooltip />
             <Bar dataKey="count" radius={[4, 4, 0, 0]}>
               {data.urgencyBreakdown.map((entry, i) => (
-                <Cell key={i} fill={entry.name === "Immediate" ? "#ef4444" : entry.name === "Within Week" ? GOLD : "#10b981"} />
+                <Cell key={i} fill={urgencyHexByLabel(entry.name)} />
               ))}
             </Bar>
           </BarChart>

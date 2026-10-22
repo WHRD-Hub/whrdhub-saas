@@ -9,6 +9,7 @@ import { Input, Label, Textarea } from "@/components/ui/field";
 import { cn } from "@/lib/utils";
 import { FEMTORSHIP_QUESTIONS, FOCUS_AREAS, FEMTOR_QUALITIES } from "@/lib/data";
 import { completeOnboarding } from "@/app/actions/onboarding";
+import { PickWithOther } from "@/components/femtorship/pick-fields";
 
 interface County { id: string; name: string; is_active: boolean }
 interface Org { id: string; name: string; county_network_id: string | null; verification_status: string }
@@ -360,7 +361,7 @@ export function OnboardingWizard({
                 </div>
                 <div className="space-y-2">
                   <Label>{FEMTORSHIP_QUESTIONS.guidance_areas}</Label>
-                  <MultiPills options={FOCUS_AREAS} value={guidanceAreas} onChange={setGuidanceAreas} />
+                  <PickWithOther options={FOCUS_AREAS} value={guidanceAreas} onChange={setGuidanceAreas} max={3} />
                 </div>
                 <div className="space-y-2">
                   <Label>{FEMTORSHIP_QUESTIONS.desired_qualities}</Label>
@@ -378,14 +379,15 @@ export function OnboardingWizard({
                   <>
                     <div className="space-y-2">
                       <Label>{FEMTORSHIP_QUESTIONS.support_offered}</Label>
-                      <MultiPills options={FOCUS_AREAS} value={supportOffered} onChange={setSupportOffered} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>{FEMTORSHIP_QUESTIONS.support_detail}</Label>
-                      <Textarea rows={2} value={supportDetail} onChange={(e) => setSupportDetail(e.target.value)} placeholder="Optional" />
+                      <PickWithOther options={FOCUS_AREAS} value={supportOffered} onChange={setSupportOffered} />
                     </div>
                   </>
                 )}
+              </div>
+
+              <div className="space-y-2">
+                <Label>{FEMTORSHIP_QUESTIONS.support_detail}</Label>
+                <Textarea rows={2} value={supportDetail} onChange={(e) => setSupportDetail(e.target.value)} placeholder="Optional, e.g. access needs, language, availability" />
               </div>
             </div>
           )}

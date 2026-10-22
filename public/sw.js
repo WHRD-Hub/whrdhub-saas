@@ -7,7 +7,7 @@
  * back to the offline page only when the network is unavailable.
  */
 
-const VERSION = "whrd-v2";
+const VERSION = "whrd-v4";
 const STATIC_CACHE = `${VERSION}-static`;
 const OFFLINE_URL = "/offline";
 
@@ -59,6 +59,13 @@ function isStaticAsset(url) {
 
 self.addEventListener("fetch", (event) => {
   const { request } = event;
+
+  // A link, screenshot or photo shared to the app from another app.
+  if (request.method === "POST" && new URL(request.url).pathname === "/share-target") {
+    event.respondWith(handleShare(request));
+    return;
+  }
+
   if (request.method !== "GET") return;
 
   const url = new URL(request.url);
@@ -127,3 +134,79 @@ async function notifyClientsToSync() {
 self.addEventListener("message", (event) => {
   if (event.data && event.data.type === "SKIP_WAITING") self.skipWaiting();
 });
+
+// Urgent-case alerts. The payload never carries what a reporter wrote: only that
+// a case needs attention, what kind, and where to open it.
+self.addEventListener("push", (event) => {
+  let data = {};
+  try { data = event.data ? event.data.json() : {}; } catch (e) { data = {}; }
+  const title = data.title || "WHRD Hub";
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body: data.body || "",
+      tag: data.tag || "whrd-alert",
+      icon: "/icon-192.png",
+      badge: "/icon-192.png",
+      data: { url: data.url || "/hub/reporting" },
+      requireInteraction: true,
+    })
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = (event.notification.data && event.notification.data.url) || "/hub/reporting";
+  event.waitUntil(
+    (async () => {
+      const all = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+      for (const c of all) {
+        if ("focus" in c) { await c.focus(); if ("navigate" in c) { try { await c.navigate(url); } catch (e) { /* cross-origin */ } } return; }
+      }
+      await self.clients.openWindow(url);
+    })()
+  );
+});
+
+// ── Sharing to the app ────────────────────────────────────────────────────
+// The shared files stay on this device (IndexedDB) until the report form takes
+// them. Nothing is sent anywhere by the act of sharing.
+function openShareDb() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open("whrd-share", 1);
+    req.onupgradeneeded = () => req.result.createObjectStore("shared");
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function saveShared(item) {
+  const db = await openShareDb();
+  await new Promise((resolve, reject) => {
+    const tx = db.transaction("shared", "readwrite");
+    tx.objectStore("shared").put(item, "latest");
+    tx.oncomplete = resolve;
+    tx.onerror = () => reject(tx.error);
+  });
+  db.close();
+}
+
+async function handleShare(request) {
+  const to = (path) => Response.redirect(new URL(path, self.location.origin).href, 303);
+  try {
+    const form = await request.formData();
+    const files = form.getAll("media")
+      .filter((f) => f && typeof f === "object" && f.size > 0)
+      .slice(0, 10)
+      .map((f) => ({ name: f.name || "shared", type: f.type || "application/octet-stream", blob: f }));
+    await saveShared({
+      title: String(form.get("title") || ""),
+      text: String(form.get("text") || ""),
+      url: String(form.get("url") || ""),
+      files,
+      at: Date.now(),
+    });
+    return to("/report?shared=1");
+  } catch (e) {
+    return to("/report");
+  }
+}

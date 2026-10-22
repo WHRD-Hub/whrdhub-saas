@@ -18,8 +18,8 @@ import {
 export type { OutboxItem as QueuedReport };
 export { requestBackgroundSync };
 
-export async function enqueueReport(payload: ReportData): Promise<OutboxItem> {
-  return enqueue("report", payload);
+export async function enqueueReport(payload: ReportData, voice?: Blob): Promise<OutboxItem> {
+  return enqueue("report", payload, { voice });
 }
 
 export async function getQueuedReports(): Promise<OutboxItem[]> {

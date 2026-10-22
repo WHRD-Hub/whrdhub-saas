@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback, useSyncExternalStore } from "react";
 import { toggleReaction } from "@/app/actions/reactions";
-import { isGuestLiked, toggleGuestLike, promptSignIn } from "@/lib/guest-reactions";
+import { isGuestLiked, toggleGuestLike, promptSignIn, subscribeGuestLikes } from "@/lib/guest-reactions";
 
 /**
  * Shared support/like logic for the feed cards.
@@ -25,12 +25,11 @@ export function useReaction({
   initialReacted: boolean;
 }) {
   const [count, setCount] = useState(initialCount);
-  const [reacted, setReacted] = useState(initialReacted);
-
-  // Reflect any guest like already stored locally (after hydration).
-  useEffect(() => {
-    if (!signedIn) setReacted(isGuestLiked(postId));
-  }, [signedIn, postId]);
+  const [signedReacted, setReacted] = useState(initialReacted);
+  // A guest's like lives in localStorage, which is an external store: read it as one,
+  // so it is correct after hydration without an effect copying it into state.
+  const guestLiked = useSyncExternalStore(subscribeGuestLikes, () => isGuestLiked(postId), () => false);
+  const reacted = signedIn ? signedReacted : guestLiked;
 
   const react = useCallback(
     (force?: boolean): boolean => {
@@ -57,7 +56,7 @@ export function useReaction({
         promptSignIn();
         return false;
       }
-      setReacted(res.liked);
+      // The store notifies the hook, so `reacted` follows by itself.
       setCount((c) => c + (res.liked ? 1 : -1));
       return res.liked;
     },

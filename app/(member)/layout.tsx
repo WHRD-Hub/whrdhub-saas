@@ -17,7 +17,9 @@ export default async function MemberLayout({ children }: { children: React.React
   // have no Hub community profile and must not be pushed through member
   // onboarding. They keep a reports-only dashboard.
   const reporterOnly = user.isReporterOnly;
-  if (!reporterOnly && !user.profile?.hub_onboarded) redirect("/onboarding");
+  // Staff are not asked to fill in the member questionnaire before they can work.
+  const isStaff = !!user.profile?.is_hub_admin || user.profile?.user_type === "admin";
+  if (!reporterOnly && !isStaff && !user.profile?.hub_onboarded) redirect("/onboarding");
 
   const supabase = await createClient();
   const [{ data: reports }, { count: notifCount }] = await Promise.all([
@@ -54,7 +56,7 @@ export default async function MemberLayout({ children }: { children: React.React
     ? [
         { label: "My Reports", href: "/dashboard/reports", icon: "reports", badge: actioned || undefined, primary: true },
         { label: "Community", href: "/dashboard/feed", icon: "feed", primary: true },
-        { label: "Account", href: "/dashboard/account", icon: "account", primary: true },
+        { label: "Profile & account", shortLabel: "Account", href: "/profile", icon: "account", primary: true },
       ]
     : [
         // The four marked primary are what the mobile bar carries, in this order.
@@ -71,8 +73,7 @@ export default async function MemberLayout({ children }: { children: React.React
               section: "Your network",
             }] as NavItem[])
           : []),
-        { label: "Profile", href: "/profile", icon: "profile", section: "You" },
-        { label: "Account", href: "/dashboard/account", icon: "account", section: "You" },
+        { label: "Profile & account", shortLabel: "Profile", href: "/profile", icon: "profile", section: "You" },
       ];
 
   // Hub admins and reporting defenders get the console switch in the user menu.

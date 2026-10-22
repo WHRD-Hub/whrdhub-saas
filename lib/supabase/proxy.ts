@@ -53,7 +53,7 @@ export async function updateSession(request: NextRequest) {
     "/report", "/offline", "/account-deleted", "/account-suspended",
     // Machine callers authenticate themselves inside the route handler:
     // Africa's Talking (USSD), Meta (signed webhook) and the chat assistant.
-    "/api/ussd", "/api/meta", "/api/chat",
+    "/api/ussd", "/api/meta", "/api/chat", "/api/cron", "/share-target",
     // Stored files, proxied to the public storage buckets by the rewrite in
     // next.config.ts. These objects are public by definition -- putting a
     // session check in front of them would hide published documents from the

@@ -14,6 +14,8 @@ export interface HubProfile {
   /** Reporting platform fields, now part of the same profile row. */
   is_anonymous: boolean | null;
   user_type: "reporter" | "defender" | "admin" | null;
+  /** How this person joined: anonymous, reporter (email, reports only) or member (a chapter). */
+  account_kind?: "anonymous" | "reporter" | "member" | null;
   preferred_language: string | null;
   account_deleted_at: string | null;
   claimed_at: string | null;
@@ -57,13 +59,17 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
   } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const { data: profile } = await supabase
+  const columns =
+    "id, email, full_name, username, title, bio, avatar_url, is_hub_admin, hub_onboarded, county_network_id, is_anonymous, user_type, preferred_language, account_deleted_at, claimed_at, banned_at, ban_reason";
+  let { data: profile, error: profileError } = await supabase
     .from("profiles")
-    .select(
-      "id, email, full_name, username, title, bio, avatar_url, is_hub_admin, hub_onboarded, county_network_id, is_anonymous, user_type, preferred_language, account_deleted_at, claimed_at, banned_at, ban_reason",
-    )
+    .select(`${columns}, account_kind`)
     .eq("id", user.id)
     .single();
+  // Before migration 018 the account_kind column does not exist; carry on without it.
+  if (profileError) {
+    ({ data: profile } = await supabase.from("profiles").select(columns).eq("id", user.id).single());
+  }
 
   const { data: membership } = await supabase
     .from("org_memberships")
@@ -78,8 +84,14 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
   return {
     id: user.id,
     email: user.email ?? null,
+    // The kind someone joined as decides it; accounts from before account kinds existed fall back to the old rule.
     isReporterOnly:
-      !!p && !p.hub_onboarded && !p.is_hub_admin && (p.is_anonymous === true || p.user_type === "reporter"),
+      !!p &&
+      !p.hub_onboarded &&
+      !p.is_hub_admin &&
+      (p.account_kind
+        ? p.account_kind === "anonymous" || p.account_kind === "reporter"
+        : p.is_anonymous === true || p.user_type === "reporter"),
     isDeleted: !!p?.account_deleted_at,
     isBanned: !!p?.banned_at,
     needsClaiming: !!p?.is_anonymous && !p.claimed_at,

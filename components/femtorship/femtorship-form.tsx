@@ -6,6 +6,7 @@ import { Input, Label, Textarea } from "@/components/ui/field";
 import { cn } from "@/lib/utils";
 import { FEMTORSHIP_QUESTIONS, FOCUS_AREAS, FEMTOR_QUALITIES } from "@/lib/data";
 import { saveFemtorship } from "@/app/actions/profile";
+import { PickWithOther } from "@/components/femtorship/pick-fields";
 
 type Fem = Record<string, unknown> | null;
 
@@ -50,15 +51,17 @@ export function FemtorshipForm({ fem, onSaved }: { fem: Fem; onSaved?: () => voi
   const [guidance, setGuidance] = useState<string[]>((f.guidance_areas as string[]) ?? []);
   const [canProvide, setCanProvide] = useState<boolean | undefined>(f.can_provide as boolean | undefined);
   const [support, setSupport] = useState<string[]>((f.support_offered as string[]) ?? []);
+  const [relationship, setRelationship] = useState((f.relationship_nature as string) ?? "");
+  const [supportDetail, setSupportDetail] = useState((f.support_detail as string) ?? "");
   const [loading, setLoading] = useState(false);
   const [saved, setSaved] = useState(false);
 
   const save = async () => {
     setLoading(true);
     await saveFemtorship({
-      in_leadership_role: inLeadership, leadership_detail: leadershipDetail, has_guide: hasGuide,
+      in_leadership_role: inLeadership, leadership_detail: leadershipDetail, has_guide: hasGuide, relationship_nature: relationship,
       barriers, wants_mentor: wantsMentor, desired_qualities: qualities, guidance_areas: guidance,
-      can_provide: canProvide, support_offered: support,
+      can_provide: canProvide, support_offered: support, support_detail: supportDetail,
     });
     setLoading(false);
     setSaved(true);
@@ -70,17 +73,22 @@ export function FemtorshipForm({ fem, onSaved }: { fem: Fem; onSaved?: () => voi
     <div className="space-y-5">
       <div className="space-y-2"><Label>{FEMTORSHIP_QUESTIONS.in_leadership_role}</Label><YesNo value={inLeadership} onChange={setInLeadership} />
         {inLeadership && <Input className="mt-2" value={leadershipDetail} onChange={(e) => setLeadershipDetail(e.target.value)} placeholder={FEMTORSHIP_QUESTIONS.leadership_detail} />}</div>
-      <div className="space-y-2"><Label>{FEMTORSHIP_QUESTIONS.has_guide}</Label><YesNo value={hasGuide} onChange={setHasGuide} /></div>
+      <div className="space-y-2"><Label>{FEMTORSHIP_QUESTIONS.has_guide}</Label><YesNo value={hasGuide} onChange={setHasGuide} />
+        {hasGuide && <Input className="mt-2" value={relationship} onChange={(e) => setRelationship(e.target.value)} placeholder={FEMTORSHIP_QUESTIONS.relationship_nature} />}</div>
       <div className="rounded-2xl border border-line bg-purple-050/40 p-4 space-y-4">
         <p className="text-sm font-bold text-purple-700">As a femtee</p>
         <div className="space-y-2"><Label>{FEMTORSHIP_QUESTIONS.barriers}</Label><Textarea rows={2} value={barriers} onChange={(e) => setBarriers(e.target.value)} /><div className="pt-1"><YesNo value={wantsMentor} onChange={setWantsMentor} /></div><p className="text-xs text-muted">I would like to be matched with a femtor.</p></div>
-        <div className="space-y-2"><Label>{FEMTORSHIP_QUESTIONS.guidance_areas}</Label><Pills options={FOCUS_AREAS} value={guidance} onChange={setGuidance} /></div>
+        <div className="space-y-2"><Label>{FEMTORSHIP_QUESTIONS.guidance_areas}</Label><PickWithOther options={FOCUS_AREAS} value={guidance} onChange={setGuidance} max={3} /></div>
         <div className="space-y-2"><Label>{FEMTORSHIP_QUESTIONS.desired_qualities}</Label><Pills options={FEMTOR_QUALITIES} value={qualities} onChange={setQualities} /></div>
       </div>
       <div className="rounded-2xl border border-line bg-magenta-050/40 p-4 space-y-4">
         <p className="text-sm font-bold text-magenta-700">As a femtor</p>
         <div className="space-y-2"><Label>{FEMTORSHIP_QUESTIONS.can_provide}</Label><YesNo value={canProvide} onChange={setCanProvide} /></div>
-        {canProvide && <div className="space-y-2"><Label>{FEMTORSHIP_QUESTIONS.support_offered}</Label><Pills options={FOCUS_AREAS} value={support} onChange={setSupport} /></div>}
+        {canProvide && <div className="space-y-2"><Label>{FEMTORSHIP_QUESTIONS.support_offered}</Label><PickWithOther options={FOCUS_AREAS} value={support} onChange={setSupport} /></div>}
+      </div>
+      <div className="space-y-2">
+        <Label>{FEMTORSHIP_QUESTIONS.support_detail}</Label>
+        <Textarea rows={2} value={supportDetail} onChange={(e) => setSupportDetail(e.target.value)} placeholder="Optional, e.g. access needs, language, availability" />
       </div>
       <div className="flex items-center gap-3">
         <button onClick={save} disabled={loading} className="inline-flex items-center gap-2 rounded-xl bg-purple text-white px-5 h-11 text-sm font-bold hover:bg-purple-600">

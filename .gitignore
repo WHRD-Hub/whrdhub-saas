@@ -43,3 +43,6 @@ next-env.d.ts
 
 # Vendored from pdfjs-dist by scripts/copy-pdf-worker.mjs on every build.
 /public/pdf.worker.min.mjs
+
+# Local test credentials (never commit)
+TEST_ACCOUNTS.md

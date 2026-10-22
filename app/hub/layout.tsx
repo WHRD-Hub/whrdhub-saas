@@ -63,59 +63,43 @@ export default async function HubLayout({ children }: { children: React.ReactNod
       .eq("status", "suspended"),
   ]);
 
-  // Grouped so each heading is contiguous, because the sidebar folds by
-  // section and a section that appears twice is two headings, not one group.
+  // The sidebar shows one area at a time. Everyday pages are listed; the rarely
+  // used ones are marked secondary and sit under "More". Items of one section
+  // stay together so each heading appears once.
   const communityNav: NavItem[] = [
-    { label: "Overview", shortLabel: "Hub", href: "/hub", icon: "overview", section: "Community", primary: true },
-    { label: "Resources", href: "/hub/resources", icon: "resources", section: "Community" },
-    { label: "CBOs", href: "/hub/organizations", icon: "organisations", badge: orgsPending || undefined, section: "Community" },
-    { label: "Members", href: "/hub/members", icon: "members", section: "Community" },
-    { label: "Femtorship", href: "/hub/femtorship", icon: "femtorship", section: "Community" },
+    { label: "Overview", shortLabel: "Hub", href: "/hub", icon: "overview", area: "Community", primary: true },
 
-    // What is waiting on a decision. This is the group an administrator opens
-    // first, so it sits directly under the overview and carries the badges.
-    { label: "Posts", href: "/hub/posts", icon: "posts", badge: postsPending || undefined, section: "Awaiting review", primary: true },
-    { label: "Stories", href: "/hub/blogs", icon: "blogs", badge: blogsPending || undefined, section: "Awaiting review" },
-    {
-      label: "Membership requests",
-      href: "/dashboard/network",
-      icon: "matching",
-      badge: membersPending || undefined,
-      section: "Awaiting review",
-    },
-    {
-      label: "Moderation",
-      href: "/hub/moderation",
-      icon: "moderation",
-      badge: suspendedMembers || undefined,
-      section: "Awaiting review",
-    },
+    // What is waiting on a decision: the group an administrator opens first, so it carries the badges.
+    { label: "Posts", href: "/hub/posts", icon: "posts", badge: postsPending || undefined, area: "Community", section: "To review", primary: true },
+    { label: "Stories", href: "/hub/blogs", icon: "blogs", badge: blogsPending || undefined, area: "Community", section: "To review" },
+    { label: "Membership requests", href: "/dashboard/network", icon: "matching", badge: membersPending || undefined, area: "Community", section: "To review" },
+    { label: "Moderation", href: "/hub/moderation", icon: "moderation", badge: suspendedMembers || undefined, area: "Community", section: "To review" },
 
-    { label: "Deleted content", href: "/hub/deleted", icon: "deleted", section: "Archive" },
-    { label: "Deleted accounts", href: "/hub/accounts", icon: "accounts", section: "Archive" },
+    { label: "Members", href: "/hub/members", icon: "members", area: "Community", section: "Manage" },
+    { label: "CBOs", href: "/hub/organizations", icon: "organisations", badge: orgsPending || undefined, area: "Community", section: "Manage" },
+    { label: "Resources", href: "/hub/resources", icon: "resources", area: "Community", section: "Manage" },
+    { label: "Femtorship", href: "/hub/femtorship", icon: "femtorship", area: "Community", section: "Manage" },
+
+    { label: "Deleted content", href: "/hub/deleted", icon: "deleted", area: "Community", secondary: true },
+    { label: "Deleted accounts", href: "/hub/accounts", icon: "accounts", area: "Community", secondary: true },
   ];
 
   // The reporting console. Triage-only accounts see the case-handling pages;
   // full administrators also get the directory, listening and linkage tools.
   const reportingNav: NavItem[] = [
-    { label: "Reporting dashboard", shortLabel: "Reporting", href: "/hub/reporting", icon: "triage", section: "Reporting", primary: true },
-    {
-      label: "Reports",
-      href: "/hub/reporting/reports",
-      icon: "reports",
-      primary: true,
-      badge: reportsUrgent || reportsPending || undefined,
-      section: "Reporting",
-    },
-    { label: "Matching", href: "/hub/reporting/matching", icon: "matchflow", section: "Reporting" },
-    { label: "Incident map", href: "/hub/reporting/map", icon: "map", section: "Reporting" },
+    { label: "Reporting dashboard", shortLabel: "Reporting", href: "/hub/reporting", icon: "triage", area: "Reporting", primary: true },
+    { label: "Reports", href: "/hub/reporting/reports", icon: "reports", primary: true, badge: reportsUrgent || reportsPending || undefined, area: "Reporting" },
+    ...(access?.canAdminister
+      ? ([{ label: "Online listening", href: "/hub/reporting/listening", icon: "listening", area: "Reporting" }] as NavItem[])
+      : []),
+    { label: "Incident map", href: "/hub/reporting/map", icon: "map", area: "Reporting" },
+    { label: "Matching", href: "/hub/reporting/matching", icon: "matchflow", area: "Reporting" },
     ...(access?.canAdminister
       ? ([
-          { label: "Support services", href: "/hub/reporting/services", icon: "support", section: "Reporting" },
-          { label: "Analytics", href: "/hub/reporting/analytics", icon: "analytics", section: "Reporting" },
-          { label: "Referral linkages", href: "/hub/reporting/linkages", icon: "linkages", section: "Reporting" },
-          { label: "Online listening", href: "/hub/reporting/listening", icon: "listening", section: "Reporting" },
-          { label: "Deleted reports", href: "/hub/reporting/deleted", icon: "deleted", section: "Reporting" },
+          { label: "Support services", href: "/hub/reporting/services", icon: "support", area: "Reporting" },
+          { label: "Analytics", href: "/hub/reporting/analytics", icon: "analytics", area: "Reporting", secondary: true },
+          { label: "Referral linkages", href: "/hub/reporting/linkages", icon: "linkages", area: "Reporting", secondary: true },
+          { label: "Deleted reports", href: "/hub/reporting/deleted", icon: "deleted", area: "Reporting", secondary: true },
         ] as NavItem[])
       : []),
   ];

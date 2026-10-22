@@ -12,7 +12,6 @@ const CATEGORY_TONE: Record<string, "purple" | "cyan" | "magenta" | "green" | "a
   shelter: "green",
   digital_security: "purple",
   financial: "amber",
-  referral: "cyan",
   other: "slate",
 };
 
@@ -69,7 +68,9 @@ async function ServicesList() {
                       <Globe className="w-3 h-3" />Website
                     </a>
                   )}
-                  {s.county && <p className="font-medium text-ink">📍 {s.county}</p>}
+                  <p className="font-medium text-ink">
+                    📍 {s.county ? `${s.county} county` : s.country ? `All of ${s.country}` : "Everywhere"}
+                  </p>
                 </div>
                 {!s.is_active && <Badge variant="secondary">Inactive</Badge>}
               </div>

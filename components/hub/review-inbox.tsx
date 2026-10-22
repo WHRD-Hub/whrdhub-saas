@@ -57,7 +57,7 @@ export function ReviewInbox({ posts, cbos, blogs }: { posts: InboxItem[]; cbos: 
           <h2 className="font-black text-ink leading-tight">Needs your attention</h2>
           <p className="text-xs text-muted">{total} item{total === 1 ? "" : "s"} waiting across the network</p>
         </div>
-        <div className="flex gap-1 rounded-[10px] border border-line bg-paper p-1">
+        <div className="flex gap-1 rounded-[7px] border border-line bg-paper p-1">
           {TABS.map((t) => {
             const on = tab === t.id;
             return (

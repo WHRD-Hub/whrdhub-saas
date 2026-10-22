@@ -13,6 +13,8 @@ export function AssignServiceForm({
   services,
   suggested = [],
   supportRequested = [],
+  fits = [],
+  fromListening = false,
 }: {
   reportId: string;
   services: Service[];
@@ -20,6 +22,10 @@ export function AssignServiceForm({
   suggested?: Service[];
   /** Raw support_needed values, for the "matched to" hint. */
   supportRequested?: string[];
+  /** Ids of the services whose category fits the kind of case; the list is already ordered best first. */
+  fits?: string[];
+  /** Found online, not reported: nothing is picked for the team. */
+  fromListening?: boolean;
 }) {
   // Preselect the first suggested match so the admin can assign in one click.
   const [serviceId, setServiceId] = useState(suggested[0]?.id ?? "");
@@ -29,6 +35,7 @@ export function AssignServiceForm({
   const [assignedIds, setAssignedIds] = useState<Set<string>>(new Set());
 
   const suggestedIds = useMemo(() => new Set(suggested.map(s => s.id)), [suggested]);
+  const fitIds = useMemo(() => new Set(fits), [fits]);
 
   const doAssign = async (id: string, noteText: string) => {
     const result = await assignService(reportId, id, noteText);
@@ -74,7 +81,7 @@ export function AssignServiceForm({
       {remainingSuggested.length > 0 && (
         <div className="space-y-2">
           <p className="text-xs font-semibold text-purple uppercase flex items-center gap-1.5">
-            <Sparkles className="w-3.5 h-3.5" /> Matched to support requested
+            <Sparkles className="w-3.5 h-3.5" /> Picked for this report
           </p>
           {humanSupport && (
             <p className="text-[11px] text-muted -mt-1">
@@ -113,6 +120,9 @@ export function AssignServiceForm({
           <p className="text-xs font-semibold text-muted uppercase">
             {remainingSuggested.length > 0 ? "Assign another service" : "Assign a service"}
           </p>
+          {fromListening && (
+            <p className="-mt-1 text-[11px] text-muted">Found online, so nothing is picked for you. Services are ordered by what this kind of case usually needs; ★ marks the likely fits.</p>
+          )}
           <select
             value={serviceId}
             onChange={e => setServiceId(e.target.value)}
@@ -121,7 +131,7 @@ export function AssignServiceForm({
             <option value="">Select service...</option>
             {remainingServices.map(s => (
               <option key={s.id} value={s.id}>
-                {suggestedIds.has(s.id) ? "★ " : ""}{s.name} ({s.category}){s.organization ? ` - ${s.organization}` : ""}
+                {suggestedIds.has(s.id) || fitIds.has(s.id) ? "★ " : ""}{s.name} ({s.category}){s.organization ? ` - ${s.organization}` : ""}
               </option>
             ))}
           </select>

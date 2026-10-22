@@ -22,12 +22,13 @@ interface Content { id: string; title?: string; body?: string; slug?: string | n
 type Fem = Record<string, unknown> | null;
 type Prof = { full_name: string; title: string; bio: string; email: string; county_network_id: string; username?: string };
 
-type SectionId = "profile" | "networks" | "femtorship" | "activity" | "security" | "accessibility" | "admin" | "privacy";
+type SectionId = "profile" | "networks" | "femtorship" | "verification" | "activity" | "security" | "accessibility" | "admin" | "privacy";
 
-const SECTIONS: { id: SectionId; label: string; icon: typeof User; membersOnly?: boolean; adminOnly?: boolean }[] = [
+const SECTIONS: { id: SectionId; label: string; icon: typeof User; membersOnly?: boolean; adminOnly?: boolean; mentorOnly?: boolean }[] = [
   { id: "profile", label: "Profile", icon: User },
   { id: "networks", label: "Networks", icon: Building2 },
   { id: "femtorship", label: "Femtorship", icon: Heart, membersOnly: true },
+  { id: "verification", label: "Verification", icon: ShieldCheck, mentorOnly: true },
   { id: "activity", label: "My activity", icon: Activity, membersOnly: true },
   { id: "security", label: "Sign-in & devices", icon: KeyRound },
   { id: "accessibility", label: "Accessibility", icon: Eye },
@@ -45,21 +46,24 @@ const SECTIONS: { id: SectionId; label: string; icon: typeof User; membersOnly?:
  * ready-made nodes, so this component stays about layout and the forms.
  */
 export function ProfileClient({
-  profile, femtorship, counties, posts, blogs, reactedPosts, isAdmin = false, reporterOnly = false,
-  initialSection, claim, networks, devices, deleteAccount,
+  profile, femtorship, counties, posts, blogs, reactedPosts, isAdmin = false, reporterOnly = false, isMentor = false,
+  initialSection, claim, networks, devices, deleteAccount, verification,
 }: {
   profile: Prof; femtorship: Fem; counties: County[];
   posts: Content[]; blogs: Content[];
   reactedPosts: { id: string; body: string; is_hub: boolean; status: string }[];
   isAdmin?: boolean;
   reporterOnly?: boolean;
+  /** Offers femtorship, so the verification section applies. */
+  isMentor?: boolean;
+  verification?: React.ReactNode;
   initialSection?: string;
   claim?: React.ReactNode;
   networks: React.ReactNode;
   devices: React.ReactNode;
   deleteAccount: React.ReactNode;
 }) {
-  const sections = SECTIONS.filter((s) => (!s.membersOnly || !reporterOnly) && (!s.adminOnly || isAdmin));
+  const sections = SECTIONS.filter((s) => (!s.membersOnly || !reporterOnly) && (!s.adminOnly || isAdmin) && (!s.mentorOnly || isMentor));
   const [section, setSection] = useState<SectionId>(sections.find((s) => s.id === initialSection)?.id ?? "profile");
 
   return (
@@ -96,6 +100,9 @@ export function ProfileClient({
             <Card title="Femtorship" desc="Update your answers any time. We use them to suggest matches.">
               <FemtorshipForm fem={femtorship} />
             </Card>
+          )}
+          {section === "verification" && isMentor && (
+            <Card title="Verification" desc="Add your ID and accreditation so the Hub can verify you as a femtor. Optional, and you can do it any time.">{verification}</Card>
           )}
           {section === "activity" && <ActivitySection posts={posts} blogs={blogs} reacted={reactedPosts} />}
           {section === "security" && (

@@ -26,8 +26,10 @@ export interface Preset {
  * so it works for client-side lists as well as URL-driven ones.
  */
 export function FilterBar({
-  filters, values, onChange, onClear, search, busy, trailing,
+  filters, values, onChange, onClear, search, busy, trailing, compact,
 }: {
+  /** Drops the surrounding box and uses shorter controls, for toolbars that share a row. */
+  compact?: boolean;
   filters: FilterDef[];
   values: Record<string, string>;
   onChange: (key: string, value: string) => void;
@@ -39,7 +41,7 @@ export function FilterBar({
   const active = filters.filter((f) => values[f.key]).length + (search?.value ? 1 : 0);
 
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-line bg-surface p-2 shadow-[0_1px_2px_rgba(28,21,34,0.04)]">
+    <div className={cn("flex flex-wrap items-center gap-2", compact ? "min-w-0 flex-1" : "rounded-2xl border border-line bg-surface p-2 shadow-[0_1px_2px_rgba(28,21,34,0.04)]")}>
       {search && (
         <div className="relative min-w-[13rem] flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
@@ -49,7 +51,7 @@ export function FilterBar({
             onChange={(e) => search.onChange(e.target.value)}
             placeholder={search.placeholder}
             aria-label={search.placeholder}
-            className="h-9 w-full rounded-full bg-paper pl-9 pr-9 text-[13px] text-ink placeholder:text-muted focus:bg-surface focus:outline-none focus:ring-2 focus:ring-purple/30"
+            className={cn(compact ? "h-8" : "h-9", "w-full rounded-full bg-paper pl-9 pr-9 text-[13px] text-ink placeholder:text-muted focus:bg-surface focus:outline-none focus:ring-2 focus:ring-purple/30")}
           />
           {busy && <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted" aria-hidden />}
         </div>
@@ -64,7 +66,7 @@ export function FilterBar({
               value={v}
               onChange={(e) => onChange(f.key, e.target.value)}
               className={cn(
-                "h-9 max-w-[11rem] appearance-none truncate rounded-full border pl-3.5 pr-8 text-[13px] transition-colors focus:outline-none focus:ring-2 focus:ring-purple/30",
+                compact ? "h-8" : "h-9", "max-w-[11rem] appearance-none truncate rounded-full border pl-3.5 pr-8 text-[13px] transition-colors focus:outline-none focus:ring-2 focus:ring-purple/30",
                 v ? "border-purple/40 bg-purple-050 font-semibold text-purple-700" : "border-line bg-surface font-medium text-muted hover:text-ink",
               )}
             >
@@ -77,7 +79,7 @@ export function FilterBar({
       })}
 
       {active > 0 && (
-        <button type="button" onClick={onClear} className="inline-flex h-9 items-center gap-1 rounded-full px-3 text-[13px] font-semibold text-muted hover:bg-paper hover:text-ink">
+        <button type="button" onClick={onClear} className="inline-flex h-8 items-center gap-1 rounded-full px-3 text-[13px] font-semibold text-muted hover:bg-paper hover:text-ink">
           <X className="h-3.5 w-3.5" /> Clear{active > 1 ? ` (${active})` : ""}
         </button>
       )}

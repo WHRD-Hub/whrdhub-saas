@@ -4,6 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import { Pill } from "@/components/ui/pill";
 import { MatchActions, RunMatching } from "@/components/mentorship/match-actions";
 import { FemtorshipForm } from "@/components/femtorship/femtorship-form";
+import { MentorDocsBanner } from "@/components/mentorship/mentor-docs-banner";
+import { missingDocs, type MentorDoc } from "@/lib/mentor-verification";
 
 export const metadata = { title: "Femtorship — WHRD Hub" };
 
@@ -12,10 +14,13 @@ export default async function MentorshipPage() {
   const supabase = await createClient();
   const uid = user!.id;
 
-  const [{ data: fem }, { data: matches }] = await Promise.all([
+  const [{ data: fem }, { data: matches }, { data: ver }] = await Promise.all([
     supabase.from("mentorship_profiles").select("*").eq("user_id", uid).maybeSingle(),
     supabase.from("mentorship_matches").select("id, mentor_id, mentee_id, overlap, score, status").or(`mentor_id.eq.${uid},mentee_id.eq.${uid}`).order("score", { ascending: false }),
+    supabase.from("mentor_verifications").select("status, documents").eq("user_id", uid).maybeSingle(),
   ]);
+  // A femtor who is not yet verified is reminded, on every visit, to add the ID and accreditation.
+  const missing = (fem as { is_mentor?: boolean } | null)?.is_mentor && ver?.status !== "verified" ? missingDocs((ver?.documents as MentorDoc[]) ?? []) : [];
 
   const list = matches ?? [];
   const connected = list.filter((m) => m.status === "accepted");
@@ -44,6 +49,7 @@ export default async function MentorshipPage() {
 
   return (
     <>
+      <MentorDocsBanner missing={missing} />
       <div className="flex items-start justify-between gap-4 flex-wrap mb-6">
         <div>
           <h1 className="text-2xl font-black text-ink flex items-center gap-2"><Heart className="w-6 h-6 text-magenta-700" /> Femtorship</h1>

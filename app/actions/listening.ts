@@ -225,3 +225,28 @@ export async function setResultsStatus(ids: string[], status: string) {
   revalidatePath("/hub/reporting/listening");
   return { ok: true };
 }
+
+/** Listen to a hashtag that keeps appearing in captures: it joins the list on the chosen platforms. */
+export async function acceptTagSuggestion(tag: string, platforms: ("instagram" | "x")[]) {
+  if (!(await requireAdmin())) return { error: "Admins only." };
+  const handle = tag.replace(/^#/, "").toLowerCase();
+  if (!validHandle(handle)) return { error: "That does not look like a hashtag." };
+  for (const platform of new Set(platforms)) {
+    if (platform !== "instagram" && platform !== "x") continue;
+    const r = await addSource(platform, "hashtag", handle, "Added from a tag that kept appearing in captures");
+    if (r.error) return r;
+  }
+  return { ok: true };
+}
+
+/** Say no to a suggested hashtag; it is not offered again. */
+export async function declineTagSuggestion(tag: string) {
+  const adminId = await requireAdmin();
+  if (!adminId) return { error: "Admins only." };
+  const handle = tag.replace(/^#/, "").toLowerCase();
+  if (!validHandle(handle)) return { error: "That does not look like a hashtag." };
+  const { error } = await db().from("listening_tag_declines").upsert({ tag: handle, declined_by: adminId });
+  if (error) return { error: /listening_tag_declines/i.test(error.message) ? "Run migration 022 so this choice can be remembered." : "Could not save that just now." };
+  revalidatePath("/hub/reporting/listening");
+  return { ok: true };
+}

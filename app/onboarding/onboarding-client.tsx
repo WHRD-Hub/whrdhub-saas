@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { FEMTORSHIP_QUESTIONS, FOCUS_AREAS, FEMTOR_QUALITIES } from "@/lib/data";
 import { completeOnboarding } from "@/app/actions/onboarding";
 import { PickWithOther } from "@/components/femtorship/pick-fields";
+import { MentorDocuments } from "@/components/mentorship/mentor-documents";
 
 interface County { id: string; name: string; is_active: boolean }
 interface Org { id: string; name: string; county_network_id: string | null; verification_status: string }
@@ -380,6 +381,11 @@ export function OnboardingWizard({
                     <div className="space-y-2">
                       <Label>{FEMTORSHIP_QUESTIONS.support_offered}</Label>
                       <PickWithOther options={FOCUS_AREAS} value={supportOffered} onChange={setSupportOffered} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Verify yourself as a femtor (optional)</Label>
+                      <p className="text-xs text-muted">Add your ID and accreditation now, or skip this and do it later from your profile.</p>
+                      <MentorDocuments docs={[]} compact />
                     </div>
                   </>
                 )}

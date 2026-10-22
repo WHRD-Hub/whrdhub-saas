@@ -11,12 +11,15 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Pill } from "@/components/ui/pill";
 import { CopyButton } from "@/components/reporting/copy-button";
+import { PostView } from "@/components/reporting/listening/post-embed";
 import { FactCheckForm } from "@/components/reporting/admin/fact-check-form";
 import { AssignServiceForm } from "@/components/reporting/admin/assign-service-form";
 import { ReportDelete } from "@/components/reporting/admin/report-delete";
 import { getReportingAccess } from "@/lib/reporting-access";
 import { incidentLabel, riskLabel, supportLabel } from "@/lib/reporting-options";
 import { urgencyMeta } from "@/lib/urgency";
+import { rankServices } from "@/lib/service-match";
+import { extractTags } from "@/lib/hashtags";
 import { generaliseArea } from "@/lib/geo-privacy";
 import { suggestSupportCategory } from "@/lib/jev-uses";
 import { timeAgo } from "@/lib/utils";
@@ -44,12 +47,12 @@ function Card({ title, icon: Icon, children, tone = "default" }: {
   title: string; icon?: React.ComponentType<{ className?: string }>; children: React.ReactNode; tone?: "default" | "warm";
 }) {
   return (
-    <section className={`card-premium p-5 sm:p-6 space-y-4 ${tone === "warm" ? "!border-amber-200 !bg-amber-50/50" : ""}`}>
-      <h2 className="flex items-center gap-2 font-display text-lg font-bold tracking-tight text-ink">
-        {Icon && <Icon className="h-4.5 w-4.5 text-purple" />}
+    <section className={`rounded-xl border bg-surface ${tone === "warm" ? "border-amber-200 bg-amber-50/40" : "border-line"}`}>
+      <h2 className={`flex items-center gap-2 border-b px-4 py-2.5 text-[13px] font-semibold text-ink ${tone === "warm" ? "border-amber-200/70" : "border-line"}`}>
+        {Icon && <Icon className="h-3.5 w-3.5 text-purple" />}
         {title}
       </h2>
-      {children}
+      <div className="space-y-3.5 p-4">{children}</div>
     </section>
   );
 }
@@ -60,8 +63,8 @@ function Fact({ label, children, empty }: { label: string; children?: React.Reac
   if (!has && !empty) return null;
   return (
     <div className="min-w-0">
-      <dt className="eyebrow mb-1">{label}</dt>
-      <dd className={`text-sm ${has ? "font-medium text-ink" : "text-muted"}`}>{has ? children : empty}</dd>
+      <dt className="mb-0.5 text-[11px] font-medium text-muted">{label}</dt>
+      <dd className={`text-[13px] ${has ? "font-medium text-ink" : "text-muted"}`}>{has ? children : empty}</dd>
     </div>
   );
 }
@@ -123,6 +126,9 @@ async function ReportDetail({ id }: { id: string }) {
     capture = data as Capture | null;
   }
   const fromListening = !!capture || report.channel === "api";
+  // The post to show as it appears online: the capture's, or the link a reporter gave.
+  const embedLink = capture?.permalink ?? ((report.tfgbv_link as string | null) || null);
+  const postTags = capture ? extractTags((report.description as string) || "") : [];
 
   const voicePaths = ((report as { voice_note_paths?: string[] | null }).voice_note_paths ?? []).slice(0, 3);
   const voiceUrls: string[] = [];
@@ -168,15 +174,12 @@ async function ReportDetail({ id }: { id: string }) {
 
   const assignedServiceIds = new Set((assignedServices ?? []).map((s) => s.service_id));
 
-  // Auto-match services to the support the reporter asked for.
-  const SUPPORT_TO_CATEGORIES: Record<string, string[]> = {
-    legal: ["legal"], medical: ["medical"], psychosocial: ["psychosocial"], counselling: ["psychosocial"],
-    shelter: ["shelter"], digital_security: ["digital_security"], financial: ["financial"], other: ["other"],
-  };
+  // Services are offered in the order that fits the case. A reported case also gets its best match picked for the
+  // team to confirm; a case found by online listening has no requester, so nothing is picked and a person chooses.
   const supportNeeded = (report.support_needed as string[]) ?? [];
-  const matchedCategories = new Set(supportNeeded.flatMap((s) => SUPPORT_TO_CATEGORIES[s] ?? [s]));
   const unassignedServices = (allServices ?? []).filter((s) => !assignedServiceIds.has(s.id));
-  const suggestedServices = unassignedServices.filter((s) => matchedCategories.has(s.category));
+  const { ordered: rankedServices, fits: fittingServices } = rankServices(unassignedServices, { incidentTypes: (report.incident_types as string[]) ?? [], supportNeeded: fromListening ? [] : supportNeeded });
+  const suggestedServices = fromListening ? [] : rankedServices.filter((s) => fittingServices.has(s.id)).slice(0, 3);
 
   const types = ((report.incident_types as string[]) ?? []);
   const title = types.length ? types.map(incidentLabel).slice(0, 3).join(" · ") + (types.length > 3 ? ` +${types.length - 3}` : "") : "Report";
@@ -205,102 +208,115 @@ async function ReportDetail({ id }: { id: string }) {
   events.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6">
-      <Link href={fromListening ? "/hub/reporting/listening" : "/hub/reporting/reports"} className="inline-flex items-center gap-2 text-sm font-semibold text-muted transition-colors hover:text-purple">
-        <ArrowLeft className="w-4 h-4" /> {fromListening ? "Back to online listening" : "Back to reports"}
-      </Link>
-
-      {/* Header */}
-      <header className="card-premium overflow-hidden">
-        <div className="h-1.5" style={{ background: urgency.hex }} aria-hidden="true" />
-        <div className="flex flex-wrap items-start justify-between gap-4 p-5 sm:p-7">
-          <div className="min-w-0">
-            <p className="eyebrow mb-1.5 flex items-center gap-2">
-              Case <span className="font-mono normal-case tracking-normal text-ink">{ref}</span>
-              <CopyButton text={report.id as string} label="case ID" />
-            </p>
-            <h1 className="font-display text-2xl font-bold tracking-tight text-ink sm:text-3xl">{title}</h1>
-            <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted">
-              <span className="inline-flex items-center gap-1"><MapPin className="h-3.5 w-3.5" />{[report.county, report.country && report.country !== report.county ? report.country : null].filter(Boolean).join(", ") || "Location not given"}</span>
-              <span className="inline-flex items-center gap-1"><Clock className="h-3.5 w-3.5" />Filed {timeAgo(report.created_at as string)}</span>
-              <span className="inline-flex items-center gap-1"><Radio className="h-3.5 w-3.5" />{CHANNEL_LABEL[report.channel as string] ?? "Web form"}</span>
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge variant={vm.variant} className="flex items-center gap-1">{vm.icon} {vm.label}</Badge>
-            <Badge variant="secondary">{titleCase((report.status as string) ?? "submitted")}</Badge>
-            <Badge variant={urgency.badge}>{urgency.label} urgency</Badge>
-            {report.is_ongoing && <Badge variant="warning">Still happening</Badge>}
-            {canAdminister && <ReportDelete reportId={report.id as string} />}
-          </div>
-        </div>
-
-        {critical && (
-          <div className="mx-5 mb-5 flex items-start gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900 sm:mx-7">
-            <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
-            <p>
-              <span className="font-bold">Critical case.</span>{" "}
-              {report.acknowledged_at || ackedNow
-                ? `Acknowledged${ackedNow ? " by you just now" : ` by ${staffNames.get(report.acknowledged_by as string) ?? "a team member"} ${timeAgo(report.acknowledged_at as string)}`}.`
-                : "Nobody has acknowledged it yet."}
-            </p>
-          </div>
-        )}
-
-        {report.deleted_at ? (
-          <div className="mx-5 mb-5 flex items-start gap-2 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900 sm:mx-7">
-            <Trash2 className="mt-0.5 h-4 w-4 shrink-0" />
-            <span>
-              <span className="font-bold">This report is deleted.</span> The reporter can no longer see it. Restore it from Deleted reports.
-              {report.deleted_reason ? ` Reason: ${report.deleted_reason as string}` : ""}
-            </span>
-          </div>
-        ) : null}
-
-        {/* At a glance */}
-        <dl className="grid grid-cols-2 gap-px border-t border-line bg-line sm:grid-cols-4">
-          {[
-            { k: "When it happened", v: report.occurred_at ? `${new Date(report.occurred_at).toLocaleDateString("en-KE", { day: "numeric", month: "short", year: "numeric" })}${report.occurred_time ? `, ${report.occurred_time}` : ""}` : "Not given", icon: Calendar },
-            { k: "Who did it", v: report.perpetrator_type ? titleCase(report.perpetrator_type as string) : "Not given", icon: User },
-            { k: "Support asked for", v: supportNeeded.length ? `${supportNeeded.length} type${supportNeeded.length === 1 ? "" : "s"}` : "None", icon: HeartHandshake },
-            { k: "Risks listed", v: risks.length ? `${risks.length}` : "None", icon: ShieldAlert },
-          ].map(({ k, v, icon: Icon }) => (
-            <div key={k} className="bg-surface px-5 py-3.5">
-              <dt className="eyebrow mb-1 flex items-center gap-1.5"><Icon className="h-3 w-3" />{k}</dt>
-              <dd className="truncate text-sm font-semibold text-ink">{v}</dd>
-            </div>
-          ))}
-        </dl>
-      </header>
-
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* ── Main column: everything the reporter told us ── */}
-        <div className="space-y-5 lg:col-span-2">
-          {fromListening && (
-            <section className="card-premium flex flex-wrap items-center justify-between gap-3 !border-purple/30 !bg-purple-050/50 p-4 sm:px-6">
+    <div className="space-y-3">
+      {/* Header: one flat block, with the way back folded into its first line */}
+      <header className="overflow-hidden rounded-xl border border-line bg-surface">
+        <div className="flex">
+          <span className="w-1 shrink-0" style={{ background: urgency.hex }} aria-hidden="true" />
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 px-4 py-3">
               <div className="min-w-0">
-                <p className="eyebrow mb-1 flex items-center gap-1.5"><Radio className="h-3 w-3" />Found by online listening</p>
-                <p className="text-sm text-ink">
-                  {capture
-                    ? <>Posted by <span className="font-semibold">{capture.author ?? "an unknown account"}</span> on {capture.source === "x" ? "X" : capture.source.replace(/^\w/, (c) => c.toUpperCase())}, captured {timeAgo(capture.captured_at)}.</>
-                    : "Nobody reported this: it was found online and taken on by the team."}
-                  {" "}Nobody has contacted us about it.
+                <p className="flex items-center gap-1.5 text-[11px] text-muted">
+                  <Link href={fromListening ? "/hub/reporting/listening" : "/hub/reporting/reports"} className="inline-flex items-center gap-1 font-semibold transition-colors hover:text-purple">
+                    <ArrowLeft className="h-3 w-3" /> {fromListening ? "Online listening" : "Reports"}
+                  </Link>
+                  <span aria-hidden="true">/</span>
+                  <span>Case <span className="font-mono text-ink">{ref}</span></span>
+                  <CopyButton text={report.id as string} label="case ID" />
+                </p>
+                <h1 className="mt-1 font-display text-xl font-bold tracking-tight text-ink">{title}</h1>
+                <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted">
+                  <span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3" />{[report.county, report.country && report.country !== report.county ? report.country : null].filter(Boolean).join(", ") || "Location not given"}</span>
+                  <span className="inline-flex items-center gap-1"><Clock className="h-3 w-3" />Filed {timeAgo(report.created_at as string)}</span>
+                  <span className="inline-flex items-center gap-1"><Radio className="h-3 w-3" />{CHANNEL_LABEL[report.channel as string] ?? "Web form"}</span>
                 </p>
               </div>
-              {capture?.permalink && (
-                <a href={capture.permalink} target="_blank" rel="noopener noreferrer" className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl border border-line bg-surface px-3.5 text-xs font-bold text-purple hover:bg-paper">
-                  Open the original post <ExternalLink className="h-3.5 w-3.5" />
-                </a>
-              )}
-            </section>
-          )}
+              <div className="flex flex-wrap items-center gap-1.5">
+                <Badge variant={vm.variant} className="flex items-center gap-1">{vm.icon} {vm.label}</Badge>
+                <Badge variant="secondary">{titleCase((report.status as string) ?? "submitted")}</Badge>
+                <Badge variant={urgency.badge}>{urgency.label} urgency</Badge>
+                {report.is_ongoing && <Badge variant="warning">Still happening</Badge>}
+                {fromListening && (
+                  <span tabIndex={0} className="group relative inline-flex cursor-help items-center gap-1 rounded-full border border-purple/25 bg-purple-050 px-2.5 py-0.5 text-xs font-semibold text-purple-700 outline-none focus-visible:ring-2 focus-visible:ring-purple/40">
+                    <Radio className="h-3 w-3" /> Found online
+                    <span role="tooltip" className="pointer-events-none absolute right-0 top-full z-30 mt-1.5 hidden w-64 rounded-lg border border-line bg-surface p-2.5 text-xs font-normal leading-snug text-ink shadow-lg group-hover:block group-focus:block">
+                      Nobody reported this. The team found it online and took it on, and nobody has contacted us about it.
+                    </span>
+                  </span>
+                )}
+                {canAdminister && <ReportDelete reportId={report.id as string} />}
+              </div>
+            </div>
 
+            {critical && (
+              <div className="mx-4 mb-3 flex items-start gap-2.5 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-[13px] text-rose-900">
+                <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
+                <p>
+                  <span className="font-bold">Critical case.</span>{" "}
+                  {report.acknowledged_at || ackedNow
+                    ? `Acknowledged${ackedNow ? " by you just now" : ` by ${staffNames.get(report.acknowledged_by as string) ?? "a team member"} ${timeAgo(report.acknowledged_at as string)}`}.`
+                    : "Nobody has acknowledged it yet."}
+                </p>
+              </div>
+            )}
+
+            {report.deleted_at ? (
+              <div className="mx-4 mb-3 flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-[13px] text-rose-900">
+                <Trash2 className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>
+                  <span className="font-bold">This report is deleted.</span> The reporter can no longer see it. Restore it from Deleted reports.
+                  {report.deleted_reason ? ` Reason: ${report.deleted_reason as string}` : ""}
+                </span>
+              </div>
+            ) : null}
+
+            {/* At a glance */}
+            <dl className="grid grid-cols-2 gap-px border-t border-line bg-line sm:grid-cols-4">
+              {[
+                { k: "When it happened", v: report.occurred_at ? `${new Date(report.occurred_at).toLocaleDateString("en-KE", { day: "numeric", month: "short", year: "numeric" })}${report.occurred_time ? `, ${report.occurred_time}` : ""}` : "Not given", icon: Calendar },
+                { k: "Who did it", v: report.perpetrator_type ? titleCase(report.perpetrator_type as string) : "Not given", icon: User },
+                { k: "Support asked for", v: supportNeeded.length ? `${supportNeeded.length} type${supportNeeded.length === 1 ? "" : "s"}` : "None", icon: HeartHandshake },
+                { k: "Risks listed", v: risks.length ? `${risks.length}` : "None", icon: ShieldAlert },
+              ].map(({ k, v, icon: Icon }) => (
+                <div key={k} className="bg-surface px-4 py-2">
+                  <dt className="mb-0.5 flex items-center gap-1.5 text-[11px] font-medium text-muted"><Icon className="h-3 w-3" />{k}</dt>
+                  <dd className="truncate text-[13px] font-semibold text-ink">{v}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        </div>
+      </header>
+
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_21rem]">
+        {/* ── Main column: everything the reporter told us ── */}
+        <div className="space-y-3">
           <Card title="What happened" icon={Shield}>
-            <div>
-              <p className="eyebrow mb-1.5">{fromListening ? "The post" : "In their words"}</p>
-              <p className="whitespace-pre-line rounded-2xl bg-paper p-4 text-[15px] leading-relaxed text-ink">
-                {(report.description as string) || (report.what_description as string) || "No description was given."}
-              </p>
+            <div className={capture ? "grid items-start gap-4 xl:grid-cols-[minmax(0,34rem)_minmax(0,1fr)]" : ""}>
+              <div>
+                <p className="mb-1 text-[11px] font-medium text-muted">{fromListening ? "The post" : "In their words"}</p>
+                <PostView permalink={embedLink}>
+                  <p className="whitespace-pre-line rounded-lg border border-line bg-paper/70 p-3 text-sm leading-relaxed text-ink">
+                    {(report.description as string) || (report.what_description as string) || "No description was given."}
+                  </p>
+                </PostView>
+              </div>
+              {capture && (
+                <dl className="space-y-3 rounded-lg border border-line bg-paper/40 p-3.5">
+                  <Fact label="Account">{capture.author ?? "Unknown account"}</Fact>
+                  <Fact label="Posted on">{capture.source === "x" ? "X" : capture.source.charAt(0).toUpperCase() + capture.source.slice(1)}</Fact>
+                  <Fact label="Captured">{stamp(capture.captured_at)}</Fact>
+                  <Fact label="Words matched">{capture.matched_keywords?.length ? <Chips items={capture.matched_keywords} tone="purple" /> : undefined}</Fact>
+                  <Fact label="Hashtags">{postTags.length ? <Chips items={postTags.map((t) => "#" + t)} tone="slate" /> : undefined}</Fact>
+                  {capture.permalink && (
+                    <Fact label="Original">
+                      <a href={capture.permalink} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-semibold text-purple hover:underline">
+                        Open the post <ExternalLink className="h-3 w-3" />
+                      </a>
+                    </Fact>
+                  )}
+                </dl>
+              )}
             </div>
 
             <dl className="grid gap-4 sm:grid-cols-2">
@@ -353,7 +369,7 @@ async function ReportDetail({ id }: { id: string }) {
               </dl>
               {report.tfgbv_link && (
                 <div>
-                  <p className="eyebrow mb-1">Link</p>
+                  <p className="mb-0.5 text-[11px] font-medium text-muted">Link</p>
                   <a href={report.tfgbv_link as string} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 break-all text-sm font-medium text-purple hover:underline">
                     {report.tfgbv_link as string} <ExternalLink className="h-3 w-3 shrink-0" />
                   </a>
@@ -361,7 +377,7 @@ async function ReportDetail({ id }: { id: string }) {
               )}
               {report.tfgbv_content_text && (
                 <div>
-                  <p className="eyebrow mb-1">Content they copied</p>
+                  <p className="mb-0.5 text-[11px] font-medium text-muted">Content they copied</p>
                   <p className="whitespace-pre-line rounded-xl bg-surface p-3 text-sm">{report.tfgbv_content_text as string}</p>
                 </div>
               )}
@@ -377,7 +393,7 @@ async function ReportDetail({ id }: { id: string }) {
               )}
               {evidence.length > 0 && (
                 <div>
-                  <p className="eyebrow mb-2">Uploaded files ({evidence.length})</p>
+                  <p className="mb-1.5 text-[11px] font-medium text-muted">Uploaded files ({evidence.length})</p>
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                     {evidence.map((e, i) =>
                       e.pdf ? (
@@ -396,7 +412,7 @@ async function ReportDetail({ id }: { id: string }) {
               )}
               {voiceUrls.length > 0 && (
                 <div>
-                  <p className="eyebrow mb-2 flex items-center gap-1.5"><Mic className="h-3 w-3" />Voice note</p>
+                  <p className="mb-1.5 flex items-center gap-1.5 text-[11px] font-medium text-muted"><Mic className="h-3 w-3" />Voice note</p>
                   <div className="space-y-2">
                     {voiceUrls.map((u) => (
                       <audio key={u} src={u} controls className="w-full" />
@@ -415,7 +431,7 @@ async function ReportDetail({ id }: { id: string }) {
               </Fact>
               {report.support_other && (
                 <div className="rounded-xl border border-line bg-paper p-3.5 text-sm">
-                  <p className="eyebrow mb-1">Other support, in their words</p>
+                  <p className="mb-0.5 text-[11px] font-medium text-muted">Other support, in their words</p>
                   <p className="whitespace-pre-line text-ink">{report.support_other as string}</p>
                   {supportSuggestion && (
                     <p className="mt-2 text-xs font-semibold text-purple-700">
@@ -457,40 +473,37 @@ async function ReportDetail({ id }: { id: string }) {
         </div>
 
         {/* ── Sidebar ── */}
-        <aside className="space-y-5 lg:sticky lg:top-4 lg:self-start">
+        <aside className="space-y-3 lg:sticky lg:top-[4.25rem] lg:max-h-[calc(100dvh-5rem)] lg:self-start lg:overflow-y-auto">
           {fromListening ? (
-            <section className="card-premium space-y-3 p-5">
-              <h3 className="flex items-center gap-2 font-display text-base font-bold text-ink"><Radio className="h-4 w-4 text-purple" />Found online</h3>
-              <p className="rounded-xl bg-paper p-3.5 text-sm text-muted">
-                There is no reporter to call or message: this was not reported to us. Use the original post and account to decide how, or whether, to reach out, and be careful not to put anyone at risk.
+            <section className="rounded-xl border border-line bg-surface space-y-3 p-4">
+              <h3 className="flex items-center gap-2 text-[13px] font-semibold text-ink"><Radio className="h-4 w-4 text-purple" />Reaching out</h3>
+              <p className="rounded-lg border border-line bg-paper/70 p-3 text-xs leading-relaxed text-muted">
+                There is no reporter to call or message. Use the original post and account to decide how, or whether, to reach out, and take care not to put anyone at risk.
               </p>
               <dl className="space-y-3">
-                <Fact label="Account">{capture?.author ?? undefined}</Fact>
-                <Fact label="Captured">{capture?.captured_at ? stamp(capture.captured_at) : undefined}</Fact>
-                <Fact label="Matched">{capture?.matched_keywords?.length ? <Chips items={capture.matched_keywords} tone="purple" /> : undefined}</Fact>
                 <Fact label="Assigned to">{report.assigned_to ? staffNames.get(report.assigned_to as string) ?? "A team member" : undefined}</Fact>
               </dl>
             </section>
           ) : (
             <>
           {/* Reaching the reporter */}
-          <section className="card-premium space-y-3 p-5">
-            <h3 className="flex items-center gap-2 font-display text-base font-bold text-ink"><Phone className="h-4 w-4 text-purple" />Reaching the reporter</h3>
+          <section className="rounded-xl border border-line bg-surface space-y-3 p-4">
+            <h3 className="flex items-center gap-2 text-[13px] font-semibold text-ink"><Phone className="h-4 w-4 text-purple" />Reaching the reporter</h3>
             {value ? (
               <>
-                <div className="rounded-xl bg-paper p-3.5">
-                  <p className="eyebrow mb-1">{CONTACT_LABEL[method] ?? "Contact"}</p>
+                <div className="rounded-lg border border-line bg-paper/70 p-3">
+                  <p className="mb-0.5 text-[11px] font-medium text-muted">{CONTACT_LABEL[method] ?? "Contact"}</p>
                   <p className="break-all font-mono text-sm font-semibold text-ink">{value}</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {(method === "phone" || method === "sms" || method === "whatsapp" || !method) && digits && (
-                    <a href={`tel:${digits}`} className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-purple px-3.5 text-xs font-bold text-white hover:bg-purple-600"><Phone className="h-3.5 w-3.5" />Call</a>
+                    <a href={`tel:${digits}`} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-purple px-3 text-xs font-semibold text-white hover:bg-purple-600"><Phone className="h-3.5 w-3.5" />Call</a>
                   )}
                   {(method === "whatsapp" || method === "phone") && digits && (
-                    <a href={`https://wa.me/${digits.replace(/^\+/, "")}`} target="_blank" rel="noopener noreferrer" className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-line px-3.5 text-xs font-bold text-ink hover:bg-paper"><MessageCircle className="h-3.5 w-3.5" />WhatsApp</a>
+                    <a href={`https://wa.me/${digits.replace(/^\+/, "")}`} target="_blank" rel="noopener noreferrer" className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-line px-3 text-xs font-semibold text-ink hover:bg-paper"><MessageCircle className="h-3.5 w-3.5" />WhatsApp</a>
                   )}
                   {(method === "email" || value.includes("@")) && (
-                    <a href={`mailto:${value}`} className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-purple px-3.5 text-xs font-bold text-white hover:bg-purple-600"><Mail className="h-3.5 w-3.5" />Email</a>
+                    <a href={`mailto:${value}`} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-purple px-3 text-xs font-semibold text-white hover:bg-purple-600"><Mail className="h-3.5 w-3.5" />Email</a>
                   )}
                   <CopyButton text={value} label="contact" />
                 </div>
@@ -506,8 +519,8 @@ async function ReportDetail({ id }: { id: string }) {
           </section>
 
           {/* Reporter */}
-          <section className="card-premium space-y-3 p-5">
-            <h3 className="flex items-center gap-2 font-display text-base font-bold text-ink"><User className="h-4 w-4 text-purple" />Reporter</h3>
+          <section className="rounded-xl border border-line bg-surface space-y-3 p-4">
+            <h3 className="flex items-center gap-2 text-[13px] font-semibold text-ink"><User className="h-4 w-4 text-purple" />Reporter</h3>
             <div className="flex flex-wrap gap-2">
               <Badge variant={profile?.is_anonymous ? "outline" : "info"}>{profile?.is_anonymous ? "Anonymous" : "Signed-in account"}</Badge>
               <Badge variant="secondary">{titleCase((report.reporter_type as string) ?? "")}</Badge>
@@ -526,8 +539,8 @@ async function ReportDetail({ id }: { id: string }) {
           )}
 
           {/* Assigned services */}
-          <section className="card-premium space-y-4 p-5">
-            <h3 className="flex items-center gap-2 font-display text-base font-bold text-ink"><Briefcase className="h-4 w-4 text-purple" />Assigned services</h3>
+          <section className="rounded-xl border border-line bg-surface space-y-3 p-4">
+            <h3 className="flex items-center gap-2 text-[13px] font-semibold text-ink"><Briefcase className="h-4 w-4 text-purple" />Assigned services</h3>
             {!assignedServices?.length ? (
               <p className="text-xs text-muted">No services assigned yet.</p>
             ) : (
@@ -560,12 +573,12 @@ async function ReportDetail({ id }: { id: string }) {
                 })}
               </div>
             )}
-            <AssignServiceForm reportId={id} services={unassignedServices} suggested={suggestedServices} supportRequested={supportNeeded} />
+            <AssignServiceForm reportId={id} services={rankedServices} suggested={suggestedServices} fits={[...fittingServices]} supportRequested={supportNeeded} fromListening={fromListening} />
           </section>
 
           {/* Timeline */}
-          <section className="card-premium space-y-3 p-5">
-            <h3 className="flex items-center gap-2 font-display text-base font-bold text-ink"><Users className="h-4 w-4 text-purple" />Case timeline</h3>
+          <section className="rounded-xl border border-line bg-surface space-y-3 p-4">
+            <h3 className="flex items-center gap-2 text-[13px] font-semibold text-ink"><Users className="h-4 w-4 text-purple" />Case timeline</h3>
             <ol className="relative space-y-3 border-l border-line pl-4">
               {events.map((e, i) => (
                 <li key={i} className="relative text-xs">
@@ -579,8 +592,8 @@ async function ReportDetail({ id }: { id: string }) {
 
           {/* Audit trail */}
           {auditLog && auditLog.length > 0 && (
-            <section className="card-premium space-y-3 p-5">
-              <h3 className="font-display text-base font-bold text-ink">Who has looked</h3>
+            <section className="rounded-xl border border-line bg-surface space-y-3 p-4">
+              <h3 className="text-[13px] font-semibold text-ink">Who has looked</h3>
               <div className="space-y-1">
                 {auditLog.map((log, i) => {
                   const p = log.profiles as { username?: string } | null;
@@ -610,11 +623,11 @@ async function ReportDetailWrapper({ params }: { params: Promise<{ id: string }>
 export default function ReportDetailPage({ params }: { params: Promise<{ id: string }> }) {
   return (
     <Suspense fallback={
-      <div className="mx-auto max-w-6xl space-y-4">
-        <div className="h-40 animate-pulse rounded-3xl bg-paper" />
-        <div className="grid gap-6 lg:grid-cols-3">
-          <div className="h-96 animate-pulse rounded-3xl bg-paper lg:col-span-2" />
-          <div className="h-96 animate-pulse rounded-3xl bg-paper" />
+      <div className="space-y-3">
+        <div className="h-28 animate-pulse rounded-xl bg-paper" />
+        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_21rem]">
+          <div className="h-96 animate-pulse rounded-xl bg-paper" />
+          <div className="h-96 animate-pulse rounded-xl bg-paper" />
         </div>
       </div>
     }>

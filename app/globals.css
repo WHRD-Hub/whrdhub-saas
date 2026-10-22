@@ -56,8 +56,15 @@
   --shadow-premium: 0 1px 2px rgba(28, 21, 34, 0.04), 0 14px 34px -14px rgba(77, 47, 115, 0.18);
   --shadow-lift: 0 2px 4px rgba(28, 21, 34, 0.05), 0 22px 44px -18px rgba(77, 47, 115, 0.28);
 
-  --radius-xl: 1rem;
-  --radius-2xl: 1.25rem;
+  /* Corners are 30% tighter than Tailwind's defaults, everywhere. */
+  --radius-xs: 0.0875rem;
+  --radius-sm: 0.175rem;
+  --radius-md: 0.2625rem;
+  --radius-lg: 0.35rem;
+  --radius-xl: 0.7rem;
+  --radius-2xl: 0.875rem;
+  --radius-3xl: 1.05rem;
+  --radius-4xl: 1.4rem;
 }
 
 * {
@@ -76,7 +83,7 @@ body {
 .card-premium {
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 1.5rem;
+  border-radius: 1.05rem;
   box-shadow: var(--shadow-premium);
 }
 .eyebrow {
@@ -130,7 +137,7 @@ body {
 .prose-editor ol { list-style: decimal; padding-left: 1.4rem; }
 .prose-editor a { color: var(--purple); text-decoration: underline; }
 .prose-editor p { margin: 0.5em 0; }
-.prose-editor img { max-width: 100%; height: auto; margin: 0.8em 0; border-radius: 0.75rem; }
+.prose-editor img { max-width: 100%; height: auto; margin: 0.8em 0; border-radius: 0.525rem; }
 /* TipTap (ProseMirror) placeholder for the first empty line */
 .prose-editor p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
@@ -149,7 +156,7 @@ body {
 .blog-content ul { list-style: disc; padding-left: 1.5rem; margin: 0.8em 0; }
 .blog-content ol { list-style: decimal; padding-left: 1.5rem; margin: 0.8em 0; }
 .blog-content a { color: var(--purple); text-decoration: underline; }
-.blog-content img { border-radius: 0.75rem; margin: 1em 0; max-width: 100%; }
+.blog-content img { border-radius: 0.525rem; margin: 1em 0; max-width: 100%; }
 
 /* ── Accessibility modes (toggled on <html> by the a11y widget) ───────────── */
 /* Larger text: scale is applied inline as --a11y-scale on <html>. */

@@ -3,6 +3,7 @@ import { ListeningView } from "@/components/reporting/listening/listening-view";
 import type { InboxData, Keyword, Result } from "@/components/reporting/listening/types";
 import type { Source } from "@/lib/listening-sources";
 import { ensurePacks } from "@/lib/listening-packs";
+import { suggestTags } from "@/lib/listening-tags";
 
 export const metadata = { title: "Online Listening - WHRD Hub" };
 
@@ -80,6 +81,7 @@ export default async function ListeningPage({ searchParams }: { searchParams: Pr
   const sources = withPack.error ? (await db.from("listening_sources").select(srcBase).order("created_at", { ascending: false })).data : withPack.data;
   const { data: keywords } = await db.from("listening_keywords").select("id, word, severity, active").order("word");
 
-  const inbox: InboxData = { results, total, page, pageSize: PAGE_SIZE, status, counts, likelyNew: likelyC.count ?? 0 };
+  const tagSuggestions = await suggestTags().catch(() => []);
+  const inbox: InboxData = { results, total, page, pageSize: PAGE_SIZE, status, counts, likelyNew: likelyC.count ?? 0, tagSuggestions };
   return <ListeningView sources={(sources ?? []) as Source[]} keywords={(keywords ?? []) as Keyword[]} inbox={inbox} packs={packs ?? []} />;
 }

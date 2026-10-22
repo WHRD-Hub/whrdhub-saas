@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/current-user";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getReportingAccess } from "@/lib/reporting-access";
 import { DashboardShell, type NavItem } from "@/components/dashboard/dashboard-shell";
 import { ChatFab } from "@/components/reporting/chat-fab";
@@ -21,6 +22,10 @@ export default async function HubLayout({ children }: { children: React.ReactNod
   if (!isHubAdmin && !access?.canTriage) redirect("/dashboard");
 
   const supabase = await createClient();
+  // Mentors who sent documents and are waiting to be checked (read with the service role: the table has no admin policy).
+  const mentorsWaiting = isHubAdmin
+    ? (await createAdminClient().from("mentor_verifications").select("user_id", { count: "exact", head: true }).eq("status", "under_review")).count ?? 0
+    : 0;
   const [
     { count: postsPending },
     { count: blogsPending },
@@ -79,6 +84,7 @@ export default async function HubLayout({ children }: { children: React.ReactNod
     { label: "CBOs", href: "/hub/organizations", icon: "organisations", badge: orgsPending || undefined, area: "Community", section: "Manage" },
     { label: "Resources", href: "/hub/resources", icon: "resources", area: "Community", section: "Manage" },
     { label: "Femtorship", href: "/hub/femtorship", icon: "femtorship", area: "Community", section: "Manage" },
+    { label: "Mentors", href: "/hub/mentors", icon: "members", badge: mentorsWaiting || undefined, area: "Community", section: "Manage" },
 
     { label: "Deleted content", href: "/hub/deleted", icon: "deleted", area: "Community", secondary: true },
     { label: "Deleted accounts", href: "/hub/accounts", icon: "accounts", area: "Community", secondary: true },

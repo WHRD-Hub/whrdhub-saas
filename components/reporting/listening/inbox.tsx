@@ -3,12 +3,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, ChevronLeft, ChevronRight, ExternalLink, Inbox as InboxIcon, Loader2, UserRoundX, X } from "lucide-react";
-import { setResultStatus, setResultsStatus, muteAccount, takeOnCapture } from "@/app/actions/listening";
+import { ArrowRight, ChevronLeft, ChevronRight, ExternalLink, Inbox as InboxIcon, Loader2, MoreHorizontal, UserRoundX } from "lucide-react";
+import { setResultStatus, muteAccount, takeOnCapture } from "@/app/actions/listening";
 import { Modal } from "@/components/ui/modal";
 import { FilterBar, Segmented } from "@/components/ui/filter-bar";
 import { cn, timeAgo } from "@/lib/utils";
 import { useUrlParams } from "./use-url-params";
+import { PostView } from "./post-embed";
+import { TagSuggestions } from "./tag-suggestions";
+import { extractTags } from "@/lib/hashtags";
 import { AI_LABEL, PLATFORM_LABEL, SEVERITY_DOT, isLikelyReal, type InboxData, type Result, type Run } from "./types";
 
 const STATUSES = [
@@ -26,17 +29,15 @@ const REFRESH_MS = 45_000;
  * The shared inbox, built for a stream rather than a handful. Search, filters and
  * paging happen on the server, so it stays quick however many captures arrive.
  * The list can be worked from the keyboard (j/k to move, t to take on, d to
- * dismiss, e to mark actioned, x to select), several captures can be closed in
- * one go, and while you are on the first page of New it quietly refreshes and
- * tells you what has arrived since you opened it.
+ * dismiss, e to mark actioned), and while you are on the first page of New it
+ * quietly refreshes and tells you what has arrived since you opened it.
  */
 export function Inbox({ data, run, busy }: { data: InboxData; run: Run; busy: string | null }) {
-  const { results, total, page, pageSize, counts, status } = data;
+  const { results, total, page, pageSize, counts, status, tagSuggestions } = data;
   const router = useRouter();
   const url = useUrlParams();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [sheet, setSheet] = useState(false);
-  const [checked, setChecked] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState(url.get("q"));
   const [openedAt, setOpenedAt] = useState(() => Date.now());
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -71,14 +72,6 @@ export function Inbox({ data, run, busy }: { data: InboxData; run: Run; busy: st
     if (res?.reportId) router.push(`/hub/reporting/reports/${res.reportId}`);
   };
 
-  const bulk = async (to: string) => {
-    const ids = [...checked];
-    await run("bulk", () => setResultsStatus(ids, to));
-    setChecked(new Set());
-  };
-
-  const flip = (id: string) => setChecked((c) => { const n = new Set(c); if (n.has(id)) n.delete(id); else n.add(id); return n; });
-  const allOnPage = results.length > 0 && results.every((r) => checked.has(r.id));
 
   // Keyboard: work the list without the mouse. Ignored while typing.
   useEffect(() => {
@@ -89,7 +82,6 @@ export function Inbox({ data, run, busy }: { data: InboxData; run: Run; busy: st
       const idx = results.findIndex((r) => r.id === selected.id);
       if (e.key === "j" || e.key === "ArrowDown") { e.preventDefault(); setSelectedId(results[Math.min(idx + 1, results.length - 1)].id); }
       else if (e.key === "k" || e.key === "ArrowUp") { e.preventDefault(); setSelectedId(results[Math.max(idx - 1, 0)].id); }
-      else if (e.key === "x") flip(selected.id);
       else if (busy === null) {
         if (e.key === "t" && selected.status === "new") takeOn(selected);
         else if (e.key === "d") move(selected, "dismissed");
@@ -119,48 +111,37 @@ export function Inbox({ data, run, busy }: { data: InboxData; run: Run; busy: st
   ) : null;
 
   return (
-    <div className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-center gap-2">
         <Segmented
           label="Status"
           items={STATUSES.map((s) => ({ id: s.id, label: s.label, count: counts[s.id] }))}
           value={status as Status}
-          onSelect={(id) => { setChecked(new Set()); setSelectedId(null); url.set({ status: id === "new" ? null : id }); }}
+          onSelect={(id) => { setSelectedId(null); url.set({ status: id === "new" ? null : id }); }}
         />
-        {status === "new" && page === 1 && (
-          <p className="flex items-center gap-1.5 text-xs text-muted" title="This list refreshes by itself">
-            <span className="relative flex h-2 w-2"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" /><span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" /></span>
-            Live
-          </p>
-        )}
-      </div>
-
-      <FilterBar
+        <FilterBar
+        compact
         filters={filters}
         values={Object.fromEntries(filters.map((f) => [f.key, url.get(f.key)]))}
         busy={url.pending}
         search={{ value: search, onChange: onSearch, placeholder: "Search posts and accounts" }}
         onChange={(key, value) => url.set({ [key]: value || null })}
         onClear={() => { setSearch(""); url.set({ q: null, platform: null, severity: null, label: null }); }}
+        trailing={status === "new" && page === 1 ? (
+          <p className="ml-auto flex items-center gap-1.5 pr-1 text-xs text-muted" title="This list refreshes by itself">
+            <span className="relative flex h-2 w-2"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" /><span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" /></span>
+            Live
+          </p>
+        ) : null}
       />
+      </div>
+
+      <TagSuggestions tags={tagSuggestions} run={run} busy={busy} />
 
       {arrived > 0 && (
         <button onClick={() => { setOpenedAt(Date.now()); setSelectedId(null); }} className="w-full rounded-xl border border-purple/20 bg-purple-050 px-4 py-2 text-center text-xs font-semibold text-purple-700 hover:bg-purple/10">
           {arrived} new since you opened this page. Mark as seen.
         </button>
-      )}
-
-      {checked.size > 0 && (
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-ink px-4 py-2.5 text-sm text-white">
-          <span className="font-semibold">{checked.size} selected</span>
-          <span className="flex items-center gap-2">
-            <button onClick={() => bulk("actioned")} disabled={busy !== null} className="rounded-lg bg-white/15 px-3 py-1.5 text-xs font-semibold hover:bg-white/25 disabled:opacity-50">Mark actioned</button>
-            <button onClick={() => bulk("dismissed")} disabled={busy !== null} className="rounded-lg bg-white/15 px-3 py-1.5 text-xs font-semibold hover:bg-white/25 disabled:opacity-50">
-              {busy === "bulk" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Dismiss"}
-            </button>
-            <button onClick={() => setChecked(new Set())} aria-label="Clear selection" className="rounded-lg p-1.5 hover:bg-white/15"><X className="h-4 w-4" /></button>
-          </span>
-        </div>
       )}
 
       {results.length === 0 ? (
@@ -176,13 +157,10 @@ export function Inbox({ data, run, busy }: { data: InboxData; run: Run; busy: st
           </p>
         </div>
       ) : (
-        <div className="card-premium grid overflow-hidden lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)]">
+        <div className="grid overflow-hidden rounded-xl border border-line bg-surface lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]">
           <div className="flex min-h-0 flex-col border-line lg:border-r">
-            <div className="flex items-center justify-between gap-3 border-b border-line bg-paper/60 px-4 py-2 text-xs text-muted">
-              <label className="flex cursor-pointer items-center gap-2">
-                <input type="checkbox" checked={allOnPage} onChange={() => setChecked(allOnPage ? new Set() : new Set(results.map((r) => r.id)))} className="accent-[#734e9e]" aria-label="Select all on this page" />
-                <span>{total === 0 ? "No captures" : <>{from + 1}–{Math.min(from + pageSize, total)} of <span className="font-semibold text-ink">{total.toLocaleString()}</span></>}</span>
-              </label>
+            <div className="flex items-center justify-between gap-3 border-b border-line bg-paper/60 px-3 py-1.5 text-xs text-muted">
+              <span>{total === 0 ? "No captures" : <>{from + 1}–{Math.min(from + pageSize, total)} of <span className="font-semibold text-ink">{total.toLocaleString()}</span></>}</span>
               {pages > 1 && (
                 <span className="flex items-center gap-1">
                   <button onClick={() => url.set({ page: page > 2 ? String(page - 1) : null }, { keepPage: true })} disabled={page <= 1} aria-label="Previous page" className="rounded-md p-1 hover:bg-surface disabled:opacity-30"><ChevronLeft className="h-4 w-4" /></button>
@@ -191,15 +169,12 @@ export function Inbox({ data, run, busy }: { data: InboxData; run: Run; busy: st
                 </span>
               )}
             </div>
-            <ul className={cn("max-h-[calc(100dvh-22rem)] min-h-[20rem] divide-y divide-line overflow-y-auto", url.pending && "opacity-60")} role="listbox" aria-label="Captures">
+            <ul className={cn("max-h-[calc(100dvh-8.5rem)] min-h-[20rem] divide-y divide-line overflow-y-auto", url.pending && "opacity-60")} role="listbox" aria-label="Captures">
               {results.map((r) => {
                 const on = selected?.id === r.id;
                 return (
                   <li key={r.id} role="option" aria-selected={on} className={cn("flex items-stretch transition-colors hover:bg-paper", on && "bg-purple-050/60")}>
-                    <label className="flex shrink-0 cursor-pointer items-start px-3 pt-4">
-                      <input type="checkbox" checked={checked.has(r.id)} onChange={() => flip(r.id)} aria-label={`Select capture from ${r.author ?? "unknown account"}`} className="accent-[#734e9e]" />
-                    </label>
-                    <button onClick={() => { setSelectedId(r.id); setSheet(true); }} className="block min-w-0 flex-1 py-3 pr-4 text-left">
+                    <button onClick={() => { setSelectedId(r.id); setSheet(true); }} className="block min-w-0 flex-1 px-3.5 py-2.5 text-left">
                       <div className="flex items-center gap-2">
                         <span className={cn("h-2 w-2 shrink-0 rounded-full", SEVERITY_DOT[r.severity] ?? SEVERITY_DOT.low)} title={`${r.severity} severity`} />
                         <span className="min-w-0 truncate text-[13px] font-semibold text-ink">{r.author ?? "Unknown account"}</span>
@@ -217,13 +192,10 @@ export function Inbox({ data, run, busy }: { data: InboxData; run: Run; busy: st
                 );
               })}
             </ul>
-            <p className="hidden border-t border-line px-4 py-2 text-[11px] text-muted lg:block">
-              <kbd className="rounded bg-paper px-1">j</kbd> <kbd className="rounded bg-paper px-1">k</kbd> move · <kbd className="rounded bg-paper px-1">t</kbd> take on · <kbd className="rounded bg-paper px-1">e</kbd> actioned · <kbd className="rounded bg-paper px-1">d</kbd> dismiss · <kbd className="rounded bg-paper px-1">x</kbd> select
-            </p>
           </div>
 
           {/* Detail, side by side on large screens */}
-          <div className="hidden min-h-[24rem] lg:block">{detail}</div>
+          <div className="hidden max-h-[calc(100dvh-5.5rem)] min-h-[24rem] overflow-y-auto lg:block">{detail}</div>
         </div>
       )}
 
@@ -240,7 +212,9 @@ export function Inbox({ data, run, busy }: { data: InboxData; run: Run; busy: st
 function Detail({ r, busy, onMove, onTakeOn, onMute }: { r: Result; busy: string | null; onMove: (to: string) => void; onTakeOn: () => void; onMute: () => void }) {
   const ai = r.ai_class ? AI_LABEL[r.ai_class] : null;
   const working = busy === `s-${r.id}`;
+  const tags = extractTags(r.content);
   const canMute = !!r.author && (r.source === "instagram" || r.source === "x");
+  const [menu, setMenu] = useState(false);
 
   const btn = (to: string, label: string, primary = false) => (
     <button
@@ -248,7 +222,7 @@ function Detail({ r, busy, onMove, onTakeOn, onMute }: { r: Result; busy: string
       onClick={() => onMove(to)}
       disabled={busy !== null}
       className={cn(
-        "inline-flex h-10 items-center justify-center rounded-xl px-4 text-sm font-semibold transition-colors disabled:opacity-50",
+        "inline-flex h-8 items-center justify-center rounded-lg px-3 text-[13px] font-semibold transition-colors disabled:opacity-50",
         primary ? "bg-purple text-white hover:bg-purple-600" : "border border-line bg-surface text-ink hover:bg-paper",
       )}
     >
@@ -257,69 +231,102 @@ function Detail({ r, busy, onMove, onTakeOn, onMute }: { r: Result; busy: string
   );
 
   return (
-    <article className="flex h-full flex-col p-5 sm:p-7">
-      <header>
-        <p className="eyebrow">{PLATFORM_LABEL[r.source] ?? r.source}</p>
-        <h2 className="mt-1 text-xl font-bold tracking-tight text-ink">{r.author ?? "Unknown account"}</h2>
-        <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
-          <span>Captured {new Date(r.captured_at).toLocaleString("en-KE", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
-          <span className="inline-flex items-center gap-1.5"><span className={cn("h-2 w-2 rounded-full", SEVERITY_DOT[r.severity] ?? SEVERITY_DOT.low)} />{r.severity} severity</span>
-        </p>
-      </header>
-
-      {ai && (
-        <p className={cn("mt-4 inline-flex w-fit items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold", ai.cls)}>
-          {ai.label}
-          {typeof r.ai_confidence === "number" && <span className="opacity-70">{Math.round(r.ai_confidence * 100)}% sure</span>}
-        </p>
-      )}
-
-      <blockquote className="mt-4 whitespace-pre-line rounded-2xl bg-paper p-4 text-[15px] leading-relaxed text-ink">{r.content}</blockquote>
-
-      {r.matched_keywords.length > 0 && (
-        <div className="mt-4">
-          <p className="eyebrow mb-1.5">Matched</p>
-          <div className="flex flex-wrap gap-1.5">
-            {r.matched_keywords.map((w) => <span key={w} className="rounded-full bg-purple-050 px-2.5 py-0.5 text-xs font-semibold text-purple-700">{w}</span>)}
-          </div>
-        </div>
-      )}
-
-      {r.permalink && (
-        <a href={r.permalink} target="_blank" rel="noopener noreferrer" className="mt-4 inline-flex w-fit items-center gap-1.5 text-sm font-semibold text-purple hover:underline">
-          Open the original post <ExternalLink className="h-3.5 w-3.5" />
-        </a>
-      )}
-
-      <footer className="mt-auto pt-6">
-        {r.handled_by_name && r.status !== "new" && (
-          <p className="mb-3 text-xs text-muted">
-            {r.status === "reviewing" ? "Being reviewed by" : r.status === "actioned" ? "Actioned by" : "Dismissed by"}{" "}
-            <span className="font-semibold text-ink">{r.handled_by_name}</span>
-            {r.handled_at ? `, ${timeAgo(r.handled_at)}` : ""}
+    <article className="flex min-h-full flex-col">
+      {/* Who and what to do, on one line that stays in view while the post scrolls */}
+      <header className="sticky top-0 z-10 flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-line bg-surface/95 px-4 py-2.5 backdrop-blur sm:px-5">
+        <div className="min-w-0 flex-1">
+          <p className="flex items-center gap-2 text-[11px] text-muted">
+            <span className="font-semibold uppercase tracking-wider">{PLATFORM_LABEL[r.source] ?? r.source}</span>
+            <span className={cn("h-1.5 w-1.5 rounded-full", SEVERITY_DOT[r.severity] ?? SEVERITY_DOT.low)} title={`${r.severity} severity`} />
+            <span>{new Date(r.captured_at).toLocaleString("en-KE", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
+            {r.handled_by_name && r.status !== "new" && (
+              <span>· {r.status === "reviewing" ? "with" : r.status === "actioned" ? "actioned by" : "dismissed by"} <span className="font-semibold text-ink">{r.handled_by_name}</span>{r.handled_at ? `, ${timeAgo(r.handled_at)}` : ""}</span>
+            )}
           </p>
-        )}
-        <div className="flex flex-wrap gap-2">
+          <h2 className="truncate text-base font-bold tracking-tight text-ink">{r.author ?? "Unknown account"}</h2>
+        </div>
+
+        <div className="relative flex flex-wrap items-center gap-1.5">
           {r.report_id && (
-            <Link href={`/hub/reporting/reports/${r.report_id}`} className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl bg-purple px-4 text-sm font-semibold text-white hover:bg-purple-600">
-              Open case <ArrowRight className="h-4 w-4" />
+            <Link href={`/hub/reporting/reports/${r.report_id}`} className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg bg-purple px-3 text-[13px] font-semibold text-white hover:bg-purple-600">
+              Open case <ArrowRight className="h-3.5 w-3.5" />
             </Link>
           )}
           {r.status === "new" && [
-            <button key="take" onClick={onTakeOn} disabled={busy !== null} className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl bg-purple px-4 text-sm font-semibold text-white hover:bg-purple-600 disabled:opacity-50">
-              {working ? <><Loader2 className="h-4 w-4 animate-spin" /> Opening case…</> : <>Take on <ArrowRight className="h-4 w-4" /></>}
+            <button key="take" onClick={onTakeOn} disabled={busy !== null} className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg bg-purple px-3 text-[13px] font-semibold text-white hover:bg-purple-600 disabled:opacity-50">
+              {working ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Opening…</> : <>Take on <ArrowRight className="h-3.5 w-3.5" /></>}
             </button>,
-            btn("actioned", "Mark actioned"), btn("dismissed", "Dismiss"),
+            btn("actioned", "Actioned"), btn("dismissed", "Dismiss"),
           ]}
           {r.status === "reviewing" && [btn("actioned", "Mark actioned", !r.report_id), btn("dismissed", "Dismiss"), !r.report_id && btn("new", "Put back")]}
           {(r.status === "actioned" || r.status === "dismissed") && btn("new", "Reopen")}
+
+          <span className="mx-0.5 h-5 w-px bg-line" aria-hidden="true" />
+          {r.permalink && (
+            <a href={r.permalink} target="_blank" rel="noopener noreferrer" title="Open the original post" aria-label="Open the original post" className="grid h-8 w-8 place-items-center rounded-lg border border-line text-purple hover:bg-paper">
+              <ExternalLink className="h-3.5 w-3.5" />
+            </a>
+          )}
+          {canMute && (
+            <>
+              <button onClick={() => setMenu((v) => !v)} aria-label="More about this account" aria-expanded={menu} className="grid h-8 w-8 place-items-center rounded-lg border border-line text-muted hover:bg-paper hover:text-ink">
+                <MoreHorizontal className="h-4 w-4" />
+              </button>
+              {menu && (
+                <>
+                  <button aria-label="Close menu" className="fixed inset-0 z-10 cursor-default" onClick={() => setMenu(false)} />
+                  <div role="menu" className="absolute right-0 top-9 z-20 w-60 rounded-lg border border-line bg-surface p-1 shadow-lg">
+                    <button
+                      role="menuitem"
+                      onClick={() => { setMenu(false); onMute(); }}
+                      disabled={busy !== null}
+                      className="flex w-full items-start gap-2 rounded-md px-2.5 py-2 text-left hover:bg-paper disabled:opacity-50"
+                    >
+                      <UserRoundX className="mt-0.5 h-3.5 w-3.5 shrink-0 text-rose-600" />
+                      <span>
+                        <span className="block text-[13px] font-semibold text-ink">Stop listening to {r.author}</span>
+                        <span className="block text-[11px] leading-snug text-muted">Pauses the account. Its posts are ignored from now on.</span>
+                      </span>
+                    </button>
+                  </div>
+                </>
+              )}
+            </>
+          )}
         </div>
-        {canMute && (
-          <button onClick={onMute} disabled={busy !== null} className="mt-4 inline-flex items-center gap-1.5 text-xs font-semibold text-muted hover:text-rose-600 disabled:opacity-50">
-            <UserRoundX className="h-3.5 w-3.5" /> Stop listening to this account
-          </button>
-        )}
-      </footer>
+      </header>
+
+      {/* The post reads top to bottom in its own column; what we know about it sits beside it */}
+      <div className="grid items-start gap-4 p-4 sm:p-5 xl:grid-cols-[minmax(0,32rem)_minmax(0,1fr)]">
+        <PostView key={r.id} permalink={r.permalink}>
+          <blockquote className="whitespace-pre-line rounded-lg border border-line bg-paper/70 p-3.5 text-sm leading-relaxed text-ink">{r.content}</blockquote>
+        </PostView>
+
+        <aside className="space-y-3">
+          {ai && (
+            <p className={cn("inline-flex w-fit items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold", ai.cls)}>
+              {ai.label}
+              {typeof r.ai_confidence === "number" && <span className="opacity-70">{Math.round(r.ai_confidence * 100)}% sure</span>}
+            </p>
+          )}
+          {r.matched_keywords.length > 0 && (
+            <div>
+              <p className="mb-1 text-[11px] font-medium text-muted">Words matched</p>
+              <div className="flex flex-wrap gap-1.5">
+                {r.matched_keywords.map((w) => <span key={w} className="rounded-full bg-purple-050 px-2.5 py-0.5 text-xs font-semibold text-purple-700">{w}</span>)}
+              </div>
+            </div>
+          )}
+          {tags.length > 0 && (
+            <div>
+              <p className="mb-1 text-[11px] font-medium text-muted">Hashtags</p>
+              <div className="flex flex-wrap gap-1.5">
+                {tags.map((t) => <span key={t} className="rounded-full bg-paper px-2.5 py-0.5 text-xs font-semibold text-muted">#{t}</span>)}
+              </div>
+            </div>
+          )}
+        </aside>
+      </div>
     </article>
   );
 }

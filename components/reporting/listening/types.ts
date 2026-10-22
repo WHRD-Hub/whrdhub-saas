@@ -1,3 +1,5 @@
+import type { TagSuggestion } from "@/lib/listening-tags";
+
 export interface Keyword { id: string; word: string; severity: string; active: boolean }
 
 export interface Result {
@@ -30,6 +32,8 @@ export interface InboxData {
   counts: Record<string, number>;
   /** New captures that look like real cases. */
   likelyNew: number;
+  /** Hashtags that keep appearing in captures, offered as ones to listen to. */
+  tagSuggestions: TagSuggestion[];
 }
 
 export type ActionResult =

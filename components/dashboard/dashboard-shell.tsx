@@ -52,6 +52,7 @@ export function DashboardShell({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const dense = pathname === "/hub/reporting/listening" || pathname.startsWith("/hub/reporting/reports/");
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userMenu, setUserMenu] = useState(false);
@@ -263,7 +264,8 @@ export function DashboardShell({
         </header>
 
         {/* pb-24 on small screens keeps the last row clear of the bottom bar. */}
-        <main className="mx-auto max-w-6xl px-4 pb-24 pt-8 sm:px-8 lg:pb-10">{children}</main>
+        {/* Working screens (the listening inbox and a case) trade margin for detail: wider, and almost no space above the content. */}
+        <main className={cn("mx-auto px-4 pb-24 sm:px-8 lg:pb-8", dense ? "max-w-[1480px] pt-3 sm:px-6" : "max-w-6xl pt-8 lg:pb-10")}>{children}</main>
       </div>
 
       <BottomNav items={bottomItems} notifCount={notifCount} />

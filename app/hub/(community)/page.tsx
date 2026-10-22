@@ -86,9 +86,9 @@ export default async function HubOverview() {
         <p className="text-xs font-bold uppercase tracking-[0.14em] text-muted mb-3">Management console</p>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           {cards.map((c) => (
-            <Link key={c.label} href={c.href} className={`rounded-[10px] ${c.bg} p-5 hover:shadow-md transition-shadow block`}>
+            <Link key={c.label} href={c.href} className={`rounded-[7px] ${c.bg} p-5 hover:shadow-md transition-shadow block`}>
               <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-[10px] grid place-items-center bg-white ${c.ic}`}><c.icon className="w-5 h-5" /></div>
+                <div className={`w-10 h-10 rounded-[7px] grid place-items-center bg-white ${c.ic}`}><c.icon className="w-5 h-5" /></div>
                 <p className="font-bold text-ink">{c.label}</p>
               </div>
               <p className="mt-4 text-3xl font-black text-ink leading-none">{c.primary}</p>
@@ -107,14 +107,14 @@ export default async function HubOverview() {
 
       {/* Charts */}
       <div className="grid lg:grid-cols-2 gap-4">
-        <div className="rounded-[10px] border border-line bg-surface p-5">
+        <div className="rounded-[7px] border border-line bg-surface p-5">
           <div className="flex items-center justify-between mb-1">
             <div><h2 className="font-black text-ink">Submissions</h2><p className="text-xs text-muted">posts + stories, last 30 days</p></div>
             <span className="text-3xl font-black text-purple">{subsSeries.reduce((a, b) => a + b.value, 0)}</span>
           </div>
           <TrendArea data={subsSeries} color="#734e9e" suffix="items" />
         </div>
-        <div className="rounded-[10px] border border-line bg-surface p-5">
+        <div className="rounded-[7px] border border-line bg-surface p-5">
           <div className="flex items-center justify-between mb-1">
             <div><h2 className="font-black text-ink">New members</h2><p className="text-xs text-muted">joins per day, last 30 days</p></div>
             <span className="text-3xl font-black text-cyan-700">{growthSeries.reduce((a, b) => a + b.value, 0)}</span>

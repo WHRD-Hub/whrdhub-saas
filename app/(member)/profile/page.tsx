@@ -10,6 +10,8 @@ import { Devices } from "@/components/account/devices";
 import { ClaimAccount } from "@/components/account/claim-account";
 import { DeleteAccount } from "@/components/account/delete-account";
 import { Pill } from "@/components/ui/pill";
+import { MentorDocuments } from "@/components/mentorship/mentor-documents";
+import type { MentorDoc, MentorStatus } from "@/lib/mentor-verification";
 
 export const metadata = { title: "Profile & account — WHRD Hub" };
 
@@ -22,8 +24,9 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
   const supabase = await createClient();
   const uid = user!.id;
 
-  const [{ data: fem }, { data: posts }, { data: blogs }, { data: reactions }, { data: memberships }, counties] =
+  const [{ data: ver }, { data: fem }, { data: posts }, { data: blogs }, { data: reactions }, { data: memberships }, counties] =
     await Promise.all([
+      supabase.from("mentor_verifications").select("status, documents, review_notes").eq("user_id", uid).maybeSingle(),
       supabase.from("mentorship_profiles").select("*").eq("user_id", uid).maybeSingle(),
       supabase.from("posts").select("id, body, status, created_at").eq("author_id", uid).order("created_at", { ascending: false }),
       supabase.from("blogs").select("id, title, slug, status, created_at").eq("author_id", uid).order("created_at", { ascending: false }),
@@ -81,6 +84,8 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
       reactedPosts={reactedPosts}
       isAdmin={!!user?.profile?.is_hub_admin}
       reporterOnly={!!user?.isReporterOnly}
+      isMentor={!!(fem as { is_mentor?: boolean } | null)?.is_mentor}
+      verification={<MentorDocuments docs={((ver?.documents as MentorDoc[]) ?? [])} status={(ver?.status as MentorStatus) ?? "not_submitted"} reviewNotes={ver?.review_notes as string | null} />}
       initialSection={section}
       claim={user?.needsClaiming ? <ClaimAccount username={user.profile?.username} /> : null}
       networks={networks}

@@ -52,47 +52,9 @@ const nextConfig: NextConfig = {
       { source: "/:path*", headers: securityHeaders },
       // Pages that show a person's own data are never kept by a shared cache.
       { source: "/(dashboard|hub|profile|mentorship)/:path*", headers: [{ key: "Cache-Control", value: "private, no-store" }] },
-      // Stored publications. Search and AI crawlers were pulling every PDF and
-      // cover straight out of Supabase Storage, which is metered. `noai` and
-      // `noimageai` are honoured by dataset scrapers such as img2dataset. The
-      // cache header lets the CDN keep a file so repeat downloads do not each
-      // reach Supabase.
-      {
-        source: "/files/:path*",
-        headers: [
-          { key: "X-Robots-Tag", value: "noindex, noai, noimageai" },
-          { key: "Cache-Control", value: "public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800" },
-        ],
-      },
     ];
   },
 
-  /**
-   * Serve stored files from this domain rather than Supabase's.
-   *
-   * Supabase returns absolute URLs on its own host, so without this a visitor
-   * opening one of the Hub's own publications sees `<ref>.supabase.co` in the
-   * address bar. The rewrite proxies the public storage endpoint; `hubFile()`
-   * in lib/file-url.ts maps stored URLs onto it, so nothing in the database
-   * has to be rewritten.
-   *
-   * Only the *public* buckets are reachable this way. Report evidence lives in
-   * a private bucket and is still reached with a signed, expiring URL — there
-   * is deliberately no proxy for it.
-   */
-  async rewrites() {
-    // Neon Object Storage serves a public bucket's files at <endpoint>/<bucket>/<key>,
-    // the same bucket/key shape the old Supabase links had, so every stored link keeps working.
-    const base = process.env.AWS_ENDPOINT_URL_S3;
-    if (!base) return [];
-    const origin = base.replace(/\/$/, "");
-    // Named one by one: only these three are public. Anything else under /files is a 404 here,
-    // whatever the storage service itself would have answered.
-    return ["avatars", "media", "publications"].map((bucket) => ({
-      source: `/files/${bucket}/:path*`,
-      destination: `${origin}/${bucket}/:path*`,
-    }));
-  },
   images: {
     // Covers are resized once and the result kept for a month, so Supabase
     // Storage is asked for the original rarely rather than once per visitor.

@@ -87,6 +87,30 @@ export function signDownload(bucket: BucketName, key: string, expiresIn: number)
   });
 }
 
+/**
+ * A public file for the site to serve itself. Returns null when no such file exists,
+ * so the caller can show a proper page instead of the storage service's own error.
+ * Only public buckets may be served this way.
+ */
+export async function getPublicObject(bucket: BucketName, key: string) {
+  if (!BUCKETS[bucket].public) return null;
+  try {
+    const res = await s3().send(new GetObjectCommand({ Bucket: bucket, Key: key }));
+    if (!res.Body) return null;
+    return {
+      body: res.Body.transformToWebStream(),
+      contentType: res.ContentType ?? "application/octet-stream",
+      contentLength: res.ContentLength,
+      etag: res.ETag,
+      lastModified: res.LastModified,
+    };
+  } catch (e) {
+    const err = e as { name?: string; $metadata?: { httpStatusCode?: number } };
+    if (err.name === "NoSuchKey" || err.$metadata?.httpStatusCode === 404) return null;
+    throw e;
+  }
+}
+
 export async function putObject(bucket: BucketName, key: string, body: Uint8Array | Buffer, contentType: string) {
   await s3().send(
     new PutObjectCommand({

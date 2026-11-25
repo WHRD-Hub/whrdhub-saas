@@ -1,5 +1,6 @@
-import { shrinkPdf } from "./shrink";
-import { browserResample } from "./resample-browser";
+import { shrinkPdf } from "./shrink.ts";
+import { PASSES, type Pass } from "./passes.ts";
+import { browserResample } from "./resample-browser.ts";
 
 /**
  * Shrink a PDF in the browser, taking as little quality as the job needs.
@@ -10,23 +11,7 @@ import { browserResample } from "./resample-browser";
  * text: see lib/pdf/shrink.ts for why that matters and how it is achieved.
  */
 
-export interface Pass {
-  label: string;
-  maxEdge: number;
-  quality: number;
-}
-
-/**
- * 1800px is roughly 150 dpi across an A4 page — the point where a photograph
- * still looks right on a laptop screen and prints acceptably. 900px is screen
- * only, and is a last resort before giving up.
- */
-export const PASSES: Pass[] = [
-  { label: "high quality", maxEdge: 2000, quality: 0.82 },
-  { label: "good quality", maxEdge: 1600, quality: 0.75 },
-  { label: "screen quality", maxEdge: 1200, quality: 0.7 },
-  { label: "compact", maxEdge: 900, quality: 0.62 },
-];
+export { PASSES, type Pass } from "./passes.ts";
 
 export interface CompressProgress {
   pass: Pass;

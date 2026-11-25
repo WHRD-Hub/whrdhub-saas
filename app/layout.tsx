@@ -10,6 +10,7 @@ import { ServiceWorkerRegistrar } from "@/components/pwa/service-worker-registra
 import { OfflineSyncManager } from "@/components/pwa/offline-sync-manager";
 import { InstallPrompt } from "@/components/pwa/install-prompt";
 import { SITE_URL, SITE_NAME, SITE_TAGLINE, SITE_DESCRIPTION } from "@/lib/seo";
+import { getPublishedContent } from "@/lib/site-content-store";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -63,13 +64,15 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  // Wording and photos changed through edit mode; cached and shared by every visitor.
+  const siteContent = await getPublishedContent();
   return (
     <html lang="en" className={`${geistSans.variable} h-full`}>
       <body className="min-h-full">
-        <Providers>{children}</Providers>
+        <Providers siteContent={siteContent}>{children}</Providers>
         <AccessibilityWidget />
         <SignInPrompt />
         <GuestReactionSync />

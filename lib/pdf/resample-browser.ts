@@ -1,4 +1,4 @@
-import type { Resample } from "./shrink";
+import type { Resample } from "./shrink.ts";
 
 /**
  * The browser's image re-encoder: decode, draw smaller, encode as JPEG.

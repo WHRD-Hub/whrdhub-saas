@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { ArrowRight, MapPin, Heart, ArrowUpRight, Sparkles } from "lucide-react";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
@@ -12,6 +13,9 @@ import { createClient } from "@/lib/supabase/server";
 import { CoverImage } from "@/components/cover-image";
 import { SITE, PILLARS, LAWLOR_QUOTE } from "@/lib/data";
 import { latestVideoId, HUB_VIDEOS } from "@/lib/videos";
+import { EDIT_COOKIE } from "@/lib/site-content-store";
+import { EditableText } from "@/components/site-edit/editable-text";
+import { EditableImage } from "@/components/site-edit/editable-image";
 
 const IMG = {
   // Same photo used as the hero on the About page, per request.
@@ -38,7 +42,9 @@ export default async function LandingPage() {
   // them straight to their dashboard removes the second click that made signing
   // in feel like it had not worked. Marketing stays reachable at /about and
   // through the footer, and anyone signed out still lands here.
-  if (user && !user.profile?.account_deleted_at) {
+  // A super administrator in edit mode came here to edit this page, so stay.
+  const editingSite = !!user?.profile?.is_hub_admin && (await cookies()).get(EDIT_COOKIE)?.value === "1";
+  if (user && !user.profile?.account_deleted_at && !editingSite) {
     redirect(user.profile?.is_hub_admin ? "/hub" : "/dashboard");
   }
 
@@ -73,12 +79,12 @@ export default async function LandingPage() {
           {/* LEFT — official content */}
           <div className="lg:pt-6">
             <span className="inline-flex items-center gap-2 rounded-full bg-surface border border-line px-3.5 py-1.5 text-xs font-bold text-purple">
-              <Sparkles className="w-3.5 h-3.5" /> The movement, now online
+              <Sparkles className="w-3.5 h-3.5" /> <EditableText id="home.hero.badge">The movement, now online</EditableText>
             </span>
             <h1 className="mt-5 text-4xl sm:text-5xl lg:text-6xl font-black leading-[1.03] text-ink">
-              A home for women <span className="text-purple">human rights defenders</span> across Kenya &amp; Beyond
+              <EditableText id="home.hero.title.lead">A home for women</EditableText>{" "}<EditableText id="home.hero.title.highlight" className="text-purple">human rights defenders</EditableText>{" "}<EditableText id="home.hero.title.tail">across Kenya &amp; Beyond</EditableText>
             </h1>
-            <p className="mt-5 text-base sm:text-lg text-muted leading-relaxed max-w-xl">{SITE.mission}</p>
+            <EditableText as="p" id="home.hero.mission" multiline className="mt-5 text-base sm:text-lg text-muted leading-relaxed max-w-xl">{SITE.mission}</EditableText>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link href={user ? "/dashboard" : "/signup"} className="inline-flex items-center gap-2 rounded-xl bg-purple text-white px-5 sm:px-6 py-3.5 text-sm font-bold hover:bg-purple-600 transition shadow-sm">
                 {user ? "Go to your dashboard" : "Join the Hub"} <ArrowRight className="w-4 h-4" />
@@ -89,8 +95,7 @@ export default async function LandingPage() {
             </div>
 
             <div className="mt-8 rounded-3xl overflow-hidden border border-line shadow-xl shadow-purple/10">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={IMG.hero} alt="Women human rights defenders" className="w-full h-64 sm:h-80 object-cover" />
+              <EditableImage id="home.hero.image" src={IMG.hero} alt="Women human rights defenders" label="Main photo at the top of the home page" className="w-full h-64 sm:h-80 object-cover" />
             </div>
           </div>
 
@@ -124,10 +129,10 @@ export default async function LandingPage() {
             { k: "9", v: "County networks" },
             { k: "6", v: "Pillars of protection" },
             { k: "1", v: "Shared movement" },
-          ].map((s) => (
+          ].map((s, i) => (
             <div key={s.v}>
-              <p className="text-4xl font-black">{s.k}</p>
-              <p className="text-sm text-white/80 mt-1">{s.v}</p>
+              <EditableText as="p" id={`home.stats.${i}.number`} className="text-4xl font-black">{s.k}</EditableText>
+              <EditableText as="p" id={`home.stats.${i}.label`} className="text-sm text-white/80 mt-1">{s.v}</EditableText>
             </div>
           ))}
         </div>
@@ -136,21 +141,21 @@ export default async function LandingPage() {
       {/* ── PILLARS ──────────────────────────────────────────────── */}
       <section id="work" className="max-w-7xl mx-auto px-4 sm:px-6 py-16 lg:py-20">
         <div className="max-w-2xl">
-          <p className="text-xs font-bold uppercase tracking-wider text-magenta">What we focus on</p>
-          <h2 className="mt-2 text-3xl font-black text-ink">Six pillars hold the work together</h2>
-          <p className="mt-3 text-muted">From safety and wellbeing to livelihoods and femtorship, our work wraps around the whole defender.</p>
+          <EditableText as="p" id="home.pillars.eyebrow" className="text-xs font-bold uppercase tracking-wider text-magenta">What we focus on</EditableText>
+          <EditableText as="h2" id="home.pillars.title" className="mt-2 text-3xl font-black text-ink">Six pillars hold the work together</EditableText>
+          <EditableText as="p" id="home.pillars.intro" multiline className="mt-3 text-muted">From safety and wellbeing to livelihoods and femtorship, our work wraps around the whole defender.</EditableText>
         </div>
         <div className="mt-10 grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {PILLARS.map((p, i) => (
             <div key={p.title} className={`rounded-2xl border border-line p-6 ${PILLAR_TINT[i % PILLAR_TINT.length]}`}>
               <div className="w-11 h-11 rounded-xl bg-surface flex items-center justify-center text-purple font-black">{i + 1}</div>
-              <h3 className="mt-4 font-bold text-ink text-lg">{p.title}</h3>
-              <p className="mt-1.5 text-sm text-ink/70 leading-relaxed">{p.body}</p>
+              <EditableText as="h3" id={`home.pillars.${i}.title`} className="mt-4 font-bold text-ink text-lg">{p.title}</EditableText>
+              <EditableText as="p" id={`home.pillars.${i}.body`} multiline className="mt-1.5 text-sm text-ink/70 leading-relaxed">{p.body}</EditableText>
             </div>
           ))}
         </div>
         <Link href="/our-work" className="mt-8 inline-flex items-center gap-1.5 text-sm font-bold text-purple hover:text-magenta">
-          Explore our work <ArrowRight className="w-4 h-4" />
+          <EditableText id="home.pillars.link">Explore our work</EditableText> <ArrowRight className="w-4 h-4" />
         </Link>
       </section>
 
@@ -158,9 +163,9 @@ export default async function LandingPage() {
       <section className="max-w-7xl mx-auto px-4 sm:px-6 py-16 lg:py-20">
         <div className="flex items-end justify-between gap-4 flex-wrap">
           <div className="max-w-xl">
-            <p className="text-xs font-bold uppercase tracking-wider text-purple">Our counties</p>
-            <h2 className="mt-2 text-3xl font-black text-ink">Networks close to home</h2>
-            <p className="mt-3 text-muted">These communities have always organised offline. Now they have an online home too.</p>
+            <EditableText as="p" id="home.counties.eyebrow" className="text-xs font-bold uppercase tracking-wider text-purple">Our counties</EditableText>
+            <EditableText as="h2" id="home.counties.title" className="mt-2 text-3xl font-black text-ink">Networks close to home</EditableText>
+            <EditableText as="p" id="home.counties.intro" multiline className="mt-3 text-muted">These communities have always organised offline. Now they have an online home too.</EditableText>
           </div>
         </div>
         <div className="mt-8 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -181,8 +186,8 @@ export default async function LandingPage() {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 py-16 lg:py-20">
             <div className="flex items-end justify-between gap-4 mb-8">
               <div>
-                <p className="text-xs font-bold uppercase tracking-wider text-magenta">Stories</p>
-                <h2 className="mt-2 text-3xl font-black text-ink">Voices from the movement</h2>
+                <EditableText as="p" id="home.stories.eyebrow" className="text-xs font-bold uppercase tracking-wider text-magenta">Stories</EditableText>
+                <EditableText as="h2" id="home.stories.title" className="mt-2 text-3xl font-black text-ink">Voices from the movement</EditableText>
               </div>
               <Link href="/blog" className="text-sm font-bold text-purple hover:text-magenta inline-flex items-center gap-1.5">All stories <ArrowRight className="w-4 h-4" /></Link>
             </div>
@@ -209,13 +214,13 @@ export default async function LandingPage() {
       <section className="max-w-7xl mx-auto px-4 sm:px-6 py-16 lg:py-20 grid lg:grid-cols-2 gap-6">
         <div className="rounded-3xl bg-magenta text-white p-8 lg:p-10">
           <Heart className="w-8 h-8 text-white/60" />
-          <p className="mt-4 text-xs font-bold uppercase tracking-wider text-white/85">Our vision</p>
-          <p className="mt-2 text-2xl font-bold leading-snug">{SITE.vision}</p>
+          <EditableText as="p" id="home.vision.label" className="mt-4 text-xs font-bold uppercase tracking-wider text-white/85">Our vision</EditableText>
+          <EditableText as="p" id="home.vision.text" multiline className="mt-2 text-2xl font-bold leading-snug">{SITE.vision}</EditableText>
         </div>
         <div className="rounded-3xl border border-line bg-surface p-8 lg:p-10">
-          <p className="text-lg text-ink font-medium leading-relaxed">&ldquo;{LAWLOR_QUOTE.text}&rdquo;</p>
-          <p className="mt-4 text-sm font-bold text-ink">{LAWLOR_QUOTE.who}</p>
-          <p className="text-xs text-muted">{LAWLOR_QUOTE.role}</p>
+          <p className="text-lg text-ink font-medium leading-relaxed">&ldquo;<EditableText id="home.quote.text" multiline>{LAWLOR_QUOTE.text}</EditableText>&rdquo;</p>
+          <EditableText as="p" id="home.quote.who" className="mt-4 text-sm font-bold text-ink">{LAWLOR_QUOTE.who}</EditableText>
+          <EditableText as="p" id="home.quote.role" className="text-xs text-muted">{LAWLOR_QUOTE.role}</EditableText>
         </div>
       </section>
 
@@ -224,8 +229,8 @@ export default async function LandingPage() {
         <div className="relative overflow-hidden rounded-3xl bg-purple text-white p-10 lg:p-14 text-center">
           <div className="absolute inset-0 opacity-10 bg-no-repeat bg-center bg-contain" style={{ backgroundImage: `url(${IMG.artwork})` }} aria-hidden />
           <div className="relative">
-            <h2 className="text-3xl lg:text-4xl font-black">Add your voice to the movement</h2>
-            <p className="mt-3 text-white/80 max-w-xl mx-auto">Join your county network, share your work, and grow through femtorship.</p>
+            <EditableText as="h2" id="home.cta.title" className="text-3xl lg:text-4xl font-black">Add your voice to the movement</EditableText>
+            <EditableText as="p" id="home.cta.text" multiline className="mt-3 text-white/80 max-w-xl mx-auto">Join your county network, share your work, and grow through femtorship.</EditableText>
             <div className="mt-7 flex flex-wrap justify-center gap-3">
               <Link href={user ? "/dashboard" : "/signup"} className="inline-flex items-center gap-2 rounded-xl bg-white text-purple-700 px-6 py-3.5 text-sm font-bold hover:bg-white/90">
                 {user ? "Go to dashboard" : "Join the Hub"} <ArrowRight className="w-4 h-4" />

@@ -17,7 +17,7 @@
  */
 
 import { PDFName, PDFDict, PDFArray, PDFNumber, type PDFRawStream } from "pdf-lib";
-import { flateDecode } from "./filters";
+import { flateDecode } from "./filters.ts";
 
 export interface RawImage {
   /** One byte per channel, row-major, no padding. */

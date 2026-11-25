@@ -1,4 +1,5 @@
 import { BUCKETS, getPublicObject, isBucket, safeKey } from "@/lib/storage/neon";
+import { movedTo } from "@/lib/file-links";
 
 /**
  * Public documents, covers and media, served from this site's own domain.
@@ -92,7 +93,18 @@ async function serve(request: Request, params: { path: string[] }): Promise<Resp
     console.error("[files] could not read", bucketName, (e as Error).message);
     return unavailablePage(503);
   }
-  if (!file) return unavailablePage(404);
+  if (!file) {
+    // An address that is in print keeps working even if its document has since
+    // been replaced: it leads to wherever that publication's file lives now.
+    const moved = await movedTo(bucketName, key);
+    if (moved) {
+      return new Response(null, {
+        status: 307,
+        headers: { Location: new URL(moved, request.url).toString(), "Cache-Control": "no-store" },
+      });
+    }
+    return unavailablePage(404);
+  }
 
   const headers = new Headers({ ...FILE_HEADERS, "Content-Type": file.contentType });
   if (file.contentLength !== undefined) headers.set("Content-Length", String(file.contentLength));

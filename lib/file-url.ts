@@ -18,18 +18,33 @@
 
 const PUBLIC_PREFIX = "/storage/v1/object/public/";
 
+/**
+ * The Supabase project the Hub's files first lived on. Addresses saved before
+ * the move to Neon carry this host, and so does anything printed from them, so
+ * it is recognised here by name rather than through an environment variable:
+ * removing the old Supabase settings must not break a single saved link.
+ */
+export const LEGACY_STORAGE_HOST = "gmfyxbvkcdlqvgotolim.supabase.co";
+
+/** True for the old storage host, and for whichever Supabase project this environment still names. */
+function isStorageHost(host: string): boolean {
+  if (host === LEGACY_STORAGE_HOST) return true;
+  try {
+    return host === new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").host;
+  } catch {
+    return false;
+  }
+}
+
 export const HUB_FILE_PREFIX = "/files/";
 
 export function hubFile(url: string | null | undefined): string {
   if (!url) return "";
   if (url.startsWith(HUB_FILE_PREFIX)) return url;
 
-  const base = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  if (!base) return url;
-
   try {
     const u = new URL(url);
-    if (u.host !== new URL(base).host) return url;
+    if (!isStorageHost(u.host)) return url;
 
     const at = u.pathname.indexOf(PUBLIC_PREFIX);
     if (at === -1) return url; // signed or authenticated object: leave it alone
@@ -64,18 +79,17 @@ export function hubFileAbsolute(url: string | null | undefined): string {
  */
 export function hubFileHtml(html: string | null | undefined): string {
   if (!html) return "";
-  const base = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  if (!base) return html;
 
-  let host: string;
+  const hosts = [LEGACY_STORAGE_HOST];
   try {
-    host = new URL(base).host;
+    const current = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").host;
+    if (current && !hosts.includes(current)) hosts.push(current);
   } catch {
-    return html;
+    // No Supabase project named here; the old host is still recognised.
   }
 
   const pattern = new RegExp(
-    `(src|href)=("|')https?://${host.replace(/\./g, "\\.")}${PUBLIC_PREFIX}`,
+    `(src|href)=("|')https?://(?:${hosts.map((h) => h.replace(/\./g, "\\.")).join("|")})${PUBLIC_PREFIX}`,
     "gi",
   );
   return html.replace(pattern, `$1=$2${HUB_FILE_PREFIX}`);

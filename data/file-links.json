@@ -1,0 +1,787 @@
+{
+  "about": "Every public file the Hub had in storage when it left Supabase, with the exact addresses it was reachable at. Printed material carries these addresses, so a file put back must go to the same bucket and key. Do not edit by hand; see data/file-links.md.",
+  "savedOn": "2026-11-17",
+  "site": "https://www.whrdhub.org",
+  "legacyHost": "gmfyxbvkcdlqvgotolim.supabase.co",
+  "files": [
+    {
+      "bucket": "publications",
+      "key": "covers/1787833093680-Pastel_Colorful_Fun_Birthday_Photo_Book-1.png",
+      "path": "/files/publications/covers/1787833093680-Pastel_Colorful_Fun_Birthday_Photo_Book-1.png",
+      "url": "https://www.whrdhub.org/files/publications/covers/1787833093680-Pastel_Colorful_Fun_Birthday_Photo_Book-1.png",
+      "legacyUrl": "https://gmfyxbvkcdlqvgotolim.supabase.co/storage/v1/object/public/publications/covers/1787833093680-Pastel_Colorful_Fun_Birthday_Photo_Book-1.png",
+      "bytes": 780366,
+      "type": "image/png",
+      "uploaded": "2026-08-27",
+      "usedBy": []
+    },
+    {
+      "bucket": "publications",
+      "key": "covers/1787837430463-Cover_Page_2024-_2025_Photobook.png",
+      "path": "/files/publications/covers/1787837430463-Cover_Page_2024-_2025_Photobook.png",
+      "url": "https://www.whrdhub.org/files/publications/covers/1787837430463-Cover_Page_2024-_2025_Photobook.png",
+      "legacyUrl": "https://gmfyxbvkcdlqvgotolim.supabase.co/storage/v1/object/public/publications/covers/1787837430463-Cover_Page_2024-_2025_Photobook.png",
+      "bytes": 780366,
+      "type": "image/png",
+      "uploaded": "2026-08-27",
+      "usedBy": []
+    },
+    {
+      "bucket": "publications",
+      "key": "covers/1787837447688-Cover_Page_2024-_2025_Photobook.png",
+      "path": "/files/publications/covers/1787837447688-Cover_Page_2024-_2025_Photobook.png",
+      "url": "https://www.whrdhub.org/files/publications/covers/1787837447688-Cover_Page_2024-_2025_Photobook.png",
+      "legacyUrl": "https://gmfyxbvkcdlqvgotolim.supabase.co/storage/v1/object/public/publications/covers/1787837447688-Cover_Page_2024-_2025_Photobook.png",
+      "bytes": 780366,
+      "type": "image/png",
+      "uploaded": "2026-08-27",
+      "usedBy": []
+    },
+    {
+      "bucket": "publications",
+      "key": "covers/1787838098718-Cover_-_Pillars_of_Transformation_The_State_of_Women_Human_Rights_Defenders_in_Kenya-1.png",
+      "path": "/files/publications/covers/1787838098718-Cover_-_Pillars_of_Transformation_The_State_of_Women_Human_Rights_Defenders_in_Kenya-1.png",
+      "url": "https://www.whrdhub.org/files/publications/covers/1787838098718-Cover_-_Pillars_of_Transformation_The_State_of_Women_Human_Rights_Defenders_in_Kenya-1.png",
+      "legacyUrl": "https://gmfyxbvkcdlqvgotolim.supabase.co/storage/v1/object/public/publications/covers/1787838098718-Cover_-_Pillars_of_Transformation_The_State_of_Women_Human_Rights_Defenders_in_Kenya-1.png",
+      "bytes": 247864,
+      "type": "image/png",
+      "uploaded": "2026-08-27",
+      "usedBy": [
+        {
+          "resource": "545981e9-928d-41ce-9dab-afe9b192fb68",
+          "slug": "state-of-whrds-kenya",
+          "title": "State of Women Human Rights Defenders in Kenya",
+          "as": "cover"
+        }
+      ]
+    },
+    {
+      "bucket": "publications",
+      "key": "covers/1787838380404-Cover_-_Annual_Report_2024_-_2025.png",
+      "path": "/files/publications/covers/1787838380404-Cover_-_Annual_Report_2024_-_2025.png",
+      "url": "https://www.whrdhub.org/files/publications/covers/1787838380404-Cover_-_Annual_Report_2024_-_2025.png",
+      "legacyUrl": "https://gmfyxbvkcdlqvgotolim.supabase.co/storage/v1/object/public/publications/covers/1787838380404-Cover_-_Annual_Report_2024_-_2025.png",
+      "bytes": 756128,
+      "type": "image/png",
+      "uploaded": "2026-08-27",
+      "usedBy": [
+        {
+          "resource": "c92e0f59-a9c9-478f-b109-e0bfde5ab504",
+          "slug": "annual-report-2024",
+          "title": "Annual Report 2024",
+          "as": "cover"
+        }
+      ]
+    },
+    {
+      "bucket": "publications",
+      "key": "covers/1787838726738-Cover_-_We-Lead-Safety-and-Security-Training-Manual-1.png",
+      "path": "/files/publications/covers/1787838726738-Cover_-_We-Lead-Safety-and-Security-Training-Manual-1.png",
+      "url": "https://www.whrdhub.org/files/publications/covers/1787838726738-Cover_-_We-Lead-Safety-and-Security-Training-Manual-1.png",
+      "legacyUrl": "https://gmfyxbvkcdlqvgotolim.supabase.co/storage/v1/object/public/publications/covers/1787838726738-Cover_-_We-Lead-Safety-and-Security-Training-Manual-1.png",
+      "bytes": 1242650,
+      "type": "image/png",
+      "uploaded": "2026-08-27",
+      "usedBy": [
+        {
+          "resource": "43ae69f4-7434-4bd3-b936-de21670b8378",
+          "slug": "digital-safety-toolkit",
+          "title": "We Lead Safety and Security Training Manual",
+          "as": "cover"
+        }
+      ]
+    },
+    {
+      "bucket": "publications",
+      "key": "covers/1787838864741-Cover-_Rooted_In_Courage-1.png",
+      "path": "/files/publications/covers/1787838864741-Cover-_Rooted_In_Courage-1.png",
+      "url": "https://www.whrdhub.org/files/publications/covers/1787838864741-Cover-_Rooted_In_Courage-1.png",
+      "legacyUrl": "https://gmfyxbvkcdlqvgotolim.supabase.co/storage/v1/object/public/publications/covers/1787838864741-Cover-_Rooted_In_Courage-1.png",
+      "bytes": 358137,
+      "type": "image/png",
+      "uploaded": "2026-08-27",
+      "usedBy": [
+        {
+          "resource": "76b791d0-5f0e-45a5-acf9-bc4d468ed4d5",
+          "slug": "rooted-in-courage-and-resilience",
+          "title": "Rooted in Courage and Resilience",
+          "as": "cover"
+        }
+      ]
+    },
+    {
+      "bucket": "publications",
+      "key": "covers/1787838969313-Cover_-_Baseline_Survey_Report_on_the_Situation_of_Gender-1.png",
+      "path": "/files/publications/covers/1787838969313-Cover_-_Baseline_Survey_Report_on_the_Situation_of_Gender-1.png",
+      "url": "https://www.whrdhub.org/files/publications/covers/1787838969313-Cover_-_Baseline_Survey_Report_on_the_Situation_of_Gender-1.png",
+      "legacyUrl": "https://gmfyxbvkcdlqvgotolim.supabase.co/storage/v1/object/public/publications/covers/1787838969313-Cover_-_Baseline_Survey_Report_on_the_Situation_of_Gender-1.png",
+      "bytes": 273324,
+      "type": "image/png",
+      "uploaded": "2026-08-27",
+      "usedBy": [
+        {
+          "resource": "dc0f9340-68be-4275-90b6-e7c25c0b7982",
+          "slug": "building-communities-of-action",
+          "title": "Building Communities of Action Towards Ending GBV",
+          "as": "cover"
+        }
+      ]
+    },
+    {
+      "bucket": "publications",
+      "key": "covers/1787839332732-Cover-_Turning_Barriers.png",
+      "path": "/files/publications/covers/1787839332732-Cover-_Turning_Barriers.png",
+      "url": "https://www.whrdhub.org/files/publications/covers/1787839332732-Cover-_Turning_Barriers.png",
+      "legacyUrl": "https://gmfyxbvkcdlqvgotolim.supabase.co/storage/v1/object/public/publications/covers/1787839332732-Cover-_Turning_Barriers.png",
+      "bytes": 1327868,
+      "type": "image/png",
+      "uploaded": "2026-08-27",
+      "usedBy": [
+        {
+          "resource": "a707d19d-1b86-457d-b4f8-dc9912e87187",
+          "slug": "turning-barriers-into-bridges",
+          "title": "Turning Barriers into Bridges: Access to Services for GBV Survivors",
+          "as": "cover"
+        }
+      ]
+    },
+    {
+      "bucket": "publications",
+      "key": "covers/1787839553154-Copy_of__Pastel_Colorful_Fun_Birthday_Photo_Book__1_.png",
+      "path": "/files/publications/covers/1787839553154-Copy_of__Pastel_Colorful_Fun_Birthday_Photo_Book__1_.png",
+      "url": "https://www.whrdhub.org/files/publications/covers/1787839553154-Copy_of__Pastel_Colorful_Fun_Birthday_Photo_Book__1_.png",
+      "legacyUrl": "https://gmfyxbvkcdlqvgotolim.supabase.co/storage/v1/object/public/publications/covers/1787839553154-Copy_of__Pastel_Colorful_Fun_Birthday_Photo_Book__1_.png",
+      "bytes": 332900,
+      "type": "image/png",
+      "uploaded": "2026-08-27",
+      "usedBy": []
+    },
+    {
+      "bucket": "publications",
+      "key": "covers/1787839721152-Photo_Book_-_The_Kenya_Hub_V1__2_.pdf.png",
+      "path": "/files/publications/covers/1787839721152-Photo_Book_-_The_Kenya_Hub_V1__2_.pdf.png",
+      "url": "https://www.whrdhub.org/files/publications/covers/1787839721152-Photo_Book_-_The_Kenya_Hub_V1__2_.pdf.png",
+      "legacyUrl": "https://gmfyxbvkcdlqvgotolim.supabase.co/storage/v1/object/public/publications/covers/1787839721152-Photo_Book_-_The_Kenya_Hub_V1__2_.pdf.png",
+      "bytes": 477750,
+      "type": "image/png",
+      "uploaded": "2026-08-27",
+      "usedBy": [
+        {
+          "resource": "0cc761d7-e1f4-4ebc-8dfe-1492b6f374a4",
+          "slug": "policy-brief",
+          "title": "Photo Book - 2023",
+          "as": "cover"
+        }
+      ]
+    },
+    {
+      "bucket": "publications",
+      "key": "covers/1787839792200-Copy_of__Pastel_Colorful_Fun_Birthday_Photo_Book__1_.png",
+      "path": "/files/publications/covers/1787839792200-Copy_of__Pastel_Colorful_Fun_Birthday_Photo_Book__1_.png",
+      "url": "https://www.whrdhub.org/files/publications/covers/1787839792200-Copy_of__Pastel_Colorful_Fun_Birthday_Photo_Book__1_.png",
+      "legacyUrl": "https://gmfyxbvkcdlqvgotolim.supabase.co/storage/v1/object/public/publications/covers/1787839792200-Copy_of__Pastel_Colorful_Fun_Birthday_Photo_Book__1_.png",
+      "bytes": 332900,
+      "type": "image/png",
+      "uploaded": "2026-08-27",
+      "usedBy": []
+    },
+    {
+      "bucket": "publications",
+      "key": "covers/1787840985043-Cover_-_Pulse_of_Progress_Newsletter_-_2025-1.png",
+      "path": "/files/publications/covers/1787840985043-Cover_-_Pulse_of_Progress_Newsletter_-_2025-1.png",
+      "url": "https://www.whrdhub.org/files/publications/covers/1787840985043-Cover_-_Pulse_of_Progress_Newsletter_-_2025-1.png",
+      "legacyUrl": "https://gmfyxbvkcdlqvgotolim.supabase.co/storage/v1/object/public/publications/covers/1787840985043-Cover_-_Pulse_of_Progress_Newsletter_-_2025-1.png",
+      "bytes": 865286,
+      "type": "image/png",
+      "uploaded": "2026-08-27",
+      "usedBy": [
+        {
+          "resource": "9bed3958-9fd8-4d40-ab6e-3fc5f7f9c7a7",
+          "slug": "pulse-of-progress",
+          "title": "Pulse of Progress 2025 Biannual Newsletter",
+          "as": "cover"
+        }
+      ]
+    },
+    {
+      "bucket": "publications",
+      "key": "covers/1787841293476-Cover_-_Indeginous-1.png",
+      "path": "/files/publications/covers/1787841293476-Cover_-_Indeginous-1.png",
+      "url": "https://www.whrdhub.org/files/publications/covers/1787841293476-Cover_-_Indeginous-1.png",
+      "legacyUrl": "https://gmfyxbvkcdlqvgotolim.supabase.co/storage/v1/object/public/publications/covers/1787841293476-Cover_-_Indeginous-1.png",
+      "bytes": 792544,
+      "type": "image/png",
+      "uploaded": "2026-08-27",
+      "usedBy": [
+        {
+          "resource": "5c1b1b4c-a5b3-4947-811c-dc11a70dfc34",
+          "slug": "deepening-analysis-of-climate-governance-frameworks-through-an-indigenous-and-gender-lens-5c1b1b",
+          "title": "Deepening Analysis of Climate Governance Frameworks through an Indigenous and Gender Lens",
+          "as": "cover"
+        }
+      ]
+    },
+    {
+      "bucket": "publications",
+      "key": "covers/1787905133008-Cover-1.png",
+      "path": "/files/publications/covers/1787905133008-Cover-1.png",
+      "url": "https://www.whrdhub.org/files/publications/covers/1787905133008-Cover-1.png",
+      "legacyUrl": "https://gmfyxbvkcdlqvgotolim.supabase.co/storage/v1/object/public/publications/covers/1787905133008-Cover-1.png",
+      "bytes": 574404,
+      "type": "image/png",
+      "uploaded": "2026-08-28",
+      "usedBy": [
+        {
+          "resource": "074ec9b9-4748-4f7f-b3ce-e42855e460b9",
+          "slug": "assessment-of-the-legal-policy-and-social-impact-of-climate-change-laws-on-women-environmental-defenders-weds-their-organizations-wedos-074ec9",
+          "title": "ASSESSMENT OF THE LEGAL, POLICY AND SOCIAL IMPACT OF CLIMATE CHANGE LAWS ON WOMEN ENVIRONMENTAL DEFENDERS (WEDs) & THEIR ORGANIZATIONS (WEDOs)",
+          "as": "cover"
+        }
+      ]
+    },
+    {
+      "bucket": "publications",
+      "key": "covers/1787905509256-Cover_Annual_Report_2025__1___1_-01.png",
+      "path": "/files/publications/covers/1787905509256-Cover_Annual_Report_2025__1___1_-01.png",
+      "url": "https://www.whrdhub.org/files/publications/covers/1787905509256-Cover_Annual_Report_2025__1___1_-01.png",
+      "legacyUrl": "https://gmfyxbvkcdlqvgotolim.supabase.co/storage/v1/object/public/publications/covers/1787905509256-Cover_Annual_Report_2025__1___1_-01.png",
+      "bytes": 2718145,
+      "type": "image/png",
+      "uploaded": "2026-08-28",
+      "usedBy": [
+        {
+          "resource": "22c77551-2a67-439b-bddb-53ef157a1264",
+          "slug": "annual-report-2025-22c775",
+          "title": "Annual Report 2025",
+          "as": "cover"
+        }
+      ]
+    },
+    {
+      "bucket": "publications",
+      "key": "covers/1787905589766-Cover_Page_2024-_2025_Photobook.png",
+      "path": "/files/publications/covers/1787905589766-Cover_Page_2024-_2025_Photobook.png",
+      "url": "https://www.whrdhub.org/files/publications/covers/1787905589766-Cover_Page_2024-_2025_Photobook.png",
+      "legacyUrl": "https://gmfyxbvkcdlqvgotolim.supabase.co/storage/v1/object/public/publications/covers/1787905589766-Cover_Page_2024-_2025_Photobook.png",
+      "bytes": 780366,
+      "type": "image/png",
+      "uploaded": "2026-08-28",
+      "usedBy": []
+    },
+    {
+      "bucket": "publications",
+      "key": "covers/1787906236796-cover_-_Livelihood_and_well-being_impacts_of_the_recent_climate_crisis_and-1.png",
+      "path": "/files/publications/covers/1787906236796-cover_-_Livelihood_and_well-being_impacts_of_the_recent_climate_crisis_and-1.png",
+      "url": "https://www.whrdhub.org/files/publications/covers/1787906236796-cover_-_Livelihood_and_well-being_impacts_of_the_recent_climate_crisis_and-1.png",
+      "legacyUrl": "https://gmfyxbvkcdlqvgotolim.supabase.co/storage/v1/object/public/publications/covers/1787906236796-cover_-_Livelihood_and_well-being_impacts_of_the_recent_climate_crisis_and-1.png",
+      "bytes": 1291796,
+      "type": "image/png",
+      "uploaded": "2026-08-28",
+      "usedBy": [
+        {
+          "resource": "0f24460e-e03f-401a-a70f-46a69ee054ec",
+          "slug": "livelihood-and-well-being-impacts-of-the-recent-climate-crisis-and-flooding-in-kenya-for-women-human-rights-defenders-0f2446",
+          "title": "Livelihood and well-being impacts of the recent climate crisis and flooding in Kenya for Women Human Rights Defenders",
+          "as": "cover"
+        }
+      ]
+    },
+    {
+      "bucket": "publications",
+      "key": "covers/1787906719177-Cover_WHRD_Hub_Strategic_Plan_24-29.indd-1.png",
+      "path": "/files/publications/covers/1787906719177-Cover_WHRD_Hub_Strategic_Plan_24-29.indd-1.png",
+      "url": "https://www.whrdhub.org/files/publications/covers/1787906719177-Cover_WHRD_Hub_Strategic_Plan_24-29.indd-1.png",
+      "legacyUrl": "https://gmfyxbvkcdlqvgotolim.supabase.co/storage/v1/object/public/publications/covers/1787906719177-Cover_WHRD_Hub_Strategic_Plan_24-29.indd-1.png",
+      "bytes": 819636,
+      "type": "image/png",
+      "uploaded": "2026-08-28",
+      "usedBy": [
+        {
+          "resource": "ed47c22e-dde9-4c40-98a4-e0c4ec98df34",
+          "slug": "strategic-plan-2024-2028-ed47c2",
+          "title": "Strategic Plan 2024-2028",
+          "as": "cover"
+        }
+      ]
+    },
+    {
+      "bucket": "publications",
+      "key": "covers/1787921493423-300_mB_sample_pdf_file__.jpg",
+      "path": "/files/publications/covers/1787921493423-300_mB_sample_pdf_file__.jpg",
+      "url": "https://www.whrdhub.org/files/publications/covers/1787921493423-300_mB_sample_pdf_file__.jpg",
+      "legacyUrl": "https://gmfyxbvkcdlqvgotolim.supabase.co/storage/v1/object/public/publications/covers/1787921493423-300_mB_sample_pdf_file__.jpg",
+      "bytes": 53638,
+      "type": "image/jpeg",
+      "uploaded": "2026-08-28",
+      "usedBy": []
+    },
+    {
+      "bucket": "publications",
+      "key": "covers/1787948025227-Copy_of__Pastel_Colorful_Fun_Birthday_Photo_Book__1_.png",
+      "path": "/files/publications/covers/1787948025227-Copy_of__Pastel_Colorful_Fun_Birthday_Photo_Book__1_.png",
+      "url": "https://www.whrdhub.org/files/publications/covers/1787948025227-Copy_of__Pastel_Colorful_Fun_Birthday_Photo_Book__1_.png",
+      "legacyUrl": "https://gmfyxbvkcdlqvgotolim.supabase.co/storage/v1/object/public/publications/covers/1787948025227-Copy_of__Pastel_Colorful_Fun_Birthday_Photo_Book__1_.png",
+      "bytes": 332900,
+      "type": "image/png",
+      "uploaded": "2026-08-28",
+      "usedBy": []
+    },
+    {
+      "bucket": "publications",
+      "key": "covers/1788150849415-2024_-2025_year_book.jpeg",
+      "path": "/files/publications/covers/1788150849415-2024_-2025_year_book.jpeg",
+      "url": "https://www.whrdhub.org/files/publications/covers/1788150849415-2024_-2025_year_book.jpeg",
+      "legacyUrl": "https://gmfyxbvkcdlqvgotolim.supabase.co/storage/v1/object/public/publications/covers/1788150849415-2024_-2025_year_book.jpeg",
+      "bytes": 164855,
+      "type": "image/jpeg",
+      "uploaded": "2026-08-31",
+      "usedBy": [
+        {
+          "resource": "c2d7e091-d5ef-4ffb-9a1a-9ef4e4b62c15",
+          "slug": "2024-2025-year-book-c2d7e0",
+          "title": "2024-2025 Year Book",
+          "as": "cover"
+        }
+      ]
+    },
+    {
+      "bucket": "publications",
+      "key": "covers/1788152733546-2024_-_2025_Photo-Book.jpg",
+      "path": "/files/publications/covers/1788152733546-2024_-_2025_Photo-Book.jpg",
+      "url": "https://www.whrdhub.org/files/publications/covers/1788152733546-2024_-_2025_Photo-Book.jpg",
+      "legacyUrl": "https://gmfyxbvkcdlqvgotolim.supabase.co/storage/v1/object/public/publications/covers/1788152733546-2024_-_2025_Photo-Book.jpg",
+      "bytes": 99280,
+      "type": "image/jpeg",
+      "uploaded": "2026-08-31",
+      "usedBy": []
+    },
+    {
+      "bucket": "publications",
+      "key": "covers/1793599717532-WHRDHUB_Policy_Brief_Nairobi_Climate_Governance.jpg",
+      "path": "/files/publications/covers/1793599717532-WHRDHUB_Policy_Brief_Nairobi_Climate_Governance.jpg",
+      "url": "https://www.whrdhub.org/files/publications/covers/1793599717532-WHRDHUB_Policy_Brief_Nairobi_Climate_Governance.jpg",
+      "legacyUrl": "https://gmfyxbvkcdlqvgotolim.supabase.co/storage/v1/object/public/publications/covers/1793599717532-WHRDHUB_Policy_Brief_Nairobi_Climate_Governance.jpg",
+      "bytes": 373747,
+      "type": "image/jpeg",
+      "uploaded": "2026-11-02",
+      "usedBy": []
+    },
+    {
+      "bucket": "publications",
+      "key": "covers/1793601959020-a_vertical_poster_style_policy_brief_cover_with_th.png",
+      "path": "/files/publications/covers/1793601959020-a_vertical_poster_style_policy_brief_cover_with_th.png",
+      "url": "https://www.whrdhub.org/files/publications/covers/1793601959020-a_vertical_poster_style_policy_brief_cover_with_th.png",
+      "legacyUrl": "https://gmfyxbvkcdlqvgotolim.supabase.co/storage/v1/object/public/publications/covers/1793601959020-a_vertical_poster_style_policy_brief_cover_with_th.png",
+      "bytes": 2510153,
+      "type": "image/png",
+      "uploaded": "2026-11-02",
+      "usedBy": [
+        {
+          "resource": "6affe2d4-7d91-4e10-9244-786f38bf8784",
+          "slug": "inclusive-transparent-and-accountable-governance-recognizing-women-environmental-defenders-strengthening-participation-and-closing-the-feedback-loop-6affe2",
+          "title": "Inclusive, Transparent and Accountable Governance: Recognizing Women Environmental Defenders, Strengthening Participation and Closing the Feedback Loop",
+          "as": "cover"
+        }
+      ]
+    },
+    {
+      "bucket": "publications",
+      "key": "covers/1793602011551-Kitui_Policy_Brief.jpg",
+      "path": "/files/publications/covers/1793602011551-Kitui_Policy_Brief.jpg",
+      "url": "https://www.whrdhub.org/files/publications/covers/1793602011551-Kitui_Policy_Brief.jpg",
+      "legacyUrl": "https://gmfyxbvkcdlqvgotolim.supabase.co/storage/v1/object/public/publications/covers/1793602011551-Kitui_Policy_Brief.jpg",
+      "bytes": 450582,
+      "type": "image/jpeg",
+      "uploaded": "2026-11-02",
+      "usedBy": []
+    },
+    {
+      "bucket": "publications",
+      "key": "covers/1793602105471-a_vertical_poster_cover_in_a_clean_professional_n.png",
+      "path": "/files/publications/covers/1793602105471-a_vertical_poster_cover_in_a_clean_professional_n.png",
+      "url": "https://www.whrdhub.org/files/publications/covers/1793602105471-a_vertical_poster_cover_in_a_clean_professional_n.png",
+      "legacyUrl": "https://gmfyxbvkcdlqvgotolim.supabase.co/storage/v1/object/public/publications/covers/1793602105471-a_vertical_poster_cover_in_a_clean_professional_n.png",
+      "bytes": 2353776,
+      "type": "image/png",
+      "uploaded": "2026-11-02",
+      "usedBy": [
+        {
+          "resource": "a294ccd8-b08d-4f95-9b9e-a1192beabae6",
+          "slug": "strengthening-gender-responsive-climate-governance-in-nairobi-city-county-a294cc",
+          "title": "STRENGTHENING GENDER-RESPONSIVE CLIMATE GOVERNANCE IN NAIROBI CITY COUNTY",
+          "as": "cover"
+        }
+      ]
+    },
+    {
+      "bucket": "publications",
+      "key": "covers/1793602123594-Nairobi_Policy_Brief.jpg",
+      "path": "/files/publications/covers/1793602123594-Nairobi_Policy_Brief.jpg",
+      "url": "https://www.whrdhub.org/files/publications/covers/1793602123594-Nairobi_Policy_Brief.jpg",
+      "legacyUrl": "https://gmfyxbvkcdlqvgotolim.supabase.co/storage/v1/object/public/publications/covers/1793602123594-Nairobi_Policy_Brief.jpg",
+      "bytes": 411465,
+      "type": "image/jpeg",
+      "uploaded": "2026-11-02",
+      "usedBy": []
+    },
+    {
+      "bucket": "publications",
+      "key": "covers/1793602245661-a_vertical_poster_cover_design_with_a_clean_profe.png",
+      "path": "/files/publications/covers/1793602245661-a_vertical_poster_cover_design_with_a_clean_profe.png",
+      "url": "https://www.whrdhub.org/files/publications/covers/1793602245661-a_vertical_poster_cover_design_with_a_clean_profe.png",
+      "legacyUrl": "https://gmfyxbvkcdlqvgotolim.supabase.co/storage/v1/object/public/publications/covers/1793602245661-a_vertical_poster_cover_design_with_a_clean_profe.png",
+      "bytes": 2352883,
+      "type": "image/png",
+      "uploaded": "2026-11-02",
+      "usedBy": [
+        {
+          "resource": "44f2316b-f4bb-41db-96eb-dbb48ba27d38",
+          "slug": "strengthening-climate-governance-in-kwale-county-44f231",
+          "title": "STRENGTHENING CLIMATE GOVERNANCE IN KWALE COUNTY",
+          "as": "cover"
+        }
+      ]
+    },
+    {
+      "bucket": "publications",
+      "key": "covers/1793602254229-Kwale_Policy_Brief.jpg",
+      "path": "/files/publications/covers/1793602254229-Kwale_Policy_Brief.jpg",
+      "url": "https://www.whrdhub.org/files/publications/covers/1793602254229-Kwale_Policy_Brief.jpg",
+      "legacyUrl": "https://gmfyxbvkcdlqvgotolim.supabase.co/storage/v1/object/public/publications/covers/1793602254229-Kwale_Policy_Brief.jpg",
+      "bytes": 398875,
+      "type": "image/jpeg",
+      "uploaded": "2026-11-02",
+      "usedBy": []
+    },
+    {
+      "bucket": "publications",
+      "key": "documents/1787838113814-Cover_-_Pillars_of_Transformation_The_State_of_Women_Human_Rights_Defenders_in_Kenya.pdf",
+      "path": "/files/publications/documents/1787838113814-Cover_-_Pillars_of_Transformation_The_State_of_Women_Human_Rights_Defenders_in_Kenya.pdf",
+      "url": "https://www.whrdhub.org/files/publications/documents/1787838113814-Cover_-_Pillars_of_Transformation_The_State_of_Women_Human_Rights_Defenders_in_Kenya.pdf",
+      "legacyUrl": "https://gmfyxbvkcdlqvgotolim.supabase.co/storage/v1/object/public/publications/documents/1787838113814-Cover_-_Pillars_of_Transformation_The_State_of_Women_Human_Rights_Defenders_in_Kenya.pdf",
+      "bytes": 4012552,
+      "type": "application/pdf",
+      "uploaded": "2026-08-27",
+      "usedBy": []
+    },
+    {
+      "bucket": "publications",
+      "key": "documents/1787838234187-Pillars_of_Transformation_The_State_of_Women_Human_Rights_Defenders_in_Kenya__1_.pdf",
+      "path": "/files/publications/documents/1787838234187-Pillars_of_Transformation_The_State_of_Women_Human_Rights_Defenders_in_Kenya__1_.pdf",
+      "url": "https://www.whrdhub.org/files/publications/documents/1787838234187-Pillars_of_Transformation_The_State_of_Women_Human_Rights_Defenders_in_Kenya__1_.pdf",
+      "legacyUrl": "https://gmfyxbvkcdlqvgotolim.supabase.co/storage/v1/object/public/publications/documents/1787838234187-Pillars_of_Transformation_The_State_of_Women_Human_Rights_Defenders_in_Kenya__1_.pdf",
+      "bytes": 5961809,
+      "type": "application/pdf",
+      "uploaded": "2026-08-27",
+      "usedBy": [
+        {
+          "resource": "545981e9-928d-41ce-9dab-afe9b192fb68",
+          "slug": "state-of-whrds-kenya",
+          "title": "State of Women Human Rights Defenders in Kenya",
+          "as": "document"
+        }
+      ]
+    },
+    {
+      "bucket": "publications",
+      "key": "documents/1787838390092-The_HUB_Annual_Report_2024.pdf",
+      "path": "/files/publications/documents/1787838390092-The_HUB_Annual_Report_2024.pdf",
+      "url": "https://www.whrdhub.org/files/publications/documents/1787838390092-The_HUB_Annual_Report_2024.pdf",
+      "legacyUrl": "https://gmfyxbvkcdlqvgotolim.supabase.co/storage/v1/object/public/publications/documents/1787838390092-The_HUB_Annual_Report_2024.pdf",
+      "bytes": 17349230,
+      "type": "application/pdf",
+      "uploaded": "2026-08-27",
+      "usedBy": []
+    },
+    {
+      "bucket": "publications",
+      "key": "documents/1787838743907-We-Lead-Safety-and-Security-Training-Manual.pdf",
+      "path": "/files/publications/documents/1787838743907-We-Lead-Safety-and-Security-Training-Manual.pdf",
+      "url": "https://www.whrdhub.org/files/publications/documents/1787838743907-We-Lead-Safety-and-Security-Training-Manual.pdf",
+      "legacyUrl": "https://gmfyxbvkcdlqvgotolim.supabase.co/storage/v1/object/public/publications/documents/1787838743907-We-Lead-Safety-and-Security-Training-Manual.pdf",
+      "bytes": 1634717,
+      "type": "application/pdf",
+      "uploaded": "2026-08-27",
+      "usedBy": [
+        {
+          "resource": "43ae69f4-7434-4bd3-b936-de21670b8378",
+          "slug": "digital-safety-toolkit",
+          "title": "We Lead Safety and Security Training Manual",
+          "as": "document"
+        }
+      ]
+    },
+    {
+      "bucket": "publications",
+      "key": "documents/1787838779851-The_HUB_Annual_Report_2024.pdf",
+      "path": "/files/publications/documents/1787838779851-The_HUB_Annual_Report_2024.pdf",
+      "url": "https://www.whrdhub.org/files/publications/documents/1787838779851-The_HUB_Annual_Report_2024.pdf",
+      "legacyUrl": "https://gmfyxbvkcdlqvgotolim.supabase.co/storage/v1/object/public/publications/documents/1787838779851-The_HUB_Annual_Report_2024.pdf",
+      "bytes": 17349230,
+      "type": "application/pdf",
+      "uploaded": "2026-08-27",
+      "usedBy": [
+        {
+          "resource": "c92e0f59-a9c9-478f-b109-e0bfde5ab504",
+          "slug": "annual-report-2024",
+          "title": "Annual Report 2024",
+          "as": "document"
+        }
+      ]
+    },
+    {
+      "bucket": "publications",
+      "key": "documents/1787838871952-Rooted_in_Courage.pdf",
+      "path": "/files/publications/documents/1787838871952-Rooted_in_Courage.pdf",
+      "url": "https://www.whrdhub.org/files/publications/documents/1787838871952-Rooted_in_Courage.pdf",
+      "legacyUrl": "https://gmfyxbvkcdlqvgotolim.supabase.co/storage/v1/object/public/publications/documents/1787838871952-Rooted_in_Courage.pdf",
+      "bytes": 22728457,
+      "type": "application/pdf",
+      "uploaded": "2026-08-27",
+      "usedBy": [
+        {
+          "resource": "76b791d0-5f0e-45a5-acf9-bc4d468ed4d5",
+          "slug": "rooted-in-courage-and-resilience",
+          "title": "Rooted in Courage and Resilience",
+          "as": "document"
+        }
+      ]
+    },
+    {
+      "bucket": "publications",
+      "key": "documents/1787839005057-Baseline_Survey_Report_on_the_Situation_of_Gender.pdf",
+      "path": "/files/publications/documents/1787839005057-Baseline_Survey_Report_on_the_Situation_of_Gender.pdf",
+      "url": "https://www.whrdhub.org/files/publications/documents/1787839005057-Baseline_Survey_Report_on_the_Situation_of_Gender.pdf",
+      "legacyUrl": "https://gmfyxbvkcdlqvgotolim.supabase.co/storage/v1/object/public/publications/documents/1787839005057-Baseline_Survey_Report_on_the_Situation_of_Gender.pdf",
+      "bytes": 2158219,
+      "type": "application/pdf",
+      "uploaded": "2026-08-27",
+      "usedBy": [
+        {
+          "resource": "dc0f9340-68be-4275-90b6-e7c25c0b7982",
+          "slug": "building-communities-of-action",
+          "title": "Building Communities of Action Towards Ending GBV",
+          "as": "document"
+        }
+      ]
+    },
+    {
+      "bucket": "publications",
+      "key": "documents/1787839341982-Turning_Barriers_into_Bridges__Enhancing_Access_to_Service_Delivery_for_GBV_Survivors.pdf",
+      "path": "/files/publications/documents/1787839341982-Turning_Barriers_into_Bridges__Enhancing_Access_to_Service_Delivery_for_GBV_Survivors.pdf",
+      "url": "https://www.whrdhub.org/files/publications/documents/1787839341982-Turning_Barriers_into_Bridges__Enhancing_Access_to_Service_Delivery_for_GBV_Survivors.pdf",
+      "legacyUrl": "https://gmfyxbvkcdlqvgotolim.supabase.co/storage/v1/object/public/publications/documents/1787839341982-Turning_Barriers_into_Bridges__Enhancing_Access_to_Service_Delivery_for_GBV_Survivors.pdf",
+      "bytes": 26206866,
+      "type": "application/pdf",
+      "uploaded": "2026-08-27",
+      "usedBy": [
+        {
+          "resource": "a707d19d-1b86-457d-b4f8-dc9912e87187",
+          "slug": "turning-barriers-into-bridges",
+          "title": "Turning Barriers into Bridges: Access to Services for GBV Survivors",
+          "as": "document"
+        }
+      ]
+    },
+    {
+      "bucket": "publications",
+      "key": "documents/1787839728363-Photo_Book_-_The_Kenya_Hub_V1__2_.pdf.pdf",
+      "path": "/files/publications/documents/1787839728363-Photo_Book_-_The_Kenya_Hub_V1__2_.pdf.pdf",
+      "url": "https://www.whrdhub.org/files/publications/documents/1787839728363-Photo_Book_-_The_Kenya_Hub_V1__2_.pdf.pdf",
+      "legacyUrl": "https://gmfyxbvkcdlqvgotolim.supabase.co/storage/v1/object/public/publications/documents/1787839728363-Photo_Book_-_The_Kenya_Hub_V1__2_.pdf.pdf",
+      "bytes": 12896833,
+      "type": "application/pdf",
+      "uploaded": "2026-08-27",
+      "usedBy": [
+        {
+          "resource": "0cc761d7-e1f4-4ebc-8dfe-1492b6f374a4",
+          "slug": "policy-brief",
+          "title": "Photo Book - 2023",
+          "as": "document"
+        }
+      ]
+    },
+    {
+      "bucket": "publications",
+      "key": "documents/1787841302603-Indeginous_Report.pdf",
+      "path": "/files/publications/documents/1787841302603-Indeginous_Report.pdf",
+      "url": "https://www.whrdhub.org/files/publications/documents/1787841302603-Indeginous_Report.pdf",
+      "legacyUrl": "https://gmfyxbvkcdlqvgotolim.supabase.co/storage/v1/object/public/publications/documents/1787841302603-Indeginous_Report.pdf",
+      "bytes": 6536329,
+      "type": "application/pdf",
+      "uploaded": "2026-08-27",
+      "usedBy": [
+        {
+          "resource": "5c1b1b4c-a5b3-4947-811c-dc11a70dfc34",
+          "slug": "deepening-analysis-of-climate-governance-frameworks-through-an-indigenous-and-gender-lens-5c1b1b",
+          "title": "Deepening Analysis of Climate Governance Frameworks through an Indigenous and Gender Lens",
+          "as": "document"
+        }
+      ]
+    },
+    {
+      "bucket": "publications",
+      "key": "documents/1787905153205-Research_Report_of_the_Legal__3_.pdf",
+      "path": "/files/publications/documents/1787905153205-Research_Report_of_the_Legal__3_.pdf",
+      "url": "https://www.whrdhub.org/files/publications/documents/1787905153205-Research_Report_of_the_Legal__3_.pdf",
+      "legacyUrl": "https://gmfyxbvkcdlqvgotolim.supabase.co/storage/v1/object/public/publications/documents/1787905153205-Research_Report_of_the_Legal__3_.pdf",
+      "bytes": 4481829,
+      "type": "application/pdf",
+      "uploaded": "2026-08-28",
+      "usedBy": [
+        {
+          "resource": "074ec9b9-4748-4f7f-b3ce-e42855e460b9",
+          "slug": "assessment-of-the-legal-policy-and-social-impact-of-climate-change-laws-on-women-environmental-defenders-weds-their-organizations-wedos-074ec9",
+          "title": "ASSESSMENT OF THE LEGAL, POLICY AND SOCIAL IMPACT OF CLIMATE CHANGE LAWS ON WOMEN ENVIRONMENTAL DEFENDERS (WEDs) & THEIR ORGANIZATIONS (WEDOs)",
+          "as": "document"
+        }
+      ]
+    },
+    {
+      "bucket": "publications",
+      "key": "documents/1787905517437-Annual_Report_2025__1___1_.pdf",
+      "path": "/files/publications/documents/1787905517437-Annual_Report_2025__1___1_.pdf",
+      "url": "https://www.whrdhub.org/files/publications/documents/1787905517437-Annual_Report_2025__1___1_.pdf",
+      "legacyUrl": "https://gmfyxbvkcdlqvgotolim.supabase.co/storage/v1/object/public/publications/documents/1787905517437-Annual_Report_2025__1___1_.pdf",
+      "bytes": 7263720,
+      "type": "application/pdf",
+      "uploaded": "2026-08-28",
+      "usedBy": [
+        {
+          "resource": "22c77551-2a67-439b-bddb-53ef157a1264",
+          "slug": "annual-report-2025-22c775",
+          "title": "Annual Report 2025",
+          "as": "document"
+        }
+      ]
+    },
+    {
+      "bucket": "publications",
+      "key": "documents/1787906257912-Livelihood_and_Wellbeing_Impacts_of_Flooding_and_Climate_Crisis_in_Kenya.pdf",
+      "path": "/files/publications/documents/1787906257912-Livelihood_and_Wellbeing_Impacts_of_Flooding_and_Climate_Crisis_in_Kenya.pdf",
+      "url": "https://www.whrdhub.org/files/publications/documents/1787906257912-Livelihood_and_Wellbeing_Impacts_of_Flooding_and_Climate_Crisis_in_Kenya.pdf",
+      "legacyUrl": "https://gmfyxbvkcdlqvgotolim.supabase.co/storage/v1/object/public/publications/documents/1787906257912-Livelihood_and_Wellbeing_Impacts_of_Flooding_and_Climate_Crisis_in_Kenya.pdf",
+      "bytes": 1674664,
+      "type": "application/pdf",
+      "uploaded": "2026-08-28",
+      "usedBy": [
+        {
+          "resource": "0f24460e-e03f-401a-a70f-46a69ee054ec",
+          "slug": "livelihood-and-well-being-impacts-of-the-recent-climate-crisis-and-flooding-in-kenya-for-women-human-rights-defenders-0f2446",
+          "title": "Livelihood and well-being impacts of the recent climate crisis and flooding in Kenya for Women Human Rights Defenders",
+          "as": "document"
+        }
+      ]
+    },
+    {
+      "bucket": "publications",
+      "key": "documents/1787906725825-WHRD_Hub_Strategic_Plan_Final__11_.pdf",
+      "path": "/files/publications/documents/1787906725825-WHRD_Hub_Strategic_Plan_Final__11_.pdf",
+      "url": "https://www.whrdhub.org/files/publications/documents/1787906725825-WHRD_Hub_Strategic_Plan_Final__11_.pdf",
+      "legacyUrl": "https://gmfyxbvkcdlqvgotolim.supabase.co/storage/v1/object/public/publications/documents/1787906725825-WHRD_Hub_Strategic_Plan_Final__11_.pdf",
+      "bytes": 5403328,
+      "type": "application/pdf",
+      "uploaded": "2026-08-28",
+      "usedBy": [
+        {
+          "resource": "ed47c22e-dde9-4c40-98a4-e0c4ec98df34",
+          "slug": "strategic-plan-2024-2028-ed47c2",
+          "title": "Strategic Plan 2024-2028",
+          "as": "document"
+        }
+      ]
+    },
+    {
+      "bucket": "publications",
+      "key": "documents/1787921471178-300_mB_sample_pdf_file__.pdf",
+      "path": "/files/publications/documents/1787921471178-300_mB_sample_pdf_file__.pdf",
+      "url": "https://www.whrdhub.org/files/publications/documents/1787921471178-300_mB_sample_pdf_file__.pdf",
+      "legacyUrl": "https://gmfyxbvkcdlqvgotolim.supabase.co/storage/v1/object/public/publications/documents/1787921471178-300_mB_sample_pdf_file__.pdf",
+      "bytes": 2065487,
+      "type": "application/pdf",
+      "uploaded": "2026-08-28",
+      "usedBy": []
+    },
+    {
+      "bucket": "publications",
+      "key": "documents/1788152718354-2024_-_2025_Photo-Book.pdf",
+      "path": "/files/publications/documents/1788152718354-2024_-_2025_Photo-Book.pdf",
+      "url": "https://www.whrdhub.org/files/publications/documents/1788152718354-2024_-_2025_Photo-Book.pdf",
+      "legacyUrl": "https://gmfyxbvkcdlqvgotolim.supabase.co/storage/v1/object/public/publications/documents/1788152718354-2024_-_2025_Photo-Book.pdf",
+      "bytes": 11442401,
+      "type": "application/pdf",
+      "uploaded": "2026-08-31",
+      "usedBy": [
+        {
+          "resource": "c2d7e091-d5ef-4ffb-9a1a-9ef4e4b62c15",
+          "slug": "2024-2025-year-book-c2d7e0",
+          "title": "2024-2025 Year Book",
+          "as": "document"
+        }
+      ]
+    },
+    {
+      "bucket": "publications",
+      "key": "documents/1793602009878-Kitui_Policy_Brief.pdf",
+      "path": "/files/publications/documents/1793602009878-Kitui_Policy_Brief.pdf",
+      "url": "https://www.whrdhub.org/files/publications/documents/1793602009878-Kitui_Policy_Brief.pdf",
+      "legacyUrl": "https://gmfyxbvkcdlqvgotolim.supabase.co/storage/v1/object/public/publications/documents/1793602009878-Kitui_Policy_Brief.pdf",
+      "bytes": 4462842,
+      "type": "application/pdf",
+      "uploaded": "2026-11-02",
+      "usedBy": [
+        {
+          "resource": "6affe2d4-7d91-4e10-9244-786f38bf8784",
+          "slug": "inclusive-transparent-and-accountable-governance-recognizing-women-environmental-defenders-strengthening-participation-and-closing-the-feedback-loop-6affe2",
+          "title": "Inclusive, Transparent and Accountable Governance: Recognizing Women Environmental Defenders, Strengthening Participation and Closing the Feedback Loop",
+          "as": "document"
+        }
+      ]
+    },
+    {
+      "bucket": "publications",
+      "key": "documents/1793602121387-Nairobi_Policy_Brief.pdf",
+      "path": "/files/publications/documents/1793602121387-Nairobi_Policy_Brief.pdf",
+      "url": "https://www.whrdhub.org/files/publications/documents/1793602121387-Nairobi_Policy_Brief.pdf",
+      "legacyUrl": "https://gmfyxbvkcdlqvgotolim.supabase.co/storage/v1/object/public/publications/documents/1793602121387-Nairobi_Policy_Brief.pdf",
+      "bytes": 3977024,
+      "type": "application/pdf",
+      "uploaded": "2026-11-02",
+      "usedBy": [
+        {
+          "resource": "a294ccd8-b08d-4f95-9b9e-a1192beabae6",
+          "slug": "strengthening-gender-responsive-climate-governance-in-nairobi-city-county-a294cc",
+          "title": "STRENGTHENING GENDER-RESPONSIVE CLIMATE GOVERNANCE IN NAIROBI CITY COUNTY",
+          "as": "document"
+        }
+      ]
+    },
+    {
+      "bucket": "publications",
+      "key": "documents/1793602252624-Kwale_Policy_Brief.pdf",
+      "path": "/files/publications/documents/1793602252624-Kwale_Policy_Brief.pdf",
+      "url": "https://www.whrdhub.org/files/publications/documents/1793602252624-Kwale_Policy_Brief.pdf",
+      "legacyUrl": "https://gmfyxbvkcdlqvgotolim.supabase.co/storage/v1/object/public/publications/documents/1793602252624-Kwale_Policy_Brief.pdf",
+      "bytes": 4160447,
+      "type": "application/pdf",
+      "uploaded": "2026-11-02",
+      "usedBy": [
+        {
+          "resource": "44f2316b-f4bb-41db-96eb-dbb48ba27d38",
+          "slug": "strengthening-climate-governance-in-kwale-county-44f231",
+          "title": "STRENGTHENING CLIMATE GOVERNANCE IN KWALE COUNTY",
+          "as": "document"
+        }
+      ]
+    }
+  ],
+  "external": [
+    {
+      "resource": "9bed3958-9fd8-4d40-ab6e-3fc5f7f9c7a7",
+      "slug": "pulse-of-progress",
+      "title": "Pulse of Progress 2025 Biannual Newsletter",
+      "as": "document",
+      "url": "https://mailchi.mp/52a925da9e63/pulse-of-progress-6751137"
+    }
+  ]
+}

@@ -4,6 +4,8 @@ import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { PILLARS } from "@/lib/data";
 import { pageMeta } from "@/lib/seo";
+import { EditableText } from "@/components/site-edit/editable-text";
+import { EditableImage } from "@/components/site-edit/editable-image";
 
 export const metadata = pageMeta({
   title: "Our Work",
@@ -27,14 +29,14 @@ export default function OurWorkPage() {
 
       <section className="brand-wash border-b border-line">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-16">
-          <p className="text-xs font-bold uppercase tracking-wider text-magenta">Our causes</p>
-          <h1 className="mt-3 text-4xl lg:text-5xl font-black text-ink leading-tight max-w-3xl">
+          <EditableText as="p" id="our-work.hero.eyebrow" className="text-xs font-bold uppercase tracking-wider text-magenta">Our causes</EditableText>
+          <EditableText as="h1" id="our-work.hero.title" className="mt-3 text-4xl lg:text-5xl font-black text-ink leading-tight max-w-3xl">
             Six pillars that hold the movement together
-          </h1>
-          <p className="mt-4 text-lg text-muted max-w-2xl">
+          </EditableText>
+          <EditableText as="p" id="our-work.hero.intro" multiline className="mt-4 text-lg text-muted max-w-2xl">
             Everything the Hub does connects back to these pillars, from keeping defenders safe to
             growing the next generation through femtorship.
-          </p>
+          </EditableText>
         </div>
       </section>
 
@@ -42,13 +44,12 @@ export default function OurWorkPage() {
         {PILLARS.map((p, i) => (
           <div key={p.title} className={`grid lg:grid-cols-2 gap-8 items-center ${i % 2 ? "lg:[direction:rtl]" : ""}`}>
             <div className="rounded-3xl overflow-hidden border border-line shadow-lg shadow-purple/5 [direction:ltr]">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={IMGS[i % IMGS.length]} alt={p.title} className="w-full h-72 object-cover" />
+              <EditableImage id={`our-work.pillars.${i}.image`} src={IMGS[i % IMGS.length]} alt={p.title} label={`Photo for the pillar "${p.title}"`} className="w-full h-72 object-cover" />
             </div>
             <div className="[direction:ltr]">
               <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-purple-050 text-purple font-black">{i + 1}</span>
-              <h2 className="mt-4 text-2xl font-black text-ink">{p.title}</h2>
-              <p className="mt-3 text-muted leading-relaxed">{p.body}</p>
+              <EditableText as="h2" id={`our-work.pillars.${i}.title`} className="mt-4 text-2xl font-black text-ink">{p.title}</EditableText>
+              <EditableText as="p" id={`our-work.pillars.${i}.body`} multiline className="mt-3 text-muted leading-relaxed">{p.body}</EditableText>
             </div>
           </div>
         ))}
@@ -56,10 +57,10 @@ export default function OurWorkPage() {
 
       <section className="max-w-6xl mx-auto px-4 sm:px-6 pb-16">
         <div className="rounded-3xl bg-purple text-white p-10 text-center">
-          <h2 className="text-3xl font-black">Be part of the work</h2>
-          <p className="mt-3 text-white/80">Join your county network and help the movement grow.</p>
+          <EditableText as="h2" id="our-work.cta.title" className="text-3xl font-black">Be part of the work</EditableText>
+          <EditableText as="p" id="our-work.cta.text" multiline className="mt-3 text-white/80">Join your county network and help the movement grow.</EditableText>
           <Link href="/signup" className="mt-6 inline-flex items-center gap-2 rounded-xl bg-white text-purple-700 px-6 py-3.5 text-sm font-bold hover:bg-white/90">
-            Join the Hub <ArrowRight className="w-4 h-4" />
+            <EditableText id="our-work.cta.button">Join the Hub</EditableText> <ArrowRight className="w-4 h-4" />
           </Link>
         </div>
       </section>

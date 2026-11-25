@@ -84,6 +84,8 @@ export default async function HubLayout({ children }: { children: React.ReactNod
     { label: "CBOs", href: "/hub/organizations", icon: "organisations", badge: orgsPending || undefined, area: "Community", section: "Manage" },
     { label: "Resources", href: "/hub/resources", icon: "resources", area: "Community", section: "Manage" },
     { label: "Femtorship", href: "/hub/femtorship", icon: "femtorship", area: "Community", section: "Manage" },
+    // Opens the public site with edit mode on (super administrators only; see app/edit-site/route.ts).
+    ...(user.profile?.is_hub_admin ? ([{ label: "Edit website", href: "/edit-site", icon: "website", area: "Community", section: "Manage" }] as NavItem[]) : []),
     { label: "Mentors", href: "/hub/mentors", icon: "members", badge: mentorsWaiting || undefined, area: "Community", section: "Manage" },
 
     { label: "Deleted content", href: "/hub/deleted", icon: "deleted", area: "Community", secondary: true },

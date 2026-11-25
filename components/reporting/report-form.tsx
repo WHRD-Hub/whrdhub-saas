@@ -426,8 +426,8 @@ export default function ReportForm({ isAuthenticated = false, userEmail }: Repor
       if (payload && nowOffline) {
         await saveOffline(payload);
       } else {
-        const msg = err instanceof Error ? err.message : String(err);
-        setError(msg || "An unexpected error occurred. Please try again.");
+        // The raw message can be a framework error code, which means nothing to someone reporting abuse.
+        setError("Your report could not be sent. What you wrote is still here, so please try again.");
       }
     } finally {
       setLoading(false);

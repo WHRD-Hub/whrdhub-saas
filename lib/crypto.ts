@@ -44,9 +44,9 @@ function loadRing() {
 
 const b64 = (b: Buffer) => b.toString("base64url");
 
-/** True when the application can encrypt (keys are configured). */
+/** True when both the encryption keys and the blind-index key are present and well formed. */
 export function encryptionConfigured(): boolean {
-  try { loadRing(); return true; } catch { return false; }
+  try { loadRing(); blindIndex("check"); return true; } catch { return false; }
 }
 
 /** True for a value this module produced. Plain legacy text returns false. */

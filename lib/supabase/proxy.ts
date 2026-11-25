@@ -28,6 +28,9 @@ const PUBLIC_PATHS = [
   // check in front of them would hide published documents from the public they
   // were published for.
   "/files",
+  // Edit mode for the public site checks the session itself and sends a signed-out
+  // visitor to sign in with the way back here, so edit mode is on when they return.
+  "/edit-site",
   // PWA plumbing.
   "/manifest.webmanifest", "/sw.js",
   // Crawlers must be able to read the rules without signing in.

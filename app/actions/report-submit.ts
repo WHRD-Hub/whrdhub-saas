@@ -7,6 +7,7 @@ import { after } from "next/server";
 import { alertOnReport } from "@/lib/alerts";
 import { generateUsername } from "@/lib/anonymous-username";
 import { randomUUID } from "node:crypto";
+import { encryptionConfigured } from "@/lib/crypto";
 import { sealReport } from "@/lib/report-crypto";
 import { actionIp, rateLimit, tooMany } from "@/lib/rate-limit";
 
@@ -71,6 +72,16 @@ export async function submitReport(data: ReportData): Promise<SubmitReportResult
   // and stops the open form being used to create accounts in bulk.
   const limit = await rateLimit(`report:${await actionIp()}`, 3600, 10);
   if (!limit.ok) return { success: false, error: tooMany(limit.retryAfter) };
+
+  // Checked before anything is written, so a server without its keys cannot leave behind
+  // an anonymous account with no report attached.
+  if (!encryptionConfigured()) {
+    console.error("[report] DATA_ENCRYPTION_KEYS or BLIND_INDEX_KEY is missing or invalid; report refused.");
+    return {
+      success: false,
+      error: "We can't accept reports securely right now, and nothing has been sent. Please keep this page open and try again shortly, or contact the response team directly if you need help now.",
+    };
+  }
 
   const supabase = await createClient();
 

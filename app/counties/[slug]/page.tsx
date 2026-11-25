@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { MapPin, Building2, Users, ArrowRight, Sparkles, BookOpen, MessageSquare } from "lucide-react";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
+import { EditableImage } from "@/components/site-edit/editable-image";
 import { createClient } from "@/lib/supabase/server";
 import { COUNTIES, countyBySlug } from "@/lib/counties";
 import { pageMeta } from "@/lib/seo";
@@ -71,8 +72,7 @@ export default async function CountyPage({
 
       {/* Hero */}
       <section className="relative overflow-hidden border-b border-line">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={county.hero} alt={county.name} className="absolute inset-0 w-full h-full object-cover" />
+        <EditableImage id={`counties.${county.slug}.hero`} src={county.hero} alt={county.name} label={`Photo of the ${county.name} network`} wrapperClassName="absolute inset-0" className="w-full h-full object-cover" />
         <div className="absolute inset-0 bg-gradient-to-r from-[#3a2357]/95 via-[#3a2357]/80 to-[#3a2357]/40" />
         <div className="relative max-w-6xl mx-auto px-4 sm:px-6 py-20 lg:py-24 text-white">
           <p className="text-xs font-bold uppercase tracking-wider text-white/90 flex items-center gap-1.5">
@@ -112,8 +112,7 @@ export default async function CountyPage({
 
         {/* Moments from this network */}
         <div className="mt-6 rounded-3xl overflow-hidden border border-line">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={county.hero} alt={`${county.name} network`} className="w-full h-64 sm:h-80 object-cover" />
+          <EditableImage id={`counties.${county.slug}.hero`} src={county.hero} alt={`${county.name} network`} label={`Photo of the ${county.name} network`} className="w-full h-64 sm:h-80 object-cover" />
         </div>
 
         {/* Organisations */}

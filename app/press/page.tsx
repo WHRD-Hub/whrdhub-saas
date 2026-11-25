@@ -1,5 +1,6 @@
 import { FileText } from "lucide-react";
 import { PageShell } from "@/components/page-hero";
+import { EditableImage } from "@/components/site-edit/editable-image";
 import { PRESS } from "@/lib/site-content";
 
 export const metadata = {
@@ -24,8 +25,7 @@ export default function PressPage() {
             className="group rounded-2xl border border-line bg-surface overflow-hidden hover:shadow-md transition-shadow flex"
           >
             <div className="w-28 shrink-0 bg-paper">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={p.cover} alt="" className="w-full h-full object-cover" />
+              <EditableImage id={`press.${i}.cover`} src={p.cover} alt="" label={`Cover of "${p.title}"`} wrapperClassName="h-full" className="w-full h-full object-cover" />
             </div>
             <div className="p-4 flex flex-col">
               <span className="inline-flex items-center gap-1 text-xs font-semibold text-cyan-700">

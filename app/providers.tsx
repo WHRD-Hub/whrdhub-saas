@@ -2,6 +2,8 @@
 
 import { LanguageProvider } from "@/lib/i18n/context";
 import { Toaster } from "@/components/ui/toast";
+import { SiteContentProvider } from "@/components/site-edit/site-content-provider";
+import { EditBar } from "@/components/site-edit/edit-bar";
 
 /**
  * Client-side providers for the merged app.
@@ -10,10 +12,13 @@ import { Toaster } from "@/components/ui/toast";
  * the report form, the member dashboard and the Hub console all render in the
  * language the visitor chose.
  */
-export function Providers({ children }: { children: React.ReactNode }) {
+export function Providers({ children, siteContent = {} }: { children: React.ReactNode; siteContent?: Record<string, string> }) {
   return (
     <LanguageProvider>
-      {children}
+      <SiteContentProvider published={siteContent}>
+        {children}
+        <EditBar />
+      </SiteContentProvider>
       <Toaster />
     </LanguageProvider>
   );

@@ -1,5 +1,6 @@
 import { Briefcase, ArrowRight } from "lucide-react";
 import { PageShell } from "@/components/page-hero";
+import { EditableImage } from "@/components/site-edit/editable-image";
 import { OPPORTUNITIES } from "@/lib/site-content";
 
 export const metadata = {
@@ -19,8 +20,7 @@ export default function OpportunitiesPage() {
         {OPPORTUNITIES.map((o, i) => (
           <div key={i} className="rounded-2xl border border-line bg-surface overflow-hidden flex flex-col sm:flex-row">
             <div className="sm:w-40 shrink-0 bg-paper">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={o.cover} alt="" className="w-full h-40 sm:h-full object-cover" />
+              <EditableImage id={`opportunities.${i}.cover`} src={o.cover} alt="" label={`Cover of "${o.title}"`} wrapperClassName="sm:h-full" className="w-full h-40 sm:h-full object-cover" />
             </div>
             <div className="p-5 flex flex-col">
               <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-magenta w-fit rounded-full bg-magenta-050 px-2.5 py-0.5">

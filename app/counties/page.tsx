@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { MapPin, ArrowUpRight } from "lucide-react";
 import { PageShell } from "@/components/page-hero";
+import { EditableImage } from "@/components/site-edit/editable-image";
 import { COUNTIES } from "@/lib/counties";
 import { pageMeta } from "@/lib/seo";
 
@@ -26,8 +27,7 @@ export default function CountiesIndex() {
             className="group rounded-2xl border border-line bg-surface overflow-hidden hover:shadow-md transition-shadow"
           >
             <div className="relative h-40 overflow-hidden">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={c.hero} alt={c.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+              <EditableImage id={`counties.${c.slug}.hero`} src={c.hero} alt={c.name} label={`Photo of the ${c.name} network (card and county page)`} wrapperClassName="h-full" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
               <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
               <div className="absolute bottom-3 left-4 flex items-center gap-1.5 text-white">
                 <MapPin className="w-4 h-4" />

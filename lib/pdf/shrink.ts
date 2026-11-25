@@ -1,6 +1,6 @@
 import { PDFDocument, PDFName, PDFRawStream, PDFDict, PDFArray, type PDFRef } from "pdf-lib";
-import { jpegPayload } from "./filters";
-import { decodeRawImage } from "./raw-image";
+import { jpegPayload } from "./filters.ts";
+import { decodeRawImage } from "./raw-image.ts";
 
 /**
  * Shrink a PDF by re-encoding the pictures inside it, and nothing else.
@@ -97,6 +97,19 @@ function imageRefs(doc: PDFDocument): PDFRef[] {
       if (!(stream instanceof PDFRawStream)) continue;
       if (stream.dict.get(PDFName.of("Subtype"))?.toString() !== "/Image") continue;
       found.set((ref as PDFRef).tag, ref as PDFRef);
+    }
+  }
+
+  // A soft mask (/SMask) or stencil (/Mask) is itself an image stream, and some
+  // layout tools also list it on the page as an ordinary image. It must stay
+  // single-channel: re-encoded as our three-channel JPEG, the reader can no
+  // longer decode it and the picture it masks disappears from the page. So any
+  // image that serves as another image's mask is left exactly as it was.
+  for (const [, obj] of doc.context.enumerateIndirectObjects()) {
+    if (!(obj instanceof PDFRawStream)) continue;
+    for (const key of ["SMask", "Mask"]) {
+      const mask = obj.dict.get(PDFName.of(key));
+      if (mask && typeof (mask as PDFRef).tag === "string") found.delete((mask as PDFRef).tag);
     }
   }
 

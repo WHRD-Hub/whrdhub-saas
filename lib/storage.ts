@@ -1,4 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { HUB_FILE_PREFIX, hubFile } from "@/lib/file-url";
+import { isPrintedFile } from "@/lib/file-links";
 
 /**
  * Every published document and cover image must live in the Hub's own storage,
@@ -28,18 +30,15 @@ const EXT_BY_TYPE: Record<string, string> = {
 
 const ALLOWED = new Set(Object.keys(EXT_BY_TYPE));
 
-/** True when the URL already points at this project's Supabase storage. */
+/**
+ * True when the URL already points at the Hub's own storage: a `/files/...`
+ * address on this site, or an address saved while the files lived on Supabase
+ * (those are served through `/files` too, see lib/file-url.ts).
+ */
 export function isStoredHere(url: string | null | undefined): boolean {
   if (!url) return false;
-  const base = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  if (!base) return false;
-  try {
-    const u = new URL(url);
-    const b = new URL(base);
-    return u.host === b.host && u.pathname.includes("/storage/v1/object/");
-  } catch {
-    return false;
-  }
+  if (url.startsWith(HUB_FILE_PREFIX)) return true;
+  return hubFile(url).startsWith(HUB_FILE_PREFIX);
 }
 
 function slugify(text: string): string {
@@ -127,14 +126,22 @@ export async function storeInBucket(
   }
 }
 
-/** Remove an object from the publications bucket, given its public URL. */
+/**
+ * Remove an object from the publications bucket, given its public URL.
+ *
+ * A file whose address is in print is never removed: replacing a document in
+ * the Hub must not turn the address on a banner or a leaflet into a dead link.
+ */
 export async function removeFromBucket(url: string | null | undefined): Promise<void> {
   if (!isStoredHere(url)) return;
   try {
-    const path = new URL(url as string).pathname.split(`/${PUBLICATIONS_BUCKET}/`)[1];
-    if (!path) return;
+    const prefix = `${HUB_FILE_PREFIX}${PUBLICATIONS_BUCKET}/`;
+    const mapped = hubFile(url).split("?")[0];
+    if (!mapped.startsWith(prefix)) return;
+    const path = decodeURIComponent(mapped.slice(prefix.length));
+    if (!path || isPrintedFile(PUBLICATIONS_BUCKET, path)) return;
     const admin = createAdminClient();
-    await admin.storage.from(PUBLICATIONS_BUCKET).remove([decodeURIComponent(path)]);
+    await admin.storage.from(PUBLICATIONS_BUCKET).remove([path]);
   } catch {
     // A file that cannot be removed is not worth failing the request over.
   }
